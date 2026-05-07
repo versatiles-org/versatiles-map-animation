@@ -56,17 +56,19 @@
 		</div>
 	{/if}
 
-	<div class="map-area">
-		<MapStage {store} />
-		<div class="readout-overlay">
-			<CameraReadout {store} />
-		</div>
-		{#if store.keyframes.length === 0}
-			<div class="empty-overlay">
-				Compose a shot, then click <strong>+ Add KF</strong>. Or try
-				<strong>★ Load example</strong>.
+	<div class="stage-wrap">
+		<div class="map-area">
+			<MapStage {store} />
+			<div class="readout-overlay">
+				<CameraReadout {store} />
 			</div>
-		{/if}
+			{#if store.keyframes.length === 0}
+				<div class="empty-overlay">
+					Compose a shot, then click <strong>+ Add KF</strong>. Or try
+					<strong>★ Load example</strong>.
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	<Toolbar {store} />
@@ -136,10 +138,19 @@
 		color: #fff;
 	}
 
-	.map-area {
-		position: relative;
+	.stage-wrap {
 		flex: 1 1 auto;
 		min-height: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		container-type: size;
+	}
+	.map-area {
+		position: relative;
+		box-sizing: border-box;
+		width: min(100cqw, calc(100cqh * 16 / 9));
+		aspect-ratio: 16 / 9;
 		border: 1px solid #222;
 		border-radius: 4px;
 		overflow: hidden;
