@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { AnimationStore } from '$lib/animation.svelte';
 	import { readAnimationFromUrl } from '$lib/url_state';
 	import MapStage from '$lib/components/MapStage.svelte';
@@ -7,14 +6,13 @@
 	const store = new AnimationStore();
 	let loadError = $state<string | null>(null);
 
-	onMount(() => {
-		try {
-			const anim = readAnimationFromUrl();
-			if (anim) store.loadFromAnimation(anim);
-		} catch (err) {
-			loadError = err instanceof Error ? err.message : 'Could not load animation.';
-		}
-	});
+	// Load before MapStage mounts so the map is built with the correct style/terrain.
+	try {
+		const anim = readAnimationFromUrl();
+		if (anim) store.loadFromAnimation(anim);
+	} catch (err) {
+		loadError = err instanceof Error ? err.message : 'Could not load animation.';
+	}
 
 	function onPlay() {
 		if (store.currentTime >= store.totalDuration) store.currentTime = 0;

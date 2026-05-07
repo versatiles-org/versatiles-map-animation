@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { AnimationStore } from '$lib/animation.svelte';
 	import { clearUrlHash, readAnimationFromUrl, writeAnimationToUrl } from '$lib/url_state';
 	import MapStage from '$lib/components/MapStage.svelte';
@@ -9,20 +8,20 @@
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
 
-	onMount(() => {
-		try {
-			const fromUrl = readAnimationFromUrl();
-			if (fromUrl) store.loadFromAnimation(fromUrl);
-		} catch (err) {
-			urlError = err instanceof Error ? err.message : 'Could not load shared link.';
-			clearUrlHash();
-		}
-	});
+	// Load before children mount so MapStage sees the correct style/terrain on first build.
+	try {
+		const fromUrl = readAnimationFromUrl();
+		if (fromUrl) store.loadFromAnimation(fromUrl);
+	} catch (err) {
+		urlError = err instanceof Error ? err.message : 'Could not load shared link.';
+		clearUrlHash();
+	}
 
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
 		void store.keyframes;
 		void store.style;
+		void store.terrain;
 		if (urlTimer) clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
 			writeAnimationToUrl(store.toAnimation());
