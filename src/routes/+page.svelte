@@ -5,7 +5,6 @@
 	import MapStage from '$lib/components/MapStage.svelte';
 	import Timeline from '$lib/components/Timeline.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
-	import CameraReadout from '$lib/components/CameraReadout.svelte';
 
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
@@ -59,9 +58,6 @@
 	<div class="stage-wrap">
 		<div class="map-area">
 			<MapStage {store} />
-			<div class="readout-overlay">
-				<CameraReadout {store} />
-			</div>
 			{#if store.keyframes.length === 0}
 				<div class="empty-overlay">
 					Compose a shot, then click <strong>+ Add KF</strong>. Or try
@@ -154,13 +150,6 @@
 		border: 1px solid #222;
 		border-radius: 4px;
 		overflow: hidden;
-	}
-	.readout-overlay {
-		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		z-index: 1;
-		max-width: calc(100% - 1rem);
 	}
 	.empty-overlay {
 		position: absolute;
