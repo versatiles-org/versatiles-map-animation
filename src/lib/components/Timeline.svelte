@@ -17,11 +17,26 @@
 		return (x / rect.width) * visualDuration;
 	}
 
-	function onTrackClick(e: MouseEvent) {
+	function startScrub(e: PointerEvent) {
 		const target = e.target as HTMLElement;
-		if (target.closest('.marker') || target.closest('.playhead')) return;
+		if (target.closest('.marker')) return;
+		e.preventDefault();
+		trackEl.setPointerCapture(e.pointerId);
 		store.pause();
 		store.seekTo(tFromClientX(e.clientX));
+
+		function onMove(ev: PointerEvent) {
+			store.seekTo(tFromClientX(ev.clientX));
+		}
+		function onUp(ev: PointerEvent) {
+			if (trackEl.hasPointerCapture(ev.pointerId)) trackEl.releasePointerCapture(ev.pointerId);
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('pointercancel', onUp);
+		}
+		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointerup', onUp);
+		window.addEventListener('pointercancel', onUp);
 	}
 
 	function startDragMarker(e: PointerEvent, index: number) {
@@ -51,27 +66,6 @@
 		window.addEventListener('pointerup', onUp);
 	}
 
-	function startDragPlayhead(e: PointerEvent) {
-		e.stopPropagation();
-		e.preventDefault();
-		const handle = e.target as HTMLElement;
-		handle.setPointerCapture(e.pointerId);
-		store.pause();
-
-		function onMove(ev: PointerEvent) {
-			store.seekTo(tFromClientX(ev.clientX));
-		}
-
-		function onUp(ev: PointerEvent) {
-			handle.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-		}
-
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-	}
-
 	function fmt(t: number): string {
 		return t.toFixed(2);
 	}
@@ -89,7 +83,7 @@
 		aria-valuemin={0}
 		aria-valuemax={visualDuration}
 		aria-valuenow={store.currentTime}
-		onclick={onTrackClick}
+		onpointerdown={startScrub}
 		onkeydown={() => {}}
 	>
 		{#each Array(tickCount) as _, i (i)}
@@ -112,15 +106,9 @@
 			</button>
 		{/each}
 
-		<div class="playhead" style="left: {pct(store.currentTime)}%">
+		<div class="playhead" style="left: {pct(store.currentTime)}%" aria-hidden="true">
 			<div class="playhead-line"></div>
-			<button
-				type="button"
-				class="playhead-handle"
-				onpointerdown={startDragPlayhead}
-				aria-label="Playhead"
-				title="Playhead at {fmt(store.currentTime)}s"
-			></button>
+			<div class="playhead-handle" title="Playhead at {fmt(store.currentTime)}s"></div>
 		</div>
 	</div>
 
@@ -221,8 +209,9 @@
 		background: #ff4a4a;
 		border: 1px solid #fff;
 		border-radius: 50%;
-		padding: 0;
-		pointer-events: auto;
+		pointer-events: none;
+	}
+	.track:active {
 		cursor: ew-resize;
 	}
 	.time-readout {
