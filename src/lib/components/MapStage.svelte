@@ -49,7 +49,8 @@
 			zoom: DEFAULT_INITIAL_VIEW.zoom,
 			pitch: DEFAULT_INITIAL_VIEW.pitch,
 			bearing: DEFAULT_INITIAL_VIEW.bearing,
-			roll: DEFAULT_INITIAL_VIEW.roll
+			roll: DEFAULT_INITIAL_VIEW.roll,
+			maxPitch: 90
 		});
 		map.on('move', () => {
 			if (!map) return;

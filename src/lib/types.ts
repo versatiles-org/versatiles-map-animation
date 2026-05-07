@@ -22,7 +22,7 @@ export interface Keyframe {
 	lng: number;
 	lat: number;
 	zoom: number;
-	/** 0..85 degrees */
+	/** 0..90 degrees */
 	pitch: number;
 	/** -180..180 degrees */
 	bearing: number;
