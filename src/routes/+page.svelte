@@ -77,6 +77,7 @@
 	:global(html, body) {
 		margin: 0;
 		padding: 0;
+		height: 100%;
 		background: #0d1117;
 		color: #e6edf3;
 		font-family:
@@ -85,14 +86,14 @@
 			'Segoe UI',
 			Roboto,
 			sans-serif;
+		overflow: hidden;
 	}
 
 	.page {
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		max-width: 80rem;
-		margin: 0 auto;
+		height: 100dvh;
 		padding: 1rem;
 		box-sizing: border-box;
 		color-scheme: dark;
@@ -137,8 +138,8 @@
 
 	.map-area {
 		position: relative;
-		height: 64vh;
-		min-height: 360px;
+		flex: 1 1 auto;
+		min-height: 0;
 		border: 1px solid #222;
 		border-radius: 4px;
 		overflow: hidden;
