@@ -41,15 +41,16 @@
 	onMount(async () => {
 		const initialId = untrack(() => store.style);
 		const initialTerrain = untrack(() => store.terrain);
+		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
 		const style = await buildMapStyle(initialId, initialTerrain);
 		map = new maplibregl.Map({
 			container,
 			style,
-			center: [DEFAULT_INITIAL_VIEW.lng, DEFAULT_INITIAL_VIEW.lat],
-			zoom: DEFAULT_INITIAL_VIEW.zoom,
-			pitch: DEFAULT_INITIAL_VIEW.pitch,
-			bearing: DEFAULT_INITIAL_VIEW.bearing,
-			roll: DEFAULT_INITIAL_VIEW.roll,
+			center: [initialCam.lng, initialCam.lat],
+			zoom: initialCam.zoom,
+			pitch: initialCam.pitch,
+			bearing: initialCam.bearing,
+			roll: initialCam.roll,
 			maxPitch: 90
 		});
 		map.on('move', () => {
