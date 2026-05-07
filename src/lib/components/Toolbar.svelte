@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
 	import { SCHEMA_VERSION } from '../types';
@@ -7,9 +8,13 @@
 	let { store }: { store: AnimationStore } = $props();
 
 	let fileInput: HTMLInputElement;
+	let embedInput = $state<HTMLInputElement | undefined>(undefined);
 	let importError = $state<string | null>(null);
 	let shareState = $state<'idle' | 'copied' | 'error'>('idle');
 	let shareTimer: ReturnType<typeof setTimeout> | undefined;
+	let embedOpen = $state(false);
+	let embedCopied = $state(false);
+	let embedCopyTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function onAdd() {
 		store.addKeyframeFromCamera(store.liveCamera);
@@ -72,6 +77,37 @@
 		store.reset();
 	}
 
+	function buildEmbedSnippet(): string {
+		const encoded = encodeAnimation(store.toAnimation());
+		const url = `${window.location.origin}${base}/view#kf=${encoded}`;
+		return `<iframe src="${url}" style="width:100%;aspect-ratio:16/9;border:0" loading="lazy" allowfullscreen></iframe>`;
+	}
+
+	function onToggleEmbed() {
+		if (store.keyframes.length === 0) return;
+		embedOpen = !embedOpen;
+		embedCopied = false;
+		if (embedOpen) {
+			queueMicrotask(() => embedInput?.select());
+		}
+	}
+
+	async function onCopyEmbed() {
+		if (!embedInput) return;
+		try {
+			await navigator.clipboard.writeText(embedInput.value);
+			embedCopied = true;
+		} catch {
+			embedInput.select();
+			document.execCommand?.('copy');
+			embedCopied = true;
+		}
+		if (embedCopyTimer) clearTimeout(embedCopyTimer);
+		embedCopyTimer = setTimeout(() => {
+			embedCopied = false;
+		}, 1800);
+	}
+
 	function onLoadExample() {
 		store.loadFromAnimation({
 			version: SCHEMA_VERSION,
@@ -99,6 +135,7 @@
 
 	const hasSelection = $derived(store.selectedIndex !== null);
 	const canPlay = $derived(store.keyframes.length >= 2);
+	const embedSnippet = $derived(embedOpen && store.keyframes.length > 0 ? buildEmbedSnippet() : '');
 </script>
 
 <div class="toolbar">
@@ -140,6 +177,16 @@
 				🔗 Share URL
 			{/if}
 		</button>
+		<button
+			type="button"
+			onclick={onToggleEmbed}
+			disabled={store.keyframes.length === 0}
+			class:active={embedOpen}
+			title="Get an iframe snippet to embed this animation"
+			aria-expanded={embedOpen}
+		>
+			🖼 Embed
+		</button>
 		<button type="button" onclick={onExport} disabled={store.keyframes.length === 0}
 			>↓ Export JSON</button
 		>
@@ -160,6 +207,27 @@
 {#if importError}
 	<div class="import-error" role="alert">
 		Import failed: {importError}
+	</div>
+{/if}
+
+{#if embedOpen}
+	<div class="embed-panel" role="region" aria-label="Embed snippet">
+		<label for="embed-input">Paste this into your page:</label>
+		<div class="embed-row">
+			<input
+				id="embed-input"
+				bind:this={embedInput}
+				type="text"
+				readonly
+				value={embedSnippet}
+				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
+			/>
+			<button type="button" onclick={onCopyEmbed} class:copied={embedCopied} title="Copy snippet">
+				{embedCopied ? '✓ Copied' : '⧉ Copy'}
+			</button>
+			<button type="button" onclick={onToggleEmbed} aria-label="Close" title="Close">✕</button>
+		</div>
+		<p class="hint">The iframe scales to its container at a fixed 16:9 aspect ratio.</p>
 	</div>
 {/if}
 
@@ -219,5 +287,51 @@
 		border-radius: 4px;
 		color: #ffaaaa;
 		font-size: 13px;
+	}
+
+	button.active {
+		background: rgba(74, 158, 255, 0.18);
+		border-color: #4a9eff;
+		color: #cfe4ff;
+	}
+
+	.embed-panel {
+		margin-top: 0.5rem;
+		padding: 0.6rem 0.75rem;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid #333;
+		border-radius: 4px;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.embed-panel label {
+		font-size: 12px;
+		color: #aaa;
+	}
+	.embed-row {
+		display: flex;
+		gap: 0.4rem;
+		align-items: stretch;
+	}
+	.embed-row input {
+		flex: 1 1 auto;
+		min-width: 0;
+		padding: 0.4rem 0.6rem;
+		background: #0d1117;
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 12px;
+	}
+	.embed-row input:focus {
+		outline: none;
+		border-color: #4a9eff;
+	}
+	.embed-panel .hint {
+		margin: 0;
+		font-size: 11px;
+		color: #888;
 	}
 </style>
