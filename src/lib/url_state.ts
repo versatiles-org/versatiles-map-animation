@@ -1,5 +1,5 @@
-import { DEFAULT_STYLE, SCHEMA_VERSION } from './types';
-import type { Animation, Keyframe } from './types';
+import { DEFAULT_STYLE, DEFAULT_TERRAIN, isMapStyleId, SCHEMA_VERSION } from './types';
+import type { Animation, Keyframe, MapStyleId } from './types';
 
 const HASH_KEY = 'kf';
 
@@ -29,7 +29,8 @@ const FIRST_KF_DEFAULTS: Record<Field, number> = {
 type CompactKeyframe = Partial<Record<Field, number>>;
 interface CompactAnimation {
 	version: number;
-	style?: string;
+	style?: MapStyleId;
+	terrain?: boolean;
 	keyframes: CompactKeyframe[];
 }
 
@@ -58,6 +59,7 @@ function roundKeyframe(kf: Keyframe): Keyframe {
 export function toCompact(anim: Animation): CompactAnimation {
 	const out: CompactAnimation = { version: anim.version, keyframes: [] };
 	if (anim.style && anim.style !== DEFAULT_STYLE) out.style = anim.style;
+	if (anim.terrain !== DEFAULT_TERRAIN) out.terrain = anim.terrain;
 
 	let prev: Keyframe | null = null;
 	for (const raw of anim.keyframes) {
@@ -98,7 +100,8 @@ export function fromCompact(input: unknown): Animation {
 		);
 	}
 	if (!Array.isArray(obj.keyframes)) throw new Error('Invalid: "keyframes" missing');
-	const style = typeof obj.style === 'string' ? obj.style : DEFAULT_STYLE;
+	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : DEFAULT_STYLE;
+	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
 
 	const keyframes: Keyframe[] = [];
 	let prev: Keyframe | null = null;
@@ -124,7 +127,7 @@ export function fromCompact(input: unknown): Animation {
 		keyframes.push(kf);
 		prev = kf;
 	}
-	return { version: SCHEMA_VERSION, style, keyframes };
+	return { version: SCHEMA_VERSION, style, terrain, keyframes };
 }
 
 function toBase64Url(s: string): string {

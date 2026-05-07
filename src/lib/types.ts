@@ -1,6 +1,20 @@
 export const SCHEMA_VERSION = 1;
 
-export const DEFAULT_STYLE = 'colorful';
+export const MAP_STYLE_IDS = ['colorful', 'satellite', 'satellite-overlay'] as const;
+export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
+
+export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
+	colorful: 'Colorful',
+	satellite: 'Satellite',
+	'satellite-overlay': 'Satellite + overlay'
+};
+
+export const DEFAULT_STYLE: MapStyleId = 'colorful';
+export const DEFAULT_TERRAIN = false;
+
+export function isMapStyleId(value: unknown): value is MapStyleId {
+	return typeof value === 'string' && (MAP_STYLE_IDS as readonly string[]).includes(value);
+}
 
 export interface Keyframe {
 	/** seconds, absolute, monotonically increasing */
@@ -20,7 +34,8 @@ export type CameraState = Omit<Keyframe, 't'>;
 
 export interface Animation {
 	version: number;
-	style: string;
+	style: MapStyleId;
+	terrain: boolean;
 	keyframes: Keyframe[];
 }
 
@@ -37,6 +52,7 @@ export function createEmptyAnimation(): Animation {
 	return {
 		version: SCHEMA_VERSION,
 		style: DEFAULT_STYLE,
+		terrain: DEFAULT_TERRAIN,
 		keyframes: []
 	};
 }

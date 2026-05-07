@@ -4,9 +4,10 @@ import {
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
 	DEFAULT_STYLE,
+	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
 } from './types';
-import type { Animation, CameraState, Keyframe } from './types';
+import type { Animation, CameraState, Keyframe, MapStyleId } from './types';
 
 const MIN_TIME_GAP = 0.01;
 
@@ -15,7 +16,8 @@ export class AnimationStore {
 	currentTime = $state(0);
 	isPlaying = $state(false);
 	selectedIndex = $state<number | null>(null);
-	style = $state(DEFAULT_STYLE);
+	style = $state<MapStyleId>(DEFAULT_STYLE);
+	terrain = $state(DEFAULT_TERRAIN);
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 
@@ -121,6 +123,7 @@ export class AnimationStore {
 	loadFromAnimation(anim: Animation): void {
 		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
 		this.style = anim.style ?? DEFAULT_STYLE;
+		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
 		this.selectedIndex = null;
 		this.currentTime = 0;
 		this.isPlaying = false;
@@ -130,6 +133,7 @@ export class AnimationStore {
 		return {
 			version: SCHEMA_VERSION,
 			style: this.style,
+			terrain: this.terrain,
 			keyframes: this.keyframes.map((kf) => ({ ...kf }))
 		};
 	}

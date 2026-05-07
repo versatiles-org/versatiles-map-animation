@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { SCHEMA_VERSION } from '../types';
+	import { DEFAULT_TERRAIN, MAP_STYLE_IDS, MAP_STYLE_LABELS, SCHEMA_VERSION } from '../types';
 	import { encodeAnimation } from '../url_state';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -112,6 +112,7 @@
 		store.loadFromAnimation({
 			version: SCHEMA_VERSION,
 			style: 'colorful',
+			terrain: DEFAULT_TERRAIN,
 			keyframes: [
 				{ t: 0, lng: 0, lat: 30, zoom: 1.5, pitch: 0, bearing: 0, roll: 0 },
 				{ t: 3, lng: 13.405, lat: 52.52, zoom: 9, pitch: 60, bearing: 30, roll: 0 },
@@ -143,6 +144,21 @@
 		<button type="button" onclick={onAdd}>+ Add KF</button>
 		<button type="button" onclick={onUpdate} disabled={!hasSelection}>↻ Update KF</button>
 		<button type="button" onclick={onDelete} disabled={!hasSelection}>✕ Delete KF</button>
+	</div>
+
+	<div class="group map-controls">
+		<label class="control-label" title="Base map style">
+			Map
+			<select bind:value={store.style}>
+				{#each MAP_STYLE_IDS as id (id)}
+					<option value={id}>{MAP_STYLE_LABELS[id]}</option>
+				{/each}
+			</select>
+		</label>
+		<label class="control-label checkbox" title="Toggle 3D terrain">
+			<input type="checkbox" bind:checked={store.terrain} />
+			Terrain
+		</label>
 	</div>
 
 	<div class="group">
@@ -293,6 +309,39 @@
 		background: rgba(74, 158, 255, 0.18);
 		border-color: #4a9eff;
 		color: #cfe4ff;
+	}
+
+	.map-controls {
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.control-label {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: 12px;
+		color: #aaa;
+	}
+	.control-label select {
+		padding: 0.35rem 0.5rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font-size: 13px;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.control-label select:hover {
+		border-color: #4a9eff;
+	}
+	.control-label.checkbox {
+		cursor: pointer;
+		user-select: none;
+	}
+	.control-label.checkbox input {
+		margin: 0;
+		accent-color: #4a9eff;
 	}
 
 	.embed-panel {

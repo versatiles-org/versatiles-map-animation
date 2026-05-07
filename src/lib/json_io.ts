@@ -1,4 +1,12 @@
-import { SCHEMA_VERSION, type Animation, type Keyframe } from './types';
+import {
+	DEFAULT_STYLE,
+	DEFAULT_TERRAIN,
+	isMapStyleId,
+	SCHEMA_VERSION,
+	type Animation,
+	type Keyframe,
+	type MapStyleId
+} from './types';
 
 export function downloadAnimation(anim: Animation, filename = 'map-animation.json'): void {
 	const json = JSON.stringify(anim, null, 2);
@@ -36,7 +44,8 @@ export function validateAnimation(input: unknown): Animation {
 			`File was made with a newer version (v${version}); this tool supports v${SCHEMA_VERSION}.`
 		);
 	}
-	const style = typeof obj.style === 'string' ? obj.style : 'colorful';
+	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : DEFAULT_STYLE;
+	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
 	if (!Array.isArray(obj.keyframes)) {
 		throw new Error('Invalid file: "keyframes" missing or not an array.');
 	}
@@ -62,5 +71,5 @@ export function validateAnimation(input: unknown): Animation {
 			roll: num('roll')
 		};
 	});
-	return { version: SCHEMA_VERSION, style, keyframes };
+	return { version: SCHEMA_VERSION, style, terrain, keyframes };
 }

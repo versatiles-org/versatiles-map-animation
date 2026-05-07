@@ -1,9 +1,9 @@
 <script lang="ts">
 	import maplibregl from 'maplibre-gl';
-	import { colorful } from '@versatiles/style';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import type { AnimationStore } from '../animation.svelte';
+	import { buildMapStyle } from '../map_style';
 	import { DEFAULT_INITIAL_VIEW, type CameraState } from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -36,8 +36,12 @@
 		});
 	}
 
-	onMount(() => {
-		const style = colorful({ baseUrl: 'https://tiles.versatiles.org' });
+	let initialStyleApplied = false;
+
+	onMount(async () => {
+		const initialId = untrack(() => store.style);
+		const initialTerrain = untrack(() => store.terrain);
+		const style = await buildMapStyle(initialId, initialTerrain);
 		map = new maplibregl.Map({
 			container,
 			style,
@@ -48,8 +52,10 @@
 			roll: DEFAULT_INITIAL_VIEW.roll
 		});
 		map.on('move', () => {
+			if (!map) return;
 			store.liveCamera = readCamera();
 		});
+		initialStyleApplied = true;
 	});
 
 	onDestroy(() => {
@@ -89,6 +95,20 @@
 		const cam = store.sampledCamera;
 		if (!cam || !map) return;
 		applyCamera(cam);
+	});
+
+	$effect(() => {
+		const id = store.style;
+		const terrain = store.terrain;
+		if (!map || !initialStyleApplied) return;
+		let cancelled = false;
+		buildMapStyle(id, terrain).then((newStyle) => {
+			if (cancelled || !map) return;
+			map.setStyle(newStyle, { diff: false });
+		});
+		return () => {
+			cancelled = true;
+		};
 	});
 </script>
 
