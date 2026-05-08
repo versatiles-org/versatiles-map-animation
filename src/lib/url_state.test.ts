@@ -127,6 +127,38 @@ describe('encode/decode round-trip', () => {
 		expect(decoded?.style).toBe('colorful');
 	});
 
+	it('round-trips per-keyframe path', () => {
+		const anim = {
+			...example,
+			keyframes: [
+				{ ...example.keyframes[0] },
+				{ ...example.keyframes[1], path: 'linear' as const },
+				{ ...example.keyframes[2], path: 'linear' as const }
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		// Default 'arc' on kf0 is omitted from the wire and reconstructed as undefined.
+		expect(decoded?.keyframes[0].path).toBeUndefined();
+		expect(decoded?.keyframes[1].path).toBe('linear');
+		// Carry-forward: kf2 had path='linear' explicitly; the encoder omitted
+		// the field because it matched kf1, and the decoder inherits it.
+		expect(decoded?.keyframes[2].path).toBe('linear');
+	});
+
+	it('explicit revert to arc on a later keyframe is preserved', () => {
+		const anim = {
+			...example,
+			keyframes: [
+				{ ...example.keyframes[0] },
+				{ ...example.keyframes[1], path: 'linear' as const },
+				{ ...example.keyframes[2] } // path undefined (= arc), overriding the prior linear
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.keyframes[1].path).toBe('linear');
+		expect(decoded?.keyframes[2].path).toBeUndefined();
+	});
+
 	it('produces URL-safe characters only', () => {
 		expect(encodeAnimation(example)).toMatch(/^[A-Za-z0-9_-]+$/);
 	});

@@ -1,9 +1,15 @@
-import { DEFAULT_STYLE, DEFAULT_TERRAIN, isMapStyleId, SCHEMA_VERSION } from './types';
-import type { Animation, Keyframe, MapStyleId } from './types';
+import {
+	DEFAULT_PATH,
+	DEFAULT_STYLE,
+	DEFAULT_TERRAIN,
+	isMapStyleId,
+	SCHEMA_VERSION
+} from './types';
+import type { Animation, Keyframe, MapStyleId, PathStyle } from './types';
 
 const HASH_KEY = 'kf';
 
-const FIELDS = ['t', 'lng', 'lat', 'zoom', 'pitch', 'bearing', 'roll'] as const;
+const FIELDS = ['t', 'lng', 'lat', 'zoom', 'pitch', 'bearing', 'roll', 'path'] as const;
 type Field = (typeof FIELDS)[number];
 
 const ROUND_DECIMALS: Record<Field, number> = {
@@ -13,7 +19,8 @@ const ROUND_DECIMALS: Record<Field, number> = {
 	zoom: 4,
 	pitch: 2,
 	bearing: 2,
-	roll: 2
+	roll: 2,
+	path: 0
 };
 
 const FIRST_KF_DEFAULTS: Record<Field, number> = {
@@ -23,8 +30,16 @@ const FIRST_KF_DEFAULTS: Record<Field, number> = {
 	zoom: 0,
 	pitch: 0,
 	bearing: 0,
-	roll: 0
+	roll: 0,
+	path: 0
 };
+
+function pathToCode(p: PathStyle | undefined): number {
+	return p === 'linear' ? 1 : 0;
+}
+function codeToPath(n: number): PathStyle {
+	return n === 1 ? 'linear' : 'arc';
+}
 
 type CompactKeyframe = Partial<Record<Field, number>>;
 interface CompactAnimation {
@@ -39,7 +54,9 @@ function round(x: number, decimals: number): number {
 	return Math.round(x * m) / m;
 }
 
-function roundKeyframe(kf: Keyframe): Keyframe {
+type NumKeyframe = Record<Field, number>;
+
+function toNumKeyframe(kf: Keyframe): NumKeyframe {
 	return {
 		t: round(kf.t, ROUND_DECIMALS.t),
 		lng: round(kf.lng, ROUND_DECIMALS.lng),
@@ -47,7 +64,8 @@ function roundKeyframe(kf: Keyframe): Keyframe {
 		zoom: round(kf.zoom, ROUND_DECIMALS.zoom),
 		pitch: round(kf.pitch, ROUND_DECIMALS.pitch),
 		bearing: round(kf.bearing, ROUND_DECIMALS.bearing),
-		roll: round(kf.roll, ROUND_DECIMALS.roll)
+		roll: round(kf.roll, ROUND_DECIMALS.roll),
+		path: pathToCode(kf.path)
 	};
 }
 
@@ -61,20 +79,10 @@ export function toCompact(anim: Animation): CompactAnimation {
 	if (anim.style && anim.style !== DEFAULT_STYLE) out.style = anim.style;
 	if (anim.terrain !== DEFAULT_TERRAIN) out.terrain = anim.terrain;
 
-	let prev: Keyframe | null = null;
+	let prev: NumKeyframe | null = null;
 	for (const raw of anim.keyframes) {
-		const kf = roundKeyframe(raw);
-		const reference: Record<Field, number> = prev
-			? {
-					t: prev.t,
-					lng: prev.lng,
-					lat: prev.lat,
-					zoom: prev.zoom,
-					pitch: prev.pitch,
-					bearing: prev.bearing,
-					roll: prev.roll
-				}
-			: FIRST_KF_DEFAULTS;
+		const kf = toNumKeyframe(raw);
+		const reference: NumKeyframe = prev ?? FIRST_KF_DEFAULTS;
 		const compact: CompactKeyframe = {};
 		for (const field of FIELDS) {
 			if (kf[field] !== reference[field]) compact[field] = kf[field];
@@ -104,7 +112,7 @@ export function fromCompact(input: unknown): Animation {
 	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
 
 	const keyframes: Keyframe[] = [];
-	let prev: Keyframe | null = null;
+	let prev: NumKeyframe | null = null;
 	for (let i = 0; i < obj.keyframes.length; i++) {
 		const raw = obj.keyframes[i];
 		if (!raw || typeof raw !== 'object') throw new Error(`Keyframe ${i}: not an object`);
@@ -115,17 +123,29 @@ export function fromCompact(input: unknown): Animation {
 			if (typeof v === 'number' && Number.isFinite(v)) return v;
 			throw new Error(`Keyframe ${i}: invalid "${field}"`);
 		};
-		const kf: Keyframe = {
+		const num: NumKeyframe = {
 			t: get('t'),
 			lng: get('lng'),
 			lat: get('lat'),
 			zoom: get('zoom'),
 			pitch: get('pitch'),
 			bearing: get('bearing'),
-			roll: get('roll')
+			roll: get('roll'),
+			path: get('path')
 		};
+		const kf: Keyframe = {
+			t: num.t,
+			lng: num.lng,
+			lat: num.lat,
+			zoom: num.zoom,
+			pitch: num.pitch,
+			bearing: num.bearing,
+			roll: num.roll
+		};
+		const path = codeToPath(num.path);
+		if (path !== DEFAULT_PATH) kf.path = path;
 		keyframes.push(kf);
-		prev = kf;
+		prev = num;
 	}
 	return { version: SCHEMA_VERSION, style, terrain, keyframes };
 }

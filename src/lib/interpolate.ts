@@ -120,7 +120,14 @@ function vanWijkSample(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number):
 
 export function interpolateKeyframes(kfA: Keyframe, kfB: Keyframe, alpha: number): CameraState {
 	const eased = easeInOut(alpha);
-	const { lng, lat, zoom } = vanWijkSample(kfA, kfB, eased);
+	// `path` lives on the *origin* keyframe and describes the shape of the
+	// trajectory leaving it. `linear` is a direct lerp through
+	// (lng, lat, zoom) — the right choice for tiny moves where van Wijk's
+	// out-and-back arc feels theatrical.
+	const useArc = (kfA.path ?? 'arc') !== 'linear';
+	const { lng, lat, zoom } = useArc
+		? vanWijkSample(kfA, kfB, eased)
+		: linearLngLatZoom(kfA, kfB, eased);
 	return {
 		lng,
 		lat,
@@ -128,6 +135,17 @@ export function interpolateKeyframes(kfA: Keyframe, kfB: Keyframe, alpha: number
 		pitch: lerp(kfA.pitch, kfB.pitch, eased),
 		bearing: lerpAngle(kfA.bearing, kfB.bearing, eased),
 		roll: lerpAngle(kfA.roll, kfB.roll, eased)
+	};
+}
+
+function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number): ZoomedPosition {
+	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
+	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
+	const dlng = shortestLngDelta(kfA.lng, kfB.lng);
+	return {
+		lng: normalizeLng(kfA.lng + dlng * alpha),
+		lat: lerp(kfA.lat, kfB.lat, alpha),
+		zoom: lerp(kfA.zoom, kfB.zoom, alpha)
 	};
 }
 

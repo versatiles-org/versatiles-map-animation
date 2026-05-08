@@ -7,7 +7,7 @@ import {
 	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
 } from './types';
-import type { Animation, CameraState, Keyframe, MapStyleId } from './types';
+import type { Animation, CameraState, Keyframe, MapStyleId, PathStyle } from './types';
 
 const MIN_TIME_GAP = 0.01;
 
@@ -66,6 +66,21 @@ export class AnimationStore {
 		} else if (this.selectedIndex !== null && this.selectedIndex > index) {
 			this.selectedIndex -= 1;
 		}
+	}
+
+	/** Set the trajectory style used to reach this keyframe from the previous one. */
+	setKeyframePath(index: number, path: PathStyle): void {
+		if (index < 0 || index >= this.keyframes.length) return;
+		const kf = this.keyframes[index];
+		if (!kf) return;
+		const updated: Keyframe = { ...kf };
+		if (path === 'arc') delete updated.path;
+		else updated.path = path;
+		this.keyframes = [
+			...this.keyframes.slice(0, index),
+			updated,
+			...this.keyframes.slice(index + 1)
+		];
 	}
 
 	/** Move a keyframe in time, clamped to a 0.01s buffer from neighbors. */

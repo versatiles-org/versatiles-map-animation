@@ -183,6 +183,27 @@
 		>
 			✕ Delete
 		</button>
+		<label
+			class="control-label path-picker"
+			title="Trajectory shape from the selected keyframe to the next one"
+		>
+			<span class="lbl">Path →</span>
+			<select
+				value={store.selectedKeyframe?.path ?? 'arc'}
+				disabled={!hasSelection || store.selectedIndex === store.keyframes.length - 1}
+				onchange={(e) => {
+					if (store.selectedIndex !== null) {
+						store.setKeyframePath(
+							store.selectedIndex,
+							(e.currentTarget as HTMLSelectElement).value as 'arc' | 'linear'
+						);
+					}
+				}}
+			>
+				<option value="arc">⌒ Arc</option>
+				<option value="linear">— Linear</option>
+			</select>
+		</label>
 	</div>
 
 	<div class="group playback">
@@ -285,6 +306,37 @@
 		letter-spacing: 0.06em;
 		color: #777;
 		margin-right: 0.15rem;
+	}
+	.path-picker {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin-left: 0.4rem;
+		font-size: 12px;
+		color: #aaa;
+	}
+	.path-picker .lbl {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #777;
+	}
+	.path-picker select {
+		padding: 0.3rem 0.45rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font-size: 13px;
+		font-family: inherit;
+		cursor: pointer;
+	}
+	.path-picker select:hover:not(:disabled) {
+		border-color: #4a9eff;
+	}
+	.path-picker select:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 	.spacer {
 		flex: 1 1 auto;

@@ -88,6 +88,25 @@ describe('interpolateKeyframes', () => {
 		const out = interpolateKeyframes(c, d, 0.5);
 		expect(out.zoom).toBeLessThan(linearMidZoom);
 	});
+	it('respects origin path: "linear" — direct lerp, no zoom-out arc', () => {
+		// path is on the *origin* keyframe (kfA) and describes the trajectory
+		// LEAVING it.
+		const c: Keyframe = {
+			t: 0,
+			lng: 0,
+			lat: 0,
+			zoom: 8,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			path: 'linear'
+		};
+		const d: Keyframe = { t: 10, lng: 30, lat: 30, zoom: 8, pitch: 0, bearing: 0, roll: 0 };
+		const out = interpolateKeyframes(c, d, 0.5);
+		// Both endpoints at zoom 8 → midpoint should be exactly 8 with linear path.
+		expect(out.zoom).toBeCloseTo(8, 5);
+		expect(out.lat).toBeCloseTo(15, 5);
+	});
 });
 
 describe('sampleAt', () => {

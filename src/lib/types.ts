@@ -1,5 +1,13 @@
 export const SCHEMA_VERSION = 1;
 
+export const PATH_STYLES = ['arc', 'linear'] as const;
+export type PathStyle = (typeof PATH_STYLES)[number];
+export const DEFAULT_PATH: PathStyle = 'arc';
+
+export function isPathStyle(value: unknown): value is PathStyle {
+	return typeof value === 'string' && (PATH_STYLES as readonly string[]).includes(value);
+}
+
 export const MAP_STYLE_IDS = ['colorful', 'satellite', 'satellite-overlay'] as const;
 export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
 
@@ -28,9 +36,16 @@ export interface Keyframe {
 	bearing: number;
 	/** -180..180 degrees */
 	roll: number;
+	/**
+	 * Shape of the trajectory leaving this keyframe — i.e., the path used to
+	 * interpolate from this keyframe to the *next* one. `arc` (default) uses
+	 * van Wijk smooth zoom-and-pan; `linear` lerps each field directly.
+	 * Ignored for the last keyframe.
+	 */
+	path?: PathStyle;
 }
 
-export type CameraState = Omit<Keyframe, 't'>;
+export type CameraState = Omit<Keyframe, 't' | 'path'>;
 
 export interface Animation {
 	version: number;

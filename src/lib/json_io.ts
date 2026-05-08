@@ -2,6 +2,7 @@ import {
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isMapStyleId,
+	isPathStyle,
 	SCHEMA_VERSION,
 	type Animation,
 	type Keyframe,
@@ -61,7 +62,7 @@ export function validateAnimation(input: unknown): Animation {
 			}
 			return v;
 		};
-		return {
+		const kf: Keyframe = {
 			t: num('t'),
 			lng: num('lng'),
 			lat: num('lat'),
@@ -70,6 +71,8 @@ export function validateAnimation(input: unknown): Animation {
 			bearing: num('bearing'),
 			roll: num('roll')
 		};
+		if (isPathStyle(o.path)) kf.path = o.path;
+		return kf;
 	});
 	return { version: SCHEMA_VERSION, style, terrain, keyframes };
 }
