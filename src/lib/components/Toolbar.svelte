@@ -354,14 +354,14 @@
 	}
 	.menu {
 		position: absolute;
-		top: calc(100% + 0.3rem);
+		bottom: calc(100% + 0.3rem);
 		right: 0;
 		min-width: 12rem;
 		padding: 0.3rem;
 		background: #16191f;
 		border: 1px solid #333;
 		border-radius: 6px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
 		display: flex;
 		flex-direction: column;
 		gap: 0.15rem;
