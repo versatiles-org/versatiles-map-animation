@@ -27,12 +27,21 @@
 
 	function applyCamera(cam: CameraState): void {
 		if (!map) return;
-		map.jumpTo({
+		// easeTo + freezeElevation skips MapLibre's per-step elevation tracking,
+		// which would otherwise snap transform.elevation to the focal point's
+		// terrain elevation each frame. Locking it to a fixed reference (set
+		// once after map creation) eliminates two artifacts at once: the camera
+		// "hop" when panning over hills, and the visible jump at integer-zoom
+		// crossings (caused by terrain LOD swaps changing the elevation lookup).
+		map.easeTo({
 			center: [cam.lng, cam.lat],
 			zoom: cam.zoom,
 			pitch: cam.pitch,
 			bearing: cam.bearing,
-			roll: cam.roll
+			roll: cam.roll,
+			duration: 0,
+			animate: false,
+			freezeElevation: true
 		});
 	}
 
@@ -52,13 +61,18 @@
 			bearing: initialCam.bearing,
 			roll: initialCam.roll,
 			maxPitch: 90,
-			attributionControl: { compact: true }
+			attributionControl: { compact: true },
+			centerClampedToGround: false
 		});
 		map.on('move', () => {
 			if (!map) return;
 			store.liveCamera = readCamera();
 		});
 		map.once('load', () => {
+			// Fix the camera's altitude reference at sea level; combined with
+			// `freezeElevation: true` on subsequent easeTo calls, this prevents
+			// MapLibre from updating transform.elevation each frame.
+			map?.setCenterElevation(0);
 			const attrib = container.querySelector('.maplibregl-ctrl-attrib');
 			if (attrib?.classList.contains('maplibregl-compact')) {
 				attrib.classList.remove('maplibregl-compact-show');
