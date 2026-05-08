@@ -1,0 +1,11 @@
+.git
+.github
+.svelte-kit
+build
+node_modules
+out
+**/node_modules
+.vscode
+.idea
+*.log
+.DS_Store

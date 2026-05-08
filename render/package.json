@@ -1,0 +1,11 @@
+{
+	"name": "map-animation-renderer",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Headless offline renderer for versatiles-map-animation. Captures the map animation frame-by-frame from the static /view page and encodes it to MP4 via ffmpeg.",
+	"main": "render.mjs",
+	"dependencies": {
+		"playwright": "^1.59.1"
+	}
+}

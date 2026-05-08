@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { AnimationStore } from '$lib/animation.svelte';
 	import { readAnimationFromUrl } from '$lib/url_state';
 	import MapStage from '$lib/components/MapStage.svelte';
@@ -20,6 +21,25 @@
 	}
 
 	const canPlay = $derived(store.keyframes.length >= 2);
+
+	// Render mode (`?render=1`): the page is being driven by an offline
+	// rendering pipeline (see render/render.mjs). Hide the play overlay and
+	// expose a tiny hook so the renderer can drive the playhead frame-by-frame.
+	const renderMode =
+		typeof window !== 'undefined' &&
+		new URLSearchParams(window.location.search).get('render') === '1';
+
+	onMount(() => {
+		if (!renderMode) return;
+		(window as unknown as { __renderer: unknown }).__renderer = {
+			seekTo(t: number) {
+				store.seekTo(t);
+			},
+			get duration() {
+				return store.totalDuration;
+			}
+		};
+	});
 </script>
 
 <svelte:head>
@@ -33,7 +53,7 @@
 		<div class="message error" role="alert">Failed to load: {loadError}</div>
 	{:else if !canPlay}
 		<div class="message">No animation to play.</div>
-	{:else if !store.isPlaying}
+	{:else if !store.isPlaying && !renderMode}
 		<button type="button" class="play-overlay" onclick={onPlay} aria-label="Play animation">
 			<svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
 				<path d="M8 5v14l11-7z" fill="currentColor" />

@@ -86,6 +86,10 @@
 				attrib.classList.remove('maplibregl-compact-show');
 				attrib.removeAttribute('open');
 			}
+			// Expose the map instance for the offline renderer (see render/).
+			if (new URLSearchParams(window.location.search).get('render') === '1') {
+				(window as unknown as { __map: unknown }).__map = map;
+			}
 		});
 		initialStyleApplied = true;
 	});
