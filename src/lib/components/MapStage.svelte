@@ -51,11 +51,19 @@
 			pitch: initialCam.pitch,
 			bearing: initialCam.bearing,
 			roll: initialCam.roll,
-			maxPitch: 90
+			maxPitch: 90,
+			attributionControl: { compact: true }
 		});
 		map.on('move', () => {
 			if (!map) return;
 			store.liveCamera = readCamera();
+		});
+		map.once('load', () => {
+			const attrib = container.querySelector('.maplibregl-ctrl-attrib');
+			if (attrib?.classList.contains('maplibregl-compact')) {
+				attrib.classList.remove('maplibregl-compact-show');
+				attrib.removeAttribute('open');
+			}
 		});
 		initialStyleApplied = true;
 	});
