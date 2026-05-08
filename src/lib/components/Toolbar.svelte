@@ -70,11 +70,7 @@
 	async function onShare() {
 		closeMenu();
 		if (store.keyframes.length === 0) return;
-		const url =
-			window.location.origin +
-			window.location.pathname +
-			'#kf=' +
-			encodeAnimation(store.toAnimation());
+		const url = `${window.location.origin}${base}/#kf=${encodeAnimation(store.toAnimation())}`;
 		try {
 			await navigator.clipboard.writeText(url);
 			flash('ok', '✓ Share URL copied');
