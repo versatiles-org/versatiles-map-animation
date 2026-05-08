@@ -44,8 +44,11 @@
 
 <main class="page">
 	<header class="header">
-		<h1>Map Animation</h1>
-		<p class="lede">Prototype — drop keyframes on a map, hit play.</p>
+		<div class="header-text">
+			<h1>Map Animation</h1>
+			<p class="lede">Prototype — drop keyframes on a map, hit play.</p>
+		</div>
+		<MapStyleControl {store} />
 	</header>
 
 	{#if urlError}
@@ -58,7 +61,6 @@
 	<div class="stage-wrap">
 		<div class="map-area">
 			<MapStage {store} />
-			<MapStyleControl {store} />
 			{#if store.keyframes.length === 0}
 				<div class="empty-overlay">
 					Compose a shot, then click <strong>+ Add KF</strong>. Or try
@@ -100,6 +102,14 @@
 
 	.header {
 		flex: 0 0 auto;
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+	.header-text {
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 	h1 {
 		margin: 0;
