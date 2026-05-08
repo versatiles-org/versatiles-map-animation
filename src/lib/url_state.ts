@@ -1,13 +1,121 @@
 import {
+	base64UrlToBytes,
+	BitReader,
+	BitWriter,
+	bool,
+	bytesToBase64Url,
+	deltaArray,
+	enumOf,
+	fixed,
+	struct,
+	type Codec,
+	type TypeOf,
+	ufixed,
+	uint,
+	vuint
+} from './codec';
+import {
 	DEFAULT_PATH,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isMapStyleId,
+	MAP_STYLE_IDS,
+	PATH_STYLES,
 	SCHEMA_VERSION
 } from './types';
 import type { Animation, Keyframe, MapStyleId, PathStyle } from './types';
 
 const HASH_KEY = 'kf';
+
+// First byte of the encoded payload tells us which format follows.
+//   0x01: bit-packed binary (current format)
+//   0x7B ('{'): legacy JSON-base64 (kept for backward compatibility)
+const FORMAT_TAG_BINARY_V1 = 0x01;
+const FORMAT_TAG_JSON_LEGACY = 0x7b;
+
+// ---------------------------------------------------------------------------
+// Binary codec for Animation
+// ---------------------------------------------------------------------------
+
+// `t` is stored in milliseconds via vuint — short animations cost just a few
+// bits per timestamp.
+const tCodec: Codec<number> = {
+	encode: (v, w) => vuint.encode(Math.max(0, Math.round(v * 1000)), w),
+	decode: (r) => vuint.decode(r) / 1000
+};
+
+// Picks the schema's `path` field type from `PATH_STYLES`. The const-readonly
+// shape requires an at-least-one-element tuple to satisfy `enumOf`.
+const pathCodec = enumOf(PATH_STYLES as readonly [PathStyle, ...PathStyle[]]);
+
+// All fields a keyframe can carry on the wire. The deltaArray emits an N-bit
+// presence mask per element and only writes the fields whose values differ
+// from the previous keyframe (or from `defaults`, for the first one).
+const keyframeShape = {
+	t: tCodec,
+	lng: fixed(29, 1e6), // ±180.000000 → fits in 29 bits signed
+	lat: fixed(28, 1e6), // ±90.000000  → fits in 28 bits signed
+	zoom: ufixed(20, 1e4), // 0..104 covered, 4-decimal precision
+	pitch: ufixed(14, 100), // 0..163 covered (we cap at 90)
+	bearing: fixed(16, 100), // ±327 covered (we cap at ±180)
+	roll: fixed(16, 100),
+	path: pathCodec
+} as const;
+
+const keyframeDefaults = {
+	t: 0,
+	lng: 0,
+	lat: 0,
+	zoom: 0,
+	pitch: 0,
+	bearing: 0,
+	roll: 0,
+	path: DEFAULT_PATH
+} as const;
+
+const AnimationCodec = struct({
+	version: uint(4),
+	style: enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]]),
+	terrain: bool,
+	keyframes: deltaArray(keyframeShape, keyframeDefaults)
+});
+
+// On the wire every keyframe carries every field — the deltaArray takes
+// care of only emitting the ones that differ. The application's
+// `Keyframe.path` is optional with default 'arc'; we normalize that on
+// encode and re-introduce `undefined` on decode.
+type WireKeyframe = TypeOf<typeof AnimationCodec>['keyframes'][number];
+
+function normalizeKeyframe(kf: Keyframe): WireKeyframe {
+	return {
+		t: kf.t,
+		lng: kf.lng,
+		lat: kf.lat,
+		zoom: kf.zoom,
+		pitch: kf.pitch,
+		bearing: kf.bearing,
+		roll: kf.roll,
+		path: kf.path ?? DEFAULT_PATH
+	};
+}
+
+function denormalizeKeyframe(wire: WireKeyframe): Keyframe {
+	const kf: Keyframe = {
+		t: wire.t,
+		lng: wire.lng,
+		lat: wire.lat,
+		zoom: wire.zoom,
+		pitch: wire.pitch,
+		bearing: wire.bearing,
+		roll: wire.roll
+	};
+	if (wire.path !== DEFAULT_PATH) kf.path = wire.path;
+	return kf;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy JSON-compact form (only used by the JSON fallback decoder)
+// ---------------------------------------------------------------------------
 
 const FIELDS = ['t', 'lng', 'lat', 'zoom', 'pitch', 'bearing', 'roll', 'path'] as const;
 type Field = (typeof FIELDS)[number];
@@ -70,9 +178,9 @@ function toNumKeyframe(kf: Keyframe): NumKeyframe {
 }
 
 /**
- * Squeeze an Animation into a smaller URL form by omitting fields that
- * match the previous keyframe (or, for the first keyframe, the default
- * value of 0). The `style` field is omitted when it equals the default.
+ * Squeeze an Animation into a smaller URL form (JSON variant) by omitting
+ * fields that match the previous keyframe (or defaults of 0 for the first).
+ * Retained for the JSON fallback path; new encodes use the binary codec.
  */
 export function toCompact(anim: Animation): CompactAnimation {
 	const out: CompactAnimation = { version: anim.version, keyframes: [] };
@@ -150,33 +258,68 @@ export function fromCompact(input: unknown): Animation {
 	return { version: SCHEMA_VERSION, style, terrain, keyframes };
 }
 
-function toBase64Url(s: string): string {
-	const bytes = new TextEncoder().encode(s);
-	let binary = '';
-	for (const b of bytes) binary += String.fromCharCode(b);
-	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-}
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
-function fromBase64Url(s: string): string {
-	const pad = (4 - (s.length % 4)) % 4;
-	const padded = s.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat(pad);
-	const binary = atob(padded);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-	return new TextDecoder().decode(bytes);
-}
-
+/**
+ * Encode an animation to a base64-url string suitable for URL hashes.
+ * Uses the bit-packed binary codec; the first byte is a format tag so
+ * legacy JSON-base64 hashes can still be decoded by `decodeAnimation`.
+ */
 export function encodeAnimation(anim: Animation): string {
-	return toBase64Url(JSON.stringify(toCompact(anim)));
+	const w = new BitWriter();
+	w.writeBits(FORMAT_TAG_BINARY_V1, 8);
+	AnimationCodec.encode(
+		{
+			version: anim.version,
+			style: anim.style,
+			terrain: anim.terrain,
+			keyframes: anim.keyframes.map(normalizeKeyframe)
+		},
+		w
+	);
+	return bytesToBase64Url(w.finish());
 }
 
+/**
+ * Decode an animation from a base64-url string. Returns null on any decode
+ * failure. Accepts both the new binary format and the legacy JSON-base64
+ * form transparently.
+ */
 export function decodeAnimation(encoded: string): Animation | null {
 	try {
-		const json = fromBase64Url(encoded);
-		return fromCompact(JSON.parse(json));
+		return decodeOrThrow(encoded);
 	} catch {
 		return null;
 	}
+}
+
+function decodeOrThrow(encoded: string): Animation {
+	const bytes = base64UrlToBytes(encoded);
+	if (bytes.length === 0) throw new Error('Empty payload');
+	const tag = bytes[0];
+	if (tag === FORMAT_TAG_BINARY_V1) {
+		const r = new BitReader(bytes);
+		r.readBits(8); // consume tag
+		const wire = AnimationCodec.decode(r);
+		if (wire.version > SCHEMA_VERSION) {
+			throw new Error(
+				`File was made with a newer version (v${wire.version}); supported: v${SCHEMA_VERSION}.`
+			);
+		}
+		return {
+			version: SCHEMA_VERSION,
+			style: wire.style,
+			terrain: wire.terrain,
+			keyframes: wire.keyframes.map(denormalizeKeyframe)
+		};
+	}
+	if (tag === FORMAT_TAG_JSON_LEGACY) {
+		const json = new TextDecoder().decode(bytes);
+		return fromCompact(JSON.parse(json));
+	}
+	throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
 }
 
 /**
@@ -194,8 +337,7 @@ export function readAnimationFromUrl(): Animation | null {
 	const params = new URLSearchParams(hash);
 	const v = params.get(HASH_KEY);
 	if (!v) return null;
-	const json = fromBase64Url(v);
-	return fromCompact(JSON.parse(json));
+	return decodeOrThrow(v);
 }
 
 export function clearUrlHash(): void {

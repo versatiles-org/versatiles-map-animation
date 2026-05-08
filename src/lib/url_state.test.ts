@@ -122,9 +122,38 @@ describe('encode/decode round-trip', () => {
 		expect(decoded?.terrain).toBe(true);
 	});
 
-	it('falls back to defaults for unknown style', () => {
-		const decoded = decodeAnimation(encodeAnimation({ ...example, style: 'eclipse' as never }));
-		expect(decoded?.style).toBe('colorful');
+	it('decodes legacy JSON-base64 hashes (backward compatibility)', () => {
+		// What a hash from before the binary codec existed looks like.
+		const legacyJson = JSON.stringify({
+			version: 1,
+			style: 'satellite',
+			terrain: true,
+			keyframes: [
+				{ t: 0, lng: 12.3, lat: 50.6, zoom: 4, pitch: 0, bearing: 0, roll: 0 },
+				{ t: 3, lng: 7.1, lat: 46.1, zoom: 12.9, pitch: 0, bearing: 0, roll: 0 }
+			]
+		});
+		const legacyB64 = btoa(legacyJson)
+			.replaceAll('+', '-')
+			.replaceAll('/', '_')
+			.replaceAll('=', '');
+		const decoded = decodeAnimation(legacyB64);
+		expect(decoded?.style).toBe('satellite');
+		expect(decoded?.terrain).toBe(true);
+		expect(decoded?.keyframes.length).toBe(2);
+		expect(decoded?.keyframes[1].lng).toBeCloseTo(7.1, 5);
+	});
+
+	it('falls back to defaults for unknown style in legacy JSON form', () => {
+		// Build a legacy JSON+base64 hash with an unknown style and verify the
+		// decoder reads it as the default. New encodes are binary and reject
+		// unknown enums at encode time; this only exercises the fallback path.
+		const legacyJson = JSON.stringify({ version: 1, style: 'eclipse', keyframes: [] });
+		const legacyB64 = btoa(legacyJson)
+			.replaceAll('+', '-')
+			.replaceAll('/', '_')
+			.replaceAll('=', '');
+		expect(decodeAnimation(legacyB64)?.style).toBe('colorful');
 	});
 
 	it('round-trips per-keyframe path', () => {
