@@ -5,12 +5,10 @@ import {
 	bool,
 	bytesToBase64Url,
 	enumOf,
-	fixed,
 	inspect,
 	struct,
 	type Codec,
 	type InspectionNode,
-	ufixed,
 	uint,
 	vuint
 } from './codec';
@@ -79,9 +77,32 @@ const zoomCodec: Codec<number> = {
 	decode: (r) => vuint.decode(r) / 100
 };
 
-const pitchCodec = ufixed(14, 100); // 0..163 covered (cap at 90)
-const bearingCodec = fixed(16, 100); // ±327 covered (cap at ±180)
-const rollCodec = fixed(16, 100);
+// Pitch: 8 bits over 0..90° → ~0.35° precision (visually imperceptible).
+const pitchCodec: Codec<number> = {
+	encode: (v, w) => {
+		const clamped = Math.max(0, Math.min(90, v));
+		uint(8).encode(Math.round((clamped * 255) / 90), w);
+	},
+	decode: (r) => (uint(8).decode(r) * 90) / 255
+};
+
+// Bearing/roll: 10 bits over 0..360° (mod 360) → ~0.35° precision.
+// Stored unsigned in [0, 360); decoded back to the application's [-180, 180).
+function makeAngleCodec(): Codec<number> {
+	return {
+		encode: (v, w) => {
+			const positive = (((v % 360) + 360) % 360) % 360;
+			const intVal = Math.round((positive * 1024) / 360) % 1024;
+			uint(10).encode(intVal, w);
+		},
+		decode: (r) => {
+			const positive = (uint(10).decode(r) * 360) / 1024;
+			return positive >= 180 ? positive - 360 : positive;
+		}
+	};
+}
+const bearingCodec = makeAngleCodec();
+const rollCodec = makeAngleCodec();
 const pathCodec = enumOf(PATH_STYLES as readonly [PathStyle, ...PathStyle[]]);
 
 interface WireKeyframe {
