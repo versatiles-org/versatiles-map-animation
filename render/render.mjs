@@ -32,8 +32,73 @@ const DEFAULT_OPTS = {
 	preset: 'slow',
 	frameTimeoutMs: 60_000,
 	prewarm: true,
-	endTime: null
+	endTime: null,
+	verbose: false
 };
+
+// ---------------------------------------------------------------------------
+// Output helpers — keep stderr tidy by default
+// ---------------------------------------------------------------------------
+
+let VERBOSE = false;
+
+function log(msg) {
+	process.stderr.write(msg + '\n');
+}
+function debug(msg) {
+	if (VERBOSE) process.stderr.write(msg + '\n');
+}
+function fmtDuration(seconds) {
+	if (!isFinite(seconds) || seconds < 0) return '–';
+	const s = Math.round(seconds);
+	if (s < 3600) return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+	const h = Math.floor(s / 3600);
+	const m = Math.floor((s % 3600) / 60);
+	const ss = s % 60;
+	return `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+}
+function fmtBytes(n) {
+	if (n < 1024) return `${n} B`;
+	if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`;
+	return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+class Progress {
+	constructor(total, label) {
+		this.total = total;
+		this.label = label;
+		this.start = Date.now();
+		this.tty = !!process.stderr.isTTY;
+		this.lastPaint = 0;
+		this.lastN = 0;
+		this.lastPrintedN = 0;
+	}
+	update(n) {
+		const now = Date.now();
+		// Throttle updates to keep stderr quiet on non-TTYs and avoid flicker on TTYs.
+		if (n < this.total && now - this.lastPaint < 250 && n - this.lastN < 1) return;
+		this.lastPaint = now;
+		this.lastN = n;
+		const elapsed = (now - this.start) / 1000;
+		const rate = n / Math.max(elapsed, 0.001);
+		const remaining = n < this.total ? (this.total - n) / Math.max(rate, 0.001) : 0;
+		const pct = Math.round((n / this.total) * 100);
+		const eta = n < this.total ? `ETA ${fmtDuration(remaining)}` : `${fmtDuration(elapsed)}`;
+		const line = `  ${this.label}  ${String(n).padStart(String(this.total).length)}/${this.total}  ${String(pct).padStart(3)}%  ${eta}`;
+		if (this.tty) {
+			process.stderr.write('\r\x1b[2K' + line);
+		} else if (
+			n === this.total ||
+			n - this.lastPrintedN >= Math.max(1, Math.ceil(this.total / 20))
+		) {
+			process.stderr.write(line + '\n');
+			this.lastPrintedN = n;
+		}
+	}
+	finish() {
+		if (this.tty) process.stderr.write('\n');
+	}
+}
 
 function parseArgv(argv) {
 	const out = { ...DEFAULT_OPTS };
@@ -81,6 +146,10 @@ function parseArgv(argv) {
 			case '--prewarm':
 				out.prewarm = true;
 				break;
+			case '--verbose':
+			case '-v':
+				out.verbose = true;
+				break;
 			case '-h':
 			case '--help':
 				out.help = true;
@@ -107,6 +176,7 @@ function usage() {
 		'  --frame-timeout <ms>   per-frame settle timeout (default 60000)',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
 		'  --output <path>        output MP4 (required)',
+		'  -v, --verbose          show ffmpeg output and page console messages',
 		''
 	].join('\n');
 }
@@ -207,6 +277,8 @@ function buildPageUrl(baseUrl, hash, render) {
 function spawnFfmpeg(opts) {
 	const args = [
 		'-y',
+		'-loglevel',
+		VERBOSE ? 'info' : 'error',
 		'-f',
 		'image2pipe',
 		'-framerate',
@@ -225,11 +297,18 @@ function spawnFfmpeg(opts) {
 		'+faststart',
 		opts.output
 	];
-	const proc = spawn('ffmpeg', args, { stdio: ['pipe', 'inherit', 'inherit'] });
+	// Capture stderr so we can show it only on failure (when not verbose).
+	const proc = spawn('ffmpeg', args, {
+		stdio: ['pipe', 'inherit', VERBOSE ? 'inherit' : 'pipe']
+	});
+	let stderrBuf = '';
+	if (proc.stderr) proc.stderr.on('data', (chunk) => (stderrBuf += chunk.toString()));
 	const exit = new Promise((res, rej) => {
-		proc.on('exit', (code) =>
-			code === 0 ? res(undefined) : rej(new Error(`ffmpeg exit ${code}`))
-		);
+		proc.on('exit', (code) => {
+			if (code === 0) return res(undefined);
+			if (stderrBuf) process.stderr.write(stderrBuf);
+			rej(new Error(`ffmpeg exit ${code}`));
+		});
 		proc.on('error', rej);
 	});
 	return { proc, exit };
@@ -260,66 +339,64 @@ async function setupPage(browser, opts, hash) {
 	const height = Math.round((opts.width * 9) / 16);
 	const ctx = await browser.newContext({ viewport: { width: opts.width, height } });
 	const page = await ctx.newPage();
-	page.on('pageerror', (e) => process.stderr.write(`[pageerror] ${e.message}\n`));
+	// Real exceptions in the page bubble up; non-fatal warnings (font glyph
+	// 404s, MapLibre router warnings, …) only show with --verbose.
+	page.on('pageerror', (e) => log(`page error: ${e.message}`));
 	page.on('console', (msg) => {
-		if (msg.type() === 'error') process.stderr.write(`[console.error] ${msg.text()}\n`);
+		if (msg.type() === 'error') debug(`page console.error: ${msg.text()}`);
 	});
 	const url = buildPageUrl(opts.siteUrl, hash, true);
-	process.stderr.write(`[renderer] navigating to ${url}\n`);
+	debug(`navigating to ${url}`);
 	await page.goto(url, { waitUntil: 'load' });
-	// Wait for the renderer hook + map instance to be ready.
 	await page.waitForFunction(
 		() => /** @type {any} */ (window).__renderer && /** @type {any} */ (window).__map,
 		{ timeout: 30_000 }
 	);
-	// First idle = initial map is fully drawn.
 	await waitForFrameReady(page, 30_000);
 	const duration = await page.evaluate(() => /** @type {any} */ (window).__renderer.duration);
 	return { ctx, page, duration };
 }
 
 async function prewarmPass(page, duration, opts) {
-	process.stderr.write(`[renderer] prewarm: walking the trajectory at 5 fps to fill tile cache\n`);
 	const fps = 5;
 	const total = Math.max(2, Math.ceil(duration * fps) + 1);
+	const progress = new Progress(total, 'warming tile cache');
 	for (let i = 0; i < total; i++) {
 		const t = Math.min(duration, i / fps);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 		try {
 			await waitForFrameReady(page, opts.frameTimeoutMs);
 		} catch {
-			process.stderr.write(`[renderer] prewarm frame ${i} timeout, continuing\n`);
+			debug(`prewarm frame ${i} timeout, continuing`);
 		}
+		progress.update(i + 1);
 	}
+	progress.finish();
 }
 
 async function capturePass(page, duration, opts, ffmpegStdin) {
 	const total = Math.max(2, Math.ceil(duration * opts.fps) + 1);
-	process.stderr.write(`[renderer] capturing ${total} frames at ${opts.fps} fps\n`);
 
 	// Install a virtual clock so MapLibre's internal animations evaluate at
 	// the correct *animation* time, not wall-clock time, regardless of how
 	// long each SwiftShader-rendered frame actually takes.
 	await page.clock.install({ time: 0 });
 
+	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
 		const t = Math.min(duration, i / opts.fps);
-		const tMs = t * 1000;
-		await page.clock.setFixedTime(tMs);
+		await page.clock.setFixedTime(t * 1000);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 		try {
 			await waitForFrameReady(page, opts.frameTimeoutMs);
 		} catch (err) {
-			process.stderr.write(
-				`[renderer] frame ${i + 1}/${total} (t=${t.toFixed(3)}) timeout: ${err.message}\n`
-			);
+			log(`! frame ${i + 1}/${total} timeout (t=${t.toFixed(3)}): ${err.message}`);
 		}
 		const png = await page.screenshot({ type: 'png' });
 		ffmpegStdin.write(png);
-		if ((i + 1) % 10 === 0 || i === total - 1) {
-			process.stderr.write(`[renderer] frame ${i + 1}/${total} (t=${t.toFixed(2)}s)\n`);
-		}
+		progress.update(i + 1);
 	}
+	progress.finish();
 	ffmpegStdin.end();
 }
 
@@ -329,6 +406,7 @@ async function main() {
 		process.stdout.write(usage());
 		return;
 	}
+	VERBOSE = !!opts.verbose;
 	if (!ALLOWED_WIDTHS.includes(opts.width)) {
 		throw new Error(`--width must be one of ${ALLOWED_WIDTHS.join('/')}, got ${opts.width}`);
 	}
@@ -337,18 +415,16 @@ async function main() {
 	const hash = extractHash(opts.url) ?? opts.hash;
 	if (!hash) throw new Error('could not extract hash from --url');
 
-	// Ensure the output directory exists.
 	const outAbs = isAbsolute(opts.output) ? opts.output : resolve(process.cwd(), opts.output);
 	await mkdir(dirname(outAbs), { recursive: true });
 	opts.output = outAbs;
 
-	// If a --site-url is given, use it; otherwise spawn a tiny static server.
 	let server = null;
 	if (!opts.siteUrl) {
 		const root = opts.siteRoot ?? defaultSiteRoot();
 		server = await spawnStaticServer(root);
 		opts.siteUrl = server.url;
-		process.stderr.write(`[renderer] serving ${root} on ${server.url}\n`);
+		debug(`serving ${root} on ${server.url}`);
 	}
 
 	const browser = await chromium.launch({
@@ -362,12 +438,14 @@ async function main() {
 	});
 
 	try {
+		log('preparing renderer…');
 		const { ctx, page, duration } = await setupPage(browser, opts, hash);
 		const cappedDuration = opts.endTime != null ? Math.min(duration, opts.endTime) : duration;
-		process.stderr.write(
-			`[renderer] animation duration: ${duration.toFixed(2)}s` +
-				(opts.endTime != null ? ` (capped at ${cappedDuration.toFixed(2)}s)` : '') +
-				'\n'
+		const totalFrames = Math.max(2, Math.ceil(cappedDuration * opts.fps) + 1);
+		const height = Math.round((opts.width * 9) / 16);
+		log(
+			`  ${cappedDuration.toFixed(2)}s · ${totalFrames} frames at ${opts.fps} fps · ${opts.width}×${height}` +
+				(opts.endTime != null ? ` (capped from ${duration.toFixed(2)}s)` : '')
 		);
 
 		if (opts.prewarm) {
@@ -376,8 +454,11 @@ async function main() {
 
 		const { proc, exit } = spawnFfmpeg(opts);
 		await capturePass(page, cappedDuration, opts, proc.stdin);
+		log('encoding video…');
 		await exit;
-		process.stderr.write(`[renderer] wrote ${opts.output}\n`);
+
+		const { size } = await stat(opts.output);
+		log(`done · ${opts.output} (${fmtBytes(size)})`);
 		await ctx.close();
 	} finally {
 		await browser.close();
