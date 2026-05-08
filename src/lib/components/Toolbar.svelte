@@ -166,9 +166,10 @@
 </script>
 
 <div class="toolbar">
-	<div class="group">
+	<div class="group" role="group" aria-label="Keyframe">
+		<span class="group-label">Keyframe</span>
 		<button type="button" onclick={onAdd} title="Add a keyframe at the current playhead time">
-			+ Add KF
+			+ Add
 		</button>
 		<button
 			type="button"
@@ -176,7 +177,7 @@
 			disabled={!hasSelection}
 			title="Update the selected keyframe to the current camera"
 		>
-			↻ Update KF
+			↻ Update
 		</button>
 		<button
 			type="button"
@@ -184,11 +185,11 @@
 			disabled={!hasSelection}
 			title="Delete the selected keyframe"
 		>
-			✕ Delete KF
+			✕ Delete
 		</button>
 	</div>
 
-	<div class="group">
+	<div class="group playback">
 		<button
 			type="button"
 			class="primary"
@@ -277,6 +278,17 @@
 	.group {
 		display: flex;
 		gap: 0.25rem;
+		align-items: center;
+	}
+	.group.playback {
+		margin-left: 1.5rem;
+	}
+	.group-label {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #777;
+		margin-right: 0.15rem;
 	}
 	.spacer {
 		flex: 1 1 auto;
