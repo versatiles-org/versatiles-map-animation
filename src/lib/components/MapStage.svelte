@@ -62,7 +62,15 @@
 			roll: initialCam.roll,
 			maxPitch: 90,
 			attributionControl: { compact: true },
-			centerClampedToGround: false
+			centerClampedToGround: false,
+			// Animations sweep across many zoom levels and revisit the same
+			// regions repeatedly. The default cache (5 zoom levels worth of
+			// viewports) thrashes during playback; 12 keeps a much wider band
+			// of tiles around in memory at the cost of some extra RAM. Disable
+			// expired-tile refetches too — the satellite/DEM data we use is
+			// stable, so respecting the browser's HTTP cache is fine.
+			maxTileCacheZoomLevels: 20,
+			refreshExpiredTiles: false
 		});
 		map.on('move', () => {
 			if (!map) return;
