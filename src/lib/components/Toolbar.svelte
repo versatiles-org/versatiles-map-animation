@@ -7,8 +7,13 @@
 
 	let { store }: { store: AnimationStore } = $props();
 
+	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation/render:latest';
+	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
+	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
+
 	let fileInput: HTMLInputElement;
 	let embedInput = $state<HTMLInputElement | undefined>(undefined);
+	let videoInput = $state<HTMLInputElement | undefined>(undefined);
 	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
 	let importError = $state<string | null>(null);
 	let status = $state<{ tone: 'ok' | 'err'; text: string } | null>(null);
@@ -16,6 +21,10 @@
 	let embedOpen = $state(false);
 	let embedCopied = $state(false);
 	let embedCopyTimer: ReturnType<typeof setTimeout> | undefined;
+	let videoOpen = $state(false);
+	let videoWidth = $state<VideoWidth>(1920);
+	let videoCopied = $state(false);
+	let videoCopyTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function flash(tone: 'ok' | 'err', text: string) {
 		status = { tone, text };
@@ -119,6 +128,40 @@
 		}, 1800);
 	}
 
+	function buildVideoCommand(): string {
+		const hash = encodeAnimation(store.toAnimation());
+		// Single-line so users can paste-and-run; --pull always keeps the image
+		// fresh; the working directory is mounted at /out so the MP4 lands next
+		// to where the user invoked the command.
+		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --output /out/animation.mp4`;
+	}
+
+	function onToggleVideo() {
+		closeMenu();
+		if (store.keyframes.length === 0) return;
+		videoOpen = !videoOpen;
+		videoCopied = false;
+		if (videoOpen) {
+			queueMicrotask(() => videoInput?.select());
+		}
+	}
+
+	async function onCopyVideo() {
+		if (!videoInput) return;
+		try {
+			await navigator.clipboard.writeText(videoInput.value);
+			videoCopied = true;
+		} catch {
+			videoInput.select();
+			document.execCommand?.('copy');
+			videoCopied = true;
+		}
+		if (videoCopyTimer) clearTimeout(videoCopyTimer);
+		videoCopyTimer = setTimeout(() => {
+			videoCopied = false;
+		}, 1800);
+	}
+
 	function onLoadExample() {
 		closeMenu();
 		store.loadFromAnimation({
@@ -159,6 +202,10 @@
 	const hasKeyframes = $derived(store.keyframes.length > 0);
 	const canPlay = $derived(store.keyframes.length >= 2);
 	const embedSnippet = $derived(embedOpen && hasKeyframes ? buildEmbedSnippet() : '');
+	const videoCommand = $derived(
+		videoOpen && hasKeyframes ? buildVideoCommand() : ''
+		// videoCommand re-derives when keyframes/style/terrain or videoWidth change.
+	);
 </script>
 
 <div class="toolbar">
@@ -236,6 +283,9 @@
 			<button type="button" role="menuitem" onclick={onToggleEmbed} disabled={!hasKeyframes}>
 				🖼 Embed…
 			</button>
+			<button type="button" role="menuitem" onclick={onToggleVideo} disabled={!hasKeyframes}>
+				🎬 Export video…
+			</button>
 			<hr />
 			<button type="button" role="menuitem" onclick={onExport} disabled={!hasKeyframes}>
 				↓ Export JSON
@@ -282,6 +332,39 @@
 			<button type="button" onclick={onToggleEmbed} aria-label="Close" title="Close">✕</button>
 		</div>
 		<p class="hint">The iframe scales to its container at a fixed 16:9 aspect ratio.</p>
+	</div>
+{/if}
+
+{#if videoOpen}
+	<div class="embed-panel" role="region" aria-label="Render to video">
+		<div class="video-row-1">
+			<label for="video-width" class="control-label">
+				<span class="lbl">Resolution</span>
+				<select id="video-width" bind:value={videoWidth}>
+					{#each VIDEO_WIDTHS as w (w)}
+						<option value={w}>{w} × {Math.round((w * 9) / 16)}</option>
+					{/each}
+				</select>
+			</label>
+			<span class="hint">
+				Renders this animation as MP4. Requires <strong>Docker</strong>; the file lands in the
+				directory you run the command from as <code>animation.mp4</code>.
+			</span>
+		</div>
+		<div class="embed-row">
+			<input
+				id="video-input"
+				bind:this={videoInput}
+				type="text"
+				readonly
+				value={videoCommand}
+				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
+			/>
+			<button type="button" onclick={onCopyVideo} class:copied={videoCopied} title="Copy command">
+				{videoCopied ? '✓ Copied' : '⧉ Copy'}
+			</button>
+			<button type="button" onclick={onToggleVideo} aria-label="Close" title="Close">✕</button>
+		</div>
 	</div>
 {/if}
 
@@ -496,6 +579,22 @@
 		margin: 0;
 		font-size: 11px;
 		color: #888;
+	}
+	.embed-panel code {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 11px;
+		background: rgba(255, 255, 255, 0.06);
+		padding: 0 0.25rem;
+		border-radius: 3px;
+	}
+	.video-row-1 {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+	}
+	.video-row-1 .hint {
+		flex: 1 1 16rem;
 	}
 	.embed-row button.copied {
 		background: rgba(80, 200, 120, 0.18);
