@@ -63,8 +63,8 @@
 			<MapStage {store} />
 			{#if store.keyframes.length === 0}
 				<div class="empty-overlay">
-					Compose a shot, then click <strong>+ Add KF</strong>. Or try
-					<strong>★ Load example</strong>.
+					Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or open the
+					<strong>⋯</strong> menu and pick <strong>Load example</strong>.
 				</div>
 			{/if}
 		</div>
