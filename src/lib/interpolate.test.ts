@@ -53,18 +53,40 @@ describe('interpolateKeyframes', () => {
 	it('returns A at alpha=0', () => {
 		const out = interpolateKeyframes(a, b, 0);
 		expect(out.lng).toBe(0);
+		expect(out.lat).toBe(0);
+		expect(out.zoom).toBe(0);
 		expect(out.bearing).toBe(0);
 	});
 	it('returns B at alpha=1', () => {
 		const out = interpolateKeyframes(a, b, 1);
 		expect(out.lng).toBeCloseTo(10);
+		expect(out.lat).toBeCloseTo(20);
+		expect(out.zoom).toBeCloseTo(5);
 		expect(out.bearing).toBeCloseTo(90);
 		expect(out.roll).toBeCloseTo(30);
 	});
-	it('reaches half-progress at midpoint (ease-in-out is 0.5 at 0.5)', () => {
+	it('interpolates non-position fields linearly under easing', () => {
 		const out = interpolateKeyframes(a, b, 0.5);
-		expect(out.lng).toBeCloseTo(5);
-		expect(out.zoom).toBeCloseTo(2.5);
+		// pitch/bearing/roll are linearly eased, easeInOut(0.5)=0.5
+		expect(out.pitch).toBeCloseTo(30);
+		expect(out.bearing).toBeCloseTo(45);
+		expect(out.roll).toBeCloseTo(15);
+	});
+	it('with equal zoom, midpoint position is the geographic midpoint', () => {
+		// w0 = w1 makes the van Wijk path symmetric around the midpoint.
+		const a2: Keyframe = { ...a, zoom: 4 };
+		const b2: Keyframe = { ...a2, lng: 10, lat: 0 };
+		const mid = interpolateKeyframes(a2, b2, 0.5);
+		expect(mid.lng).toBeCloseTo(5, 5);
+	});
+	it('arcs through a lower zoom when zooming + panning a long distance', () => {
+		// At alpha=0.5 the camera should be _lower zoom_ than the linear average,
+		// which is the whole point of van Wijk — fly out, then back in.
+		const c: Keyframe = { t: 0, lng: 0, lat: 0, zoom: 8, pitch: 0, bearing: 0, roll: 0 };
+		const d: Keyframe = { t: 10, lng: 30, lat: 30, zoom: 8, pitch: 0, bearing: 0, roll: 0 };
+		const linearMidZoom = (c.zoom + d.zoom) / 2; // 8
+		const out = interpolateKeyframes(c, d, 0.5);
+		expect(out.zoom).toBeLessThan(linearMidZoom);
 	});
 });
 
