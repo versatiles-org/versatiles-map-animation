@@ -10,6 +10,8 @@
 	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation:latest';
 	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
+	const VIDEO_FPS = [24, 25, 30, 50, 60] as const;
+	type VideoFps = (typeof VIDEO_FPS)[number];
 
 	let fileInput: HTMLInputElement;
 	let embedInput = $state<HTMLInputElement | undefined>(undefined);
@@ -23,6 +25,7 @@
 	let embedCopyTimer: ReturnType<typeof setTimeout> | undefined;
 	let videoOpen = $state(false);
 	let videoWidth = $state<VideoWidth>(1920);
+	let videoFps = $state<VideoFps>(30);
 	let videoCopied = $state(false);
 	let videoCopyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -133,7 +136,7 @@
 		// Single-line so users can paste-and-run; --pull always keeps the image
 		// fresh; the working directory is mounted at /out so the MP4 lands next
 		// to where the user invoked the command.
-		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --output /out/animation.mp4`;
+		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --fps ${videoFps} --output /out/animation.mp4`;
 	}
 
 	function onToggleVideo() {
@@ -343,6 +346,14 @@
 				<select id="video-width" bind:value={videoWidth}>
 					{#each VIDEO_WIDTHS as w (w)}
 						<option value={w}>{w} × {Math.round((w * 9) / 16)}</option>
+					{/each}
+				</select>
+			</label>
+			<label for="video-fps" class="control-label">
+				<span class="lbl">FPS</span>
+				<select id="video-fps" bind:value={videoFps}>
+					{#each VIDEO_FPS as f (f)}
+						<option value={f}>{f}</option>
 					{/each}
 				</select>
 			</label>
