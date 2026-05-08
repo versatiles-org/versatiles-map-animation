@@ -348,11 +348,30 @@ async function setupPage(browser, opts, hash) {
 	const url = buildPageUrl(opts.siteUrl, hash, true);
 	debug(`navigating to ${url}`);
 	await page.goto(url, { waitUntil: 'load' });
-	await page.waitForFunction(
-		() => /** @type {any} */ (window).__renderer && /** @type {any} */ (window).__map,
-		{ timeout: 30_000 }
-	);
-	await waitForFrameReady(page, 30_000);
+	// Cold containers with software WebGL + uncached satellite/DEM tiles can
+	// easily take longer than 30s to reach `map.on('load')`. Be generous; the
+	// caller can shorten with --frame-timeout if they want stricter behaviour.
+	const setupTimeout = Math.max(opts.frameTimeoutMs, 120_000);
+	try {
+		await page.waitForFunction(
+			() => /** @type {any} */ (window).__renderer && /** @type {any} */ (window).__map,
+			{ timeout: setupTimeout }
+		);
+	} catch (err) {
+		const has = await page.evaluate(() => ({
+			renderer: !!(/** @type {any} */ (window).__renderer),
+			map: !!(/** @type {any} */ (window).__map),
+			href: window.location.href
+		}));
+		throw new Error(
+			`setup timed out after ${Math.round(setupTimeout / 1000)}s ` +
+				`(renderer=${has.renderer}, map=${has.map}). ` +
+				`URL: ${has.href}. ` +
+				`Re-run with --verbose to see page console output, or pass a larger --frame-timeout.`,
+			{ cause: err }
+		);
+	}
+	await waitForFrameReady(page, setupTimeout);
 	const duration = await page.evaluate(() => /** @type {any} */ (window).__renderer.duration);
 	return { ctx, page, duration };
 }
