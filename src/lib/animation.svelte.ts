@@ -96,8 +96,9 @@ export class AnimationStore {
 	}
 
 	seekTo(t: number): void {
-		const max = this.totalDuration;
-		this.currentTime = Math.max(0, Math.min(max, t));
+		// No upper clamp: the user may scrub past the last keyframe to add a new
+		// one there. sampleAt() holds the last keyframe's pose past the end.
+		this.currentTime = Math.max(0, t);
 	}
 
 	play(): void {

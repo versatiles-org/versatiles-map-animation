@@ -7,18 +7,25 @@
 	let panbarEl: HTMLDivElement;
 
 	const MIN_SPAN = 0.1;
+	const MAX_SPAN = 86400; // 24h, just to prevent absurd extremes
 	const MIN_THUMB_PCT = 4;
 
-	// View window state. `null` span means auto-fit to fullDuration; the moment
-	// the user zooms or pans, it becomes a concrete number.
+	// View window state. `null` span means auto-fit to contentDuration; the
+	// moment the user zooms or pans, it becomes a concrete number. start and
+	// span are otherwise unbounded above — the user may pan/zoom past the last
+	// keyframe to set up new shots there.
 	let viewStart = $state(0);
 	let viewSpan = $state<number | null>(null);
 
-	const fullDuration = $derived(Math.max(store.totalDuration, 1));
-	const rawSpan = $derived(viewSpan ?? fullDuration);
-	const span = $derived(Math.max(MIN_SPAN, Math.min(fullDuration, rawSpan)));
-	const start = $derived(Math.max(0, Math.min(viewStart, fullDuration - span)));
+	const contentDuration = $derived(Math.max(store.totalDuration, 1));
+	const rawSpan = $derived(viewSpan ?? contentDuration);
+	const span = $derived(Math.max(MIN_SPAN, Math.min(MAX_SPAN, rawSpan)));
+	const start = $derived(Math.max(0, viewStart));
 	const end = $derived(start + span);
+	// The panbar reflects everything that's currently in scope: animation
+	// content, the playhead, and the right edge of the current view. As the
+	// user pans/scrubs past the last keyframe, the panbar auto-extends.
+	const panbarMax = $derived(Math.max(store.totalDuration, store.currentTime, end, 1));
 
 	function pct(t: number): number {
 		return ((t - start) / span) * 100;
@@ -76,7 +83,7 @@
 
 	function zoomAt(factor: number, anchorClientX: number) {
 		const tAnchor = tFromClientX(anchorClientX);
-		const newSpan = Math.max(MIN_SPAN, Math.min(fullDuration, span * factor));
+		const newSpan = Math.max(MIN_SPAN, Math.min(MAX_SPAN, span * factor));
 		if (newSpan === span) return;
 		const ratio = newSpan / span;
 		viewSpan = newSpan;
@@ -108,10 +115,14 @@
 		const startStart = start;
 		const startEnd = end;
 		const rect = panbarEl.getBoundingClientRect();
+		// Capture the panbar's time scale at drag start so the cursor-to-time
+		// mapping stays stable even when panbarMax grows during the drag (which
+		// happens when the user drags past the current end).
+		const initialMax = panbarMax;
 		const startX = e.clientX;
 
 		function onMove(ev: PointerEvent) {
-			const dT = ((ev.clientX - startX) / rect.width) * fullDuration;
+			const dT = ((ev.clientX - startX) / rect.width) * initialMax;
 			if (mode === 'pan') {
 				viewSpan = startEnd - startStart;
 				viewStart = startStart + dT;
@@ -120,7 +131,10 @@
 				viewSpan = startEnd - newStart;
 				viewStart = newStart;
 			} else {
-				const newEnd = Math.max(startStart + MIN_SPAN, Math.min(fullDuration, startEnd + dT));
+				const newEnd = Math.max(
+					startStart + MIN_SPAN,
+					Math.min(MAX_SPAN + startStart, startEnd + dT)
+				);
 				viewSpan = newEnd - startStart;
 				viewStart = startStart;
 			}
@@ -144,7 +158,7 @@
 		// Click in gutter: center the thumb at the click position.
 		e.preventDefault();
 		const rect = panbarEl.getBoundingClientRect();
-		const clickT = ((e.clientX - rect.left) / rect.width) * fullDuration;
+		const clickT = ((e.clientX - rect.left) / rect.width) * panbarMax;
 		viewSpan = span;
 		viewStart = clickT - span / 2;
 	}
@@ -174,9 +188,17 @@
 		return tickStep < 1 ? t.toFixed(1) + 's' : Math.round(t) + 's';
 	}
 
-	const thumbLeftPct = $derived((start / fullDuration) * 100);
-	const thumbWidthPct = $derived(Math.max(MIN_THUMB_PCT, (span / fullDuration) * 100));
+	const thumbLeftPct = $derived((start / panbarMax) * 100);
+	const thumbWidthPct = $derived(Math.max(MIN_THUMB_PCT, (span / panbarMax) * 100));
 	const isFit = $derived(viewSpan === null);
+	// Visible position of the "end of content" marker on the track (may be off-screen).
+	const contentEndPct = $derived(((store.totalDuration - start) / span) * 100);
+	const showContentEnd = $derived(
+		store.totalDuration > 0 &&
+			end > store.totalDuration &&
+			contentEndPct >= 0 &&
+			contentEndPct <= 100
+	);
 
 	function fmt(t: number): string {
 		return t.toFixed(2);
@@ -191,7 +213,7 @@
 		tabindex="0"
 		aria-label="Animation timeline"
 		aria-valuemin={0}
-		aria-valuemax={fullDuration}
+		aria-valuemax={panbarMax}
 		aria-valuenow={store.currentTime}
 		onpointerdown={startScrub}
 		onwheel={onWheel}
@@ -217,6 +239,15 @@
 			</button>
 		{/each}
 
+		{#if showContentEnd}
+			<div
+				class="content-end"
+				style="left: {contentEndPct}%"
+				aria-hidden="true"
+				title="End of last keyframe ({fmt(store.totalDuration)}s)"
+			></div>
+		{/if}
+
 		<div class="playhead" style="left: {pct(store.currentTime)}%" aria-hidden="true">
 			<div class="playhead-line"></div>
 			<div class="playhead-handle" title="Playhead at {fmt(store.currentTime)}s"></div>
@@ -231,7 +262,7 @@
 		aria-controls="timeline-track"
 		aria-orientation="horizontal"
 		aria-valuemin={0}
-		aria-valuemax={fullDuration}
+		aria-valuemax={panbarMax}
 		aria-valuenow={start}
 		onpointerdown={onPanbarPointerDown}
 	>
@@ -359,6 +390,20 @@
 	}
 	.track:active {
 		cursor: ew-resize;
+	}
+	.content-end {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 1px;
+		background: repeating-linear-gradient(
+			to bottom,
+			rgba(255, 255, 255, 0.45) 0,
+			rgba(255, 255, 255, 0.45) 4px,
+			transparent 4px,
+			transparent 8px
+		);
+		pointer-events: none;
 	}
 
 	.panbar {
