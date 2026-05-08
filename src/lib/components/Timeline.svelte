@@ -96,15 +96,19 @@
 	}
 
 	function onWheel(e: WheelEvent) {
-		// Mac trackpad pinch is delivered as `wheel` with ctrlKey synthesized.
+		if (e.deltaX === 0 && e.deltaY === 0) return;
+		e.preventDefault();
+		// Mac trackpad pinch arrives as a wheel event with ctrlKey synthesized.
+		// Treat that the same as an explicit Ctrl/Cmd+wheel.
 		if (e.ctrlKey || e.metaKey) {
-			e.preventDefault();
 			zoomAt(Math.exp(e.deltaY * 0.0015), e.clientX);
-		} else if (e.deltaX !== 0 || e.deltaY !== 0) {
-			e.preventDefault();
-			const dPx = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+			return;
+		}
+		// Plain wheel: vertical → zoom around cursor, horizontal → pan.
+		if (e.deltaY !== 0) zoomAt(Math.exp(e.deltaY * 0.0015), e.clientX);
+		if (e.deltaX !== 0) {
 			const rect = trackEl.getBoundingClientRect();
-			panBy((dPx / rect.width) * span);
+			panBy((e.deltaX / rect.width) * span);
 		}
 	}
 
