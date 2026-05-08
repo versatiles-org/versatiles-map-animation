@@ -231,29 +231,48 @@ export function sint(bits: number): Codec<number> {
 /**
  * Variable-length unsigned integer. Each chunk is 5 bits: 4 payload + 1
  * continuation. Compact for small values: 0..15 → 5 bits; 16..255 → 10 bits.
+ *
+ * Uses arithmetic ops (not bitwise) so values can exceed 32 bits (up to
+ * Number.MAX_SAFE_INTEGER).
  */
 export const vuint: Codec<number> = {
 	encode: (value, w) => {
 		if (!Number.isInteger(value) || value < 0) {
 			throw new Error(`vuint: ${value} is not a non-negative integer`);
 		}
-		let v = value >>> 0;
+		let v = value;
 		do {
-			const chunk = v & 0xf;
-			v = v >>> 4;
+			const chunk = v % 16;
+			v = Math.floor(v / 16);
 			w.writeBits(v ? chunk | 0x10 : chunk, 5);
 		} while (v);
 	},
 	decode: (r) => {
 		let out = 0;
-		let shift = 0;
+		let scale = 1;
 		while (true) {
 			const b = r.readBits(5);
-			out |= (b & 0xf) << shift;
-			if (!(b & 0x10)) return out >>> 0;
-			shift += 4;
-			if (shift >= 32) throw new Error('vuint: overflow');
+			out += (b & 0xf) * scale;
+			if (!(b & 0x10)) return out;
+			scale *= 16;
+			if (scale > Number.MAX_SAFE_INTEGER) throw new Error('vuint: overflow');
 		}
+	}
+};
+
+/**
+ * Variable-length signed integer. Zig-zag mapping (0 → 0, -1 → 1, 1 → 2, …)
+ * onto `vuint`. Cheap for values close to zero (the common case for deltas).
+ */
+export const vsint: Codec<number> = {
+	encode: (value, w) => {
+		if (!Number.isInteger(value)) throw new Error(`vsint: ${value} is not an integer`);
+		const zz = value >= 0 ? value * 2 : -value * 2 - 1;
+		vuint.encode(zz, w);
+	},
+	decode: (r) => {
+		const u = vuint.decode(r);
+		return u % 2 === 0 ? u / 2 : -((u + 1) / 2);
 	}
 };
 

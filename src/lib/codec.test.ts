@@ -19,6 +19,7 @@ import {
 	uint,
 	unpack,
 	unpackBase64Url,
+	vsint,
 	vuint
 } from './codec';
 
@@ -127,6 +128,24 @@ describe('vuint', () => {
 	it('rejects negative or non-integer values', () => {
 		expect(() => pack(vuint, -1)).toThrow();
 		expect(() => pack(vuint, 1.5)).toThrow();
+	});
+});
+
+describe('vsint', () => {
+	it('round-trips small signed values cheaply', () => {
+		for (const v of [0, -1, 1, -7, 7, -1000, 1000, -100_000, 100_000]) {
+			expect(unpack(vsint, pack(vsint, v))).toBe(v);
+		}
+	});
+	it('handles values larger than int32', () => {
+		for (const v of [-(2 ** 33), 2 ** 33, -(2 ** 40), 2 ** 40]) {
+			expect(unpack(vsint, pack(vsint, v))).toBe(v);
+		}
+	});
+	it('uses 5 bits for 0', () => {
+		const w = new BitWriter();
+		vsint.encode(0, w);
+		expect(w.finish().length).toBe(1);
 	});
 });
 

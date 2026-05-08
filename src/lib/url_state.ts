@@ -10,6 +10,7 @@ import {
 	type Codec,
 	type InspectionNode,
 	uint,
+	vsint,
 	vuint
 } from './codec';
 import {
@@ -57,10 +58,11 @@ function mercatorToLngLat(mx: number, my: number): { lng: number; lat: number } 
  * How many bits to use for each Mercator-x / -y axis at a given zoom.
  * One world pixel at zoom z spans 1/(256·2^z) ≈ 2^-(z+8) of WM space, so
  * (z + 12) bits buys ~16× sub-pixel accuracy. Floor at 12 (sub-pixel even
- * at zoom 0) and cap at 32 (codec primitive limit).
+ * at zoom 0) and cap at 30 — that bound keeps signed deltas in safe-integer
+ * range for the zigzag varint and is still sub-pixel up to zoom 18.
  */
 function zoomBits(zoom: number): number {
-	return Math.max(12, Math.min(32, Math.ceil(zoom) + 12));
+	return Math.max(12, Math.min(30, Math.ceil(zoom) + 12));
 }
 
 // `t` is stored in milliseconds via vuint — short animations cost just a few
@@ -131,18 +133,30 @@ const KEYFRAME_DEFAULTS: WireKeyframe = {
 // position uses zoom-dependent bit widths. Mask bit i corresponds to the
 // i-th field in (t, zoom, mx, my, pitch, bearing, roll, path).
 
-function encodeMercatorAxis(value: number, zoom: number, w: BitWriter): void {
-	const n = zoomBits(zoom);
-	const max = Math.pow(2, n) - 1;
-	// Clamp to [0, 1] then quantize to n bits.
-	const clamped = Math.max(0, Math.min(1, value));
-	uint(n).encode(Math.round(clamped * max), w);
+function quantize(value: number, zoom: number): number {
+	const max = Math.pow(2, zoomBits(zoom)) - 1;
+	return Math.round(Math.max(0, Math.min(1, value)) * max);
 }
 
-function decodeMercatorAxis(zoom: number, r: BitReader): number {
-	const n = zoomBits(zoom);
-	const max = Math.pow(2, n) - 1;
-	return uint(n).decode(r) / max;
+function dequantize(intValue: number, zoom: number): number {
+	const max = Math.pow(2, zoomBits(zoom)) - 1;
+	return intValue / max;
+}
+
+function encodeMercatorAxisAbsolute(value: number, zoom: number, w: BitWriter): void {
+	uint(zoomBits(zoom)).encode(quantize(value, zoom), w);
+}
+
+function decodeMercatorAxisAbsolute(zoom: number, r: BitReader): number {
+	return dequantize(uint(zoomBits(zoom)).decode(r), zoom);
+}
+
+function encodeMercatorAxisDelta(value: number, prev: number, zoom: number, w: BitWriter): void {
+	vsint.encode(quantize(value, zoom) - quantize(prev, zoom), w);
+}
+
+function decodeMercatorAxisDelta(prev: number, zoom: number, r: BitReader): number {
+	return dequantize(quantize(prev, zoom) + vsint.decode(r), zoom);
 }
 
 /**
@@ -150,11 +164,17 @@ function decodeMercatorAxis(zoom: number, r: BitReader): number {
  * depends on the keyframe's `zoom`, which the standard `deltaArray` can't
  * express (its sub-codecs are independent).
  *
- * Carry-forward subtlety: position precision is bound to the zoom at which
- * it was last encoded, so when the same lng/lat is reused at a higher zoom,
- * blind carry-forward would drift visibly. We instead compare position with
- * a precision-aware test ("does this round to the same int at the *current*
- * zoom?"); when the answer is "no", we re-emit at the higher precision.
+ * Position encoding uses classical differential coding: the *first* time an
+ * axis is emitted it is absolute (`uint(zoomBits)`); subsequent emissions
+ * are signed deltas in the *current* zoom's grid (`vsint`). Re-quantizing
+ * the previous value into the new grid each time keeps deltas small even
+ * across zoom changes — a tighter zoom just gives a bigger grid, but the
+ * delta still represents the same physical motion.
+ *
+ * Mask uses precision-aware comparison: an axis is emitted if it would
+ * round to a different int at the current zoom. This naturally re-emits
+ * position when zoom precision increases, so the precision context shift
+ * is handled implicitly.
  */
 const keyframesCodec: Codec<WireKeyframe[]> = {
 	encode(arr, w) {
@@ -164,6 +184,8 @@ const keyframesCodec: Codec<WireKeyframe[]> = {
 		if (ins) ins.exit('[length]', w.totalBits());
 
 		let prev: WireKeyframe = { ...KEYFRAME_DEFAULTS };
+		let mxHasPrior = false;
+		let myHasPrior = false;
 		for (let idx = 0; idx < arr.length; idx++) {
 			const item = arr[idx];
 			if (ins) ins.enter(`[${idx}]`, w.totalBits());
@@ -174,9 +196,8 @@ const keyframesCodec: Codec<WireKeyframe[]> = {
 			if (item.t !== prev.t) mask |= 1 << 0;
 			if (item.zoom !== prev.zoom) mask |= 1 << 1;
 			const effZoom = mask & 0b00000010 ? item.zoom : prev.zoom;
-			const posMax = Math.pow(2, zoomBits(effZoom)) - 1;
-			if (Math.round(item.mx * posMax) !== Math.round(prev.mx * posMax)) mask |= 1 << 2;
-			if (Math.round(item.my * posMax) !== Math.round(prev.my * posMax)) mask |= 1 << 3;
+			if (quantize(item.mx, effZoom) !== quantize(prev.mx, effZoom)) mask |= 1 << 2;
+			if (quantize(item.my, effZoom) !== quantize(prev.my, effZoom)) mask |= 1 << 3;
 			if (item.pitch !== prev.pitch) mask |= 1 << 4;
 			if (item.bearing !== prev.bearing) mask |= 1 << 5;
 			if (item.roll !== prev.roll) mask |= 1 << 6;
@@ -196,13 +217,17 @@ const keyframesCodec: Codec<WireKeyframe[]> = {
 			if (mask & (1 << 1)) writeField('zoom', zoomCodec, item.zoom);
 			if (mask & (1 << 2)) {
 				if (ins) ins.enter('mx', w.totalBits());
-				encodeMercatorAxis(item.mx, effZoom, w);
+				if (mxHasPrior) encodeMercatorAxisDelta(item.mx, prev.mx, effZoom, w);
+				else encodeMercatorAxisAbsolute(item.mx, effZoom, w);
 				if (ins) ins.exit('mx', w.totalBits());
+				mxHasPrior = true;
 			}
 			if (mask & (1 << 3)) {
 				if (ins) ins.enter('my', w.totalBits());
-				encodeMercatorAxis(item.my, effZoom, w);
+				if (myHasPrior) encodeMercatorAxisDelta(item.my, prev.my, effZoom, w);
+				else encodeMercatorAxisAbsolute(item.my, effZoom, w);
 				if (ins) ins.exit('my', w.totalBits());
+				myHasPrior = true;
 			}
 			if (mask & (1 << 4)) writeField('pitch', pitchCodec, item.pitch);
 			if (mask & (1 << 5)) writeField('bearing', bearingCodec, item.bearing);
@@ -212,13 +237,11 @@ const keyframesCodec: Codec<WireKeyframe[]> = {
 			if (ins) ins.exit(`[${idx}]`, w.totalBits());
 
 			// Update `prev` to mirror exactly what the decoder will see.
-			// Encoded fields take their post-quantization value; non-encoded
-			// fields keep prev's existing (already-decoded) value.
 			const next: WireKeyframe = { ...prev };
 			if (mask & (1 << 0)) next.t = item.t; // tCodec is ms-quantized; close enough
 			if (mask & (1 << 1)) next.zoom = item.zoom;
-			if (mask & (1 << 2)) next.mx = Math.round(item.mx * posMax) / posMax;
-			if (mask & (1 << 3)) next.my = Math.round(item.my * posMax) / posMax;
+			if (mask & (1 << 2)) next.mx = dequantize(quantize(item.mx, effZoom), effZoom);
+			if (mask & (1 << 3)) next.my = dequantize(quantize(item.my, effZoom), effZoom);
 			if (mask & (1 << 4)) next.pitch = item.pitch;
 			if (mask & (1 << 5)) next.bearing = item.bearing;
 			if (mask & (1 << 6)) next.roll = item.roll;
@@ -230,14 +253,26 @@ const keyframesCodec: Codec<WireKeyframe[]> = {
 		const len = vuint.decode(r);
 		const out: WireKeyframe[] = [];
 		let prev: WireKeyframe = { ...KEYFRAME_DEFAULTS };
+		let mxHasPrior = false;
+		let myHasPrior = false;
 		for (let i = 0; i < len; i++) {
 			const mask = r.readBits(8);
 			const item: WireKeyframe = { ...prev };
 			if (mask & (1 << 0)) item.t = tCodec.decode(r);
 			if (mask & (1 << 1)) item.zoom = zoomCodec.decode(r);
 			const effZoom = item.zoom;
-			if (mask & (1 << 2)) item.mx = decodeMercatorAxis(effZoom, r);
-			if (mask & (1 << 3)) item.my = decodeMercatorAxis(effZoom, r);
+			if (mask & (1 << 2)) {
+				item.mx = mxHasPrior
+					? decodeMercatorAxisDelta(prev.mx, effZoom, r)
+					: decodeMercatorAxisAbsolute(effZoom, r);
+				mxHasPrior = true;
+			}
+			if (mask & (1 << 3)) {
+				item.my = myHasPrior
+					? decodeMercatorAxisDelta(prev.my, effZoom, r)
+					: decodeMercatorAxisAbsolute(effZoom, r);
+				myHasPrior = true;
+			}
 			if (mask & (1 << 4)) item.pitch = pitchCodec.decode(r);
 			if (mask & (1 << 5)) item.bearing = bearingCodec.decode(r);
 			if (mask & (1 << 6)) item.roll = rollCodec.decode(r);
