@@ -4,7 +4,19 @@ Headless renderer that takes a sharing code (the `kf=...` URL hash payload) and
 produces an MP4 of the animation. Runs in a Docker container with software
 WebGL — no GPU required.
 
-## Build
+## Pull a prebuilt image
+
+Every push to `main` builds and publishes a fresh image to GitHub Container
+Registry (see `.github/workflows/docker.yml`):
+
+```sh
+docker pull ghcr.io/versatiles-org/versatiles-map-animation/render:latest
+```
+
+Tags published: `latest` (default branch), `main` (branch name), `sha-<short>`
+(every push), `v<x.y.z>` (release tags).
+
+## Or build it yourself
 
 ```sh
 docker build -f render/Dockerfile -t map-anim-render .
@@ -16,7 +28,8 @@ and `render/` in the build context.)
 ## Render an animation
 
 ```sh
-docker run --rm -v "$PWD/out:/out" map-anim-render \
+docker run --rm -v "$PWD/out:/out" \
+  ghcr.io/versatiles-org/versatiles-map-animation/render:latest \
   --hash 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3...' \
   --width 1920 \
   --fps 30 \
@@ -26,7 +39,8 @@ docker run --rm -v "$PWD/out:/out" map-anim-render \
 You can also pass a full URL with `--url` and the renderer will extract the hash:
 
 ```sh
-docker run --rm -v "$PWD/out:/out" map-anim-render \
+docker run --rm -v "$PWD/out:/out" \
+  ghcr.io/versatiles-org/versatiles-map-animation/render:latest \
   --url 'https://example.org/#kf=AVYw...' \
   --output /out/animation.mp4
 ```
