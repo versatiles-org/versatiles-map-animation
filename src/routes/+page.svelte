@@ -2,6 +2,7 @@
 	import { AnimationStore } from '$lib/animation.svelte';
 	import { clearUrlHash, readAnimationFromUrl, writeAnimationToUrl } from '$lib/url_state';
 	import MapStage from '$lib/components/MapStage.svelte';
+	import MapStyleControl from '$lib/components/MapStyleControl.svelte';
 	import Timeline from '$lib/components/Timeline.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 
@@ -57,6 +58,7 @@
 	<div class="stage-wrap">
 		<div class="map-area">
 			<MapStage {store} />
+			<MapStyleControl {store} />
 			{#if store.keyframes.length === 0}
 				<div class="empty-overlay">
 					Compose a shot, then click <strong>+ Add KF</strong>. Or try
