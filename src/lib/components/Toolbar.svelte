@@ -7,7 +7,7 @@
 
 	let { store }: { store: AnimationStore } = $props();
 
-	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation/render:latest';
+	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation:latest';
 	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
 

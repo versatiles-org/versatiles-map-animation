@@ -26,7 +26,7 @@ jobs:
       - name: Lowercase image name
         id: image
         run: |
-          name="ghcr.io/${{ github.repository }}/render"
+          name="ghcr.io/${{ github.repository }}"
           echo "name=${name,,}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU (for cross-arch builds)

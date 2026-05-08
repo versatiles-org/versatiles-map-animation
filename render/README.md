@@ -10,7 +10,7 @@ Every push to `main` builds and publishes a fresh image to GitHub Container
 Registry (see `.github/workflows/docker.yml`):
 
 ```sh
-docker pull ghcr.io/versatiles-org/versatiles-map-animation/render:latest
+docker pull ghcr.io/versatiles-org/versatiles-map-animation:latest
 ```
 
 Tags published: `latest` (default branch), `main` (branch name), `sha-<short>`
@@ -29,7 +29,7 @@ and `render/` in the build context.)
 
 ```sh
 docker run --rm -v "$PWD/out:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation/render:latest \
+  ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --hash 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3...' \
   --width 1920 \
   --fps 30 \
@@ -40,7 +40,7 @@ You can also pass a full URL with `--url` and the renderer will extract the hash
 
 ```sh
 docker run --rm -v "$PWD/out:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation/render:latest \
+  ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --url 'https://example.org/#kf=AVYw...' \
   --output /out/animation.mp4
 ```
