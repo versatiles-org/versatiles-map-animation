@@ -7,8 +7,10 @@ import {
 	deltaArray,
 	enumOf,
 	fixed,
+	inspect,
 	struct,
 	type Codec,
+	type InspectionNode,
 	type TypeOf,
 	ufixed,
 	uint,
@@ -338,6 +340,27 @@ export function readAnimationFromUrl(): Animation | null {
 	const v = params.get(HASH_KEY);
 	if (!v) return null;
 	return decodeOrThrow(v);
+}
+
+/**
+ * Return a bit-cost tree for the current encoding of `anim`. Useful for
+ * debugging URL-hash size — pair with `formatInspection()` from `./codec`
+ * to print a "lat: 28 bits, zoom: 20 bits, …" tree.
+ */
+export function inspectAnimation(anim: Animation): InspectionNode {
+	const inner = inspect(AnimationCodec, {
+		version: anim.version,
+		style: anim.style,
+		terrain: anim.terrain,
+		keyframes: anim.keyframes.map(normalizeKeyframe)
+	});
+	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so
+	// the tree's bit total matches the actual on-the-wire payload.
+	return {
+		label: 'animation',
+		bits: 8 + inner.bits,
+		children: [{ label: '[format-tag]', bits: 8, children: [] }, ...inner.children]
+	};
 }
 
 export function clearUrlHash(): void {

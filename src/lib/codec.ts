@@ -27,10 +27,30 @@
 // Bit stream substrate
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional hook that combinators call around each sub-codec's encode, so that
+ * `inspect()` can build a tree of "where the bits went". Set to `undefined`
+ * (the default) for production use — the per-call overhead is then a single
+ * `?.` check.
+ */
+export interface Inspector {
+	enter(label: string, bit: number): void;
+	exit(label: string, bit: number): void;
+}
+
 export class BitWriter {
 	private bytes: number[] = [];
 	private cur = 0; // partial byte being filled, low bits valid
 	private nbits = 0; // number of bits currently in `cur`, 0..7
+	private total = 0; // total bits written
+
+	/** Optional tracing hook used by `inspect()`. */
+	inspector?: Inspector;
+
+	/** Number of bits written so far (not counting the trailing pad in finish()). */
+	totalBits(): number {
+		return this.total;
+	}
 
 	/** Write the low `n` bits of `value` to the stream, MSB-first. */
 	writeBits(value: number, n: number): void {
@@ -58,6 +78,7 @@ export class BitWriter {
 			// Drop the bits we already emitted from `v`.
 			v = remain > 0 ? v & ((1 << remain) - 1) : 0;
 		}
+		this.total += n;
 	}
 
 	/** Pad to a byte boundary with zeros and return the encoded bytes. */
@@ -301,8 +322,14 @@ export function optional<T>(inner: Codec<T>): Codec<T | undefined> {
 export function array<T>(inner: Codec<T>, lengthCodec: Codec<number> = vuint): Codec<T[]> {
 	return {
 		encode: (arr, w) => {
+			w.inspector?.enter('[length]', w.totalBits());
 			lengthCodec.encode(arr.length, w);
-			for (const v of arr) inner.encode(v, w);
+			w.inspector?.exit('[length]', w.totalBits());
+			for (let i = 0; i < arr.length; i++) {
+				w.inspector?.enter(`[${i}]`, w.totalBits());
+				inner.encode(arr[i], w);
+				w.inspector?.exit(`[${i}]`, w.totalBits());
+			}
 		},
 		decode: (r) => {
 			const len = lengthCodec.decode(r);
@@ -321,7 +348,12 @@ export function struct<S extends Record<string, Codec<unknown>>>(
 	type Out = { [K in keyof S]: S[K] extends Codec<infer V> ? V : never };
 	return {
 		encode: (value, w) => {
-			for (const k of keys) shape[k].encode((value as Out)[k], w);
+			for (const k of keys) {
+				const ins = w.inspector;
+				if (ins) ins.enter(String(k), w.totalBits());
+				shape[k].encode((value as Out)[k], w);
+				if (ins) ins.exit(String(k), w.totalBits());
+			}
 		},
 		decode: (r) => {
 			const out = {} as Out;
@@ -350,17 +382,30 @@ export function deltaArray<S extends Record<string, Codec<unknown>>>(
 	type Item = { [K in keyof S]: S[K] extends Codec<infer V> ? V : never };
 	return {
 		encode: (arr, w) => {
+			const ins = w.inspector;
+			if (ins) ins.enter('[length]', w.totalBits());
 			lengthCodec.encode(arr.length, w);
+			if (ins) ins.exit('[length]', w.totalBits());
 			let prev: Item = { ...defaults };
-			for (const item of arr) {
+			for (let idx = 0; idx < arr.length; idx++) {
+				const item = arr[idx];
+				if (ins) ins.enter(`[${idx}]`, w.totalBits());
 				let mask = 0;
 				for (let i = 0; i < keys.length; i++) {
 					if (item[keys[i]] !== prev[keys[i]]) mask |= 1 << i;
 				}
+				if (ins) ins.enter('[mask]', w.totalBits());
 				w.writeBits(mask, maskBits);
+				if (ins) ins.exit('[mask]', w.totalBits());
 				for (let i = 0; i < keys.length; i++) {
-					if (mask & (1 << i)) shape[keys[i]].encode(item[keys[i]], w);
+					if (mask & (1 << i)) {
+						const k = keys[i];
+						if (ins) ins.enter(String(k), w.totalBits());
+						shape[k].encode(item[k], w);
+						if (ins) ins.exit(String(k), w.totalBits());
+					}
 				}
+				if (ins) ins.exit(`[${idx}]`, w.totalBits());
 				prev = { ...prev, ...item };
 			}
 		},
@@ -382,4 +427,68 @@ export function deltaArray<S extends Record<string, Codec<unknown>>>(
 			return out;
 		}
 	};
+}
+
+// ---------------------------------------------------------------------------
+// Inspector — "where do the bits go?"
+// ---------------------------------------------------------------------------
+
+/** A node in the bit-cost tree returned by `inspect()`. */
+export interface InspectionNode {
+	label: string;
+	bits: number;
+	children: InspectionNode[];
+}
+
+/**
+ * Encode `value` with `codec` and return a tree describing how many bits each
+ * sub-codec contributed. Useful for debugging URL-hash size: drop the result
+ * into `formatInspection()` to see a tree of "lat: 28 bits, zoom: 20 bits…".
+ *
+ * Combinators (struct/array/deltaArray) emit one tree node per field or
+ * element. Primitive codecs are leaves attributed to their parent.
+ */
+export function inspect<T>(codec: Codec<T>, value: T): InspectionNode {
+	type Pending = InspectionNode & { _start: number };
+	const root: Pending = { label: 'root', bits: 0, children: [], _start: 0 };
+	const stack: Pending[] = [root];
+	const w = new BitWriter();
+	w.inspector = {
+		enter(label, bit) {
+			const node: Pending = { label, bits: 0, children: [], _start: bit };
+			stack[stack.length - 1].children.push(node);
+			stack.push(node);
+		},
+		exit(_label, bit) {
+			const node = stack.pop();
+			if (node) node.bits = bit - node._start;
+		}
+	};
+	codec.encode(value, w);
+	root.bits = w.totalBits();
+	const strip = (n: Pending): InspectionNode => ({
+		label: n.label,
+		bits: n.bits,
+		children: n.children.map((c) => strip(c as Pending))
+	});
+	return strip(root);
+}
+
+/** Pretty-print an inspection tree as an indented, branched layout. */
+export function formatInspection(node: InspectionNode): string {
+	const lines: string[] = [];
+	const fmt = (b: number) => `${b} bit${b === 1 ? '' : 's'} (${(b / 8).toFixed(1)} B)`;
+	const recurse = (n: InspectionNode, prefix: string, isLast: boolean, isRoot: boolean) => {
+		if (isRoot) {
+			lines.push(`${n.label}: ${fmt(n.bits)}`);
+		} else {
+			lines.push(`${prefix}${isLast ? '└── ' : '├── '}${n.label}: ${fmt(n.bits)}`);
+		}
+		const childPrefix = isRoot ? '' : prefix + (isLast ? '    ' : '│   ');
+		for (let i = 0; i < n.children.length; i++) {
+			recurse(n.children[i], childPrefix, i === n.children.length - 1, false);
+		}
+	};
+	recurse(node, '', true, true);
+	return lines.join('\n');
 }
