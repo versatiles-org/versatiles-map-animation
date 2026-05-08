@@ -170,18 +170,22 @@
 		<button type="button" onclick={onAdd} title="Add a keyframe at the current playhead time">
 			+ Add KF
 		</button>
-		{#if hasSelection}
-			<button
-				type="button"
-				onclick={onUpdate}
-				title="Update the selected keyframe to the current camera"
-			>
-				↻ Update KF
-			</button>
-			<button type="button" onclick={onDelete} title="Delete the selected keyframe">
-				✕ Delete KF
-			</button>
-		{/if}
+		<button
+			type="button"
+			onclick={onUpdate}
+			disabled={!hasSelection}
+			title="Update the selected keyframe to the current camera"
+		>
+			↻ Update KF
+		</button>
+		<button
+			type="button"
+			onclick={onDelete}
+			disabled={!hasSelection}
+			title="Delete the selected keyframe"
+		>
+			✕ Delete KF
+		</button>
 	</div>
 
 	<div class="group">
