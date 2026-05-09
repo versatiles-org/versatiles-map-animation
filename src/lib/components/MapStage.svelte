@@ -61,7 +61,9 @@
 			bearing: initialCam.bearing,
 			roll: initialCam.roll,
 			maxPitch: 90,
-			attributionControl: { compact: true },
+			// Disable MapLibre's built-in attribution control; we render a
+			// minimal "VersaTiles" watermark in the corner instead (see template).
+			attributionControl: false,
 			centerClampedToGround: false,
 			// Animations sweep across many zoom levels and revisit the same
 			// regions repeatedly. The default cache (5 zoom levels worth of
@@ -81,11 +83,6 @@
 			// `freezeElevation: true` on subsequent easeTo calls, this prevents
 			// MapLibre from updating transform.elevation each frame.
 			map?.setCenterElevation(0);
-			const attrib = container.querySelector('.maplibregl-ctrl-attrib');
-			if (attrib?.classList.contains('maplibregl-compact')) {
-				attrib.classList.remove('maplibregl-compact-show');
-				attrib.removeAttribute('open');
-			}
 			// Expose the map instance for the offline renderer (see render/).
 			if (new URLSearchParams(window.location.search).get('render') === '1') {
 				(window as unknown as { __map: unknown }).__map = map;
@@ -146,17 +143,57 @@
 			cancelled = true;
 		};
 	});
+
+	// Watermark colours flip with the base map: dark text + light outline reads
+	// best on the colourful style, light text + dark outline on satellite imagery.
+	const onSatellite = $derived(store.style === 'satellite' || store.style === 'satellite-overlay');
 </script>
 
-<div bind:this={container} class="map-stage" data-testid="map-stage"></div>
+<div class="map-stage" data-testid="map-stage">
+	<div bind:this={container} class="map-canvas"></div>
+	<a
+		class="watermark"
+		class:on-satellite={onSatellite}
+		href="https://versatiles.org/sources"
+		target="_blank"
+		rel="noopener noreferrer">VersaTiles</a
+	>
+</div>
 
 <style>
 	.map-stage {
+		position: relative;
 		width: 100%;
 		height: 100%;
 		background: #111;
 	}
+	.map-canvas {
+		width: 100%;
+		height: 100%;
+	}
 	.map-stage :global(.maplibregl-canvas) {
 		outline: none;
+	}
+	.watermark {
+		position: absolute;
+		bottom: 4px;
+		right: 6px;
+		z-index: 1;
+		font:
+			600 11px/1 system-ui,
+			-apple-system,
+			'Segoe UI',
+			sans-serif;
+		text-decoration: none;
+		paint-order: stroke fill; /* stroke under the fill */
+		user-select: none;
+		letter-spacing: 0.02em;
+		/* Default: colourful style — dark glyphs on a light halo. */
+		color: #000;
+		-webkit-text-stroke: 2px #fff;
+	}
+	.watermark.on-satellite {
+		color: #fff;
+		-webkit-text-stroke: 2px #000;
 	}
 </style>
