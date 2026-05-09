@@ -1,10 +1,14 @@
 import {
+	DEFAULT_ANNOTATION_COLOR,
+	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
+	isAnnotationIcon,
 	isMapStyleId,
 	isPathStyle,
 	SCHEMA_VERSION,
 	type Animation,
+	type Annotation,
 	type Keyframe,
 	type MapStyleId
 } from './types';
@@ -74,5 +78,44 @@ export function validateAnimation(input: unknown): Animation {
 		if (isPathStyle(o.path)) kf.path = o.path;
 		return kf;
 	});
-	return { version: SCHEMA_VERSION, style, terrain, keyframes };
+	const annotations: Annotation[] = Array.isArray(obj.annotations)
+		? obj.annotations.map((raw, i) => validateAnnotation(raw, i))
+		: [];
+	return { version: SCHEMA_VERSION, style, terrain, keyframes, annotations };
+}
+
+function validateAnnotation(raw: unknown, i: number): Annotation {
+	if (!raw || typeof raw !== 'object') {
+		throw new Error(`Annotation ${i}: not an object.`);
+	}
+	const o = raw as Record<string, unknown>;
+	const num = (key: string): number => {
+		const v = o[key];
+		if (typeof v !== 'number' || !Number.isFinite(v)) {
+			throw new Error(`Annotation ${i}: missing or invalid "${key}".`);
+		}
+		return v;
+	};
+	const optionalNum = (key: string): number | undefined => {
+		const v = o[key];
+		if (v === undefined) return undefined;
+		if (typeof v !== 'number' || !Number.isFinite(v)) {
+			throw new Error(`Annotation ${i}: invalid "${key}".`);
+		}
+		return v;
+	};
+	const out: Annotation = {
+		lng: num('lng'),
+		lat: num('lat'),
+		icon: isAnnotationIcon(o.icon) ? o.icon : DEFAULT_ANNOTATION_ICON,
+		color: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
+		label: typeof o.label === 'string' ? o.label : ''
+	};
+	const rotation = optionalNum('rotation');
+	if (rotation !== undefined) out.rotation = rotation;
+	const visibleFrom = optionalNum('visibleFrom');
+	if (visibleFrom !== undefined) out.visibleFrom = visibleFrom;
+	const visibleUntil = optionalNum('visibleUntil');
+	if (visibleUntil !== undefined) out.visibleUntil = visibleUntil;
+	return out;
 }

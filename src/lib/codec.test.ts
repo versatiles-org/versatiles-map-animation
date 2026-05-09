@@ -13,6 +13,7 @@ import {
 	pack,
 	packBase64Url,
 	sint,
+	string,
 	struct,
 	type Codec,
 	ufixed,
@@ -300,6 +301,23 @@ describe('deltaArray', () => {
 
 	it('round-trips an empty array', () => {
 		expect(unpack(Frame, pack(Frame, []))).toEqual([]);
+	});
+});
+
+describe('string', () => {
+	it('round-trips ascii', () => {
+		expect(unpack(string, pack(string, 'hello world'))).toBe('hello world');
+	});
+	it('round-trips unicode (multi-byte UTF-8)', () => {
+		expect(unpack(string, pack(string, 'Köln 🦊 北京'))).toBe('Köln 🦊 北京');
+	});
+	it('round-trips the empty string', () => {
+		expect(unpack(string, pack(string, ''))).toBe('');
+	});
+	it('survives byte-misalignment when nested in a struct', () => {
+		const c = struct({ a: bool, s: string, b: uint(3) });
+		const value = { a: true, s: 'mid', b: 5 };
+		expect(unpack(c, pack(c, value))).toEqual(value);
 	});
 });
 

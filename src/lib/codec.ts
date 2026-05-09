@@ -294,6 +294,25 @@ export function fixed(bits: number, scale: number): Codec<number> {
 	};
 }
 
+/**
+ * A length-prefixed UTF-8 string. Cheap for short strings (5 bits length +
+ * 8 bits per byte); use sparingly — strings are the worst offender for URL
+ * size in our schema.
+ */
+export const string: Codec<string> = {
+	encode: (s, w) => {
+		const bytes = new TextEncoder().encode(s);
+		vuint.encode(bytes.length, w);
+		for (const b of bytes) w.writeBits(b, 8);
+	},
+	decode: (r) => {
+		const len = vuint.decode(r);
+		const bytes = new Uint8Array(len);
+		for (let i = 0; i < len; i++) bytes[i] = r.readBits(8);
+		return new TextDecoder().decode(bytes);
+	}
+};
+
 /** A string union codec. Costs `⌈log₂(values.length)⌉` bits. */
 export function enumOf<const T extends readonly [string, ...string[]]>(
 	values: T

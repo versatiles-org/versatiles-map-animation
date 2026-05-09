@@ -7,12 +7,13 @@ import {
 	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
 } from './types';
-import type { Animation, CameraState, Keyframe, MapStyleId, PathStyle } from './types';
+import type { Animation, Annotation, CameraState, Keyframe, MapStyleId, PathStyle } from './types';
 
 const MIN_TIME_GAP = 0.01;
 
 export class AnimationStore {
 	keyframes = $state<Keyframe[]>([]);
+	annotations = $state<Annotation[]>([]);
 	currentTime = $state(0);
 	isPlaying = $state(false);
 	selectedIndex = $state<number | null>(null);
@@ -138,6 +139,7 @@ export class AnimationStore {
 
 	loadFromAnimation(anim: Animation): void {
 		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
+		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
 		this.style = anim.style ?? DEFAULT_STYLE;
 		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
 		this.selectedIndex = null;
@@ -150,7 +152,8 @@ export class AnimationStore {
 			version: SCHEMA_VERSION,
 			style: this.style,
 			terrain: this.terrain,
-			keyframes: this.keyframes.map((kf) => ({ ...kf }))
+			keyframes: this.keyframes.map((kf) => ({ ...kf })),
+			annotations: this.annotations.map((a) => ({ ...a }))
 		};
 	}
 
