@@ -118,7 +118,11 @@
 		const input = e.currentTarget as HTMLInputElement;
 		const raw = readNonNegativeOrUndefined(e);
 		if (raw === undefined) {
-			patch({ visibleFrom: undefined });
+			// Clearing the bound also resets its fade — a dangling fadeIn would
+			// be silently invisible (the opacity helper ignores it when there's
+			// no anchor) but would still persist via the codec, and re-enabling
+			// the bound would surprise the user with a fade they didn't ask for.
+			patch({ visibleFrom: undefined, fadeIn: 0 });
 			return;
 		}
 		const until = ann?.visibleUntil;
@@ -131,7 +135,7 @@
 		const input = e.currentTarget as HTMLInputElement;
 		const raw = readNonNegativeOrUndefined(e);
 		if (raw === undefined) {
-			patch({ visibleUntil: undefined });
+			patch({ visibleUntil: undefined, fadeOut: 0 });
 			return;
 		}
 		const from = ann?.visibleFrom;
@@ -141,10 +145,10 @@
 		syncInput(input, clamped);
 	}
 	function onClearFrom() {
-		patch({ visibleFrom: undefined });
+		patch({ visibleFrom: undefined, fadeIn: 0 });
 	}
 	function onClearUntil() {
-		patch({ visibleUntil: undefined });
+		patch({ visibleUntil: undefined, fadeOut: 0 });
 	}
 	function onFadeIn(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
