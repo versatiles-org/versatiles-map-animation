@@ -127,6 +127,7 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 		color: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
 		label: typeof o.label === 'string' ? o.label : ''
 	};
+	if (typeof o.labelColor === 'string') out.labelColor = o.labelColor;
 	const rotation = optionalNum('rotation');
 	if (rotation !== undefined) out.rotation = rotation;
 	const visibleFrom = optionalNum('visibleFrom');

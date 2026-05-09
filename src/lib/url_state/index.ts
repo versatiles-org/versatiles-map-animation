@@ -16,6 +16,7 @@
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
 import {
+	DEFAULT_ANNOTATION_LABEL_COLOR,
 	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_LABEL_DISTANCE,
 	DEFAULT_LABEL_POSITION,
@@ -61,7 +62,8 @@ export function encodeAnimation(anim: Animation): string {
 				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
 				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
 				(a.fadeIn ?? 0) !== 0 ||
-				(a.fadeOut ?? 0) !== 0
+				(a.fadeOut ?? 0) !== 0 ||
+				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	if (needsV4) {
@@ -240,7 +242,8 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
 				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
 				(a.fadeIn ?? 0) !== 0 ||
-				(a.fadeOut ?? 0) !== 0
+				(a.fadeOut ?? 0) !== 0 ||
+				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	const inner = needsV4

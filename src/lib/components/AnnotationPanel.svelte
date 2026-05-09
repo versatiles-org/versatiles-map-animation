@@ -4,6 +4,7 @@
 	import {
 		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
+		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
@@ -44,6 +45,9 @@
 	}
 	function onColor(e: Event) {
 		patch({ color: (e.currentTarget as HTMLInputElement).value });
+	}
+	function onLabelColor(e: Event) {
+		patch({ labelColor: (e.currentTarget as HTMLInputElement).value });
 	}
 	function onIcon(icon: AnnotationIcon) {
 		patch({ icon });
@@ -250,14 +254,26 @@
 		</div>
 
 		<label class="row">
-			<span class="lbl">Color</span>
+			<span class="lbl">Icon col</span>
 			<input
 				type="color"
 				value={normalizeHex(ann.color)}
 				oninput={onColor}
-				aria-label="Annotation color"
+				aria-label="Icon color"
 			/>
 			<span class="hex">{ann.color}</span>
+		</label>
+
+		<label class="row">
+			<span class="lbl">Label col</span>
+			<input
+				type="color"
+				value={normalizeHex(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
+				oninput={onLabelColor}
+				aria-label="Label color"
+				title="Label text color. The halo automatically flips to a contrasting brightness to keep the label legible."
+			/>
+			<span class="hex">{ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
 		</label>
 
 		<label class="row">

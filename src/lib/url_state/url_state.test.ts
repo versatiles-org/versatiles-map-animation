@@ -283,6 +283,24 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 		expect(decoded?.annotations[1].iconSize).toBeCloseTo(1.5, 2);
 	});
 
+	it('non-default labelColor switches to V4 and round-trips', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					color: '#fff',
+					label: 'L',
+					labelColor: '#ff0080'
+				}
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].labelColor).toBe('#ff0080');
+	});
+
 	it('non-default labelDistance switches to V4 and round-trips', () => {
 		const anim: Animation = {
 			...example,

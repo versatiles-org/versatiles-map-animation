@@ -16,6 +16,7 @@ import {
 	ANNOTATION_ICONS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
+	DEFAULT_ANNOTATION_LABEL_COLOR,
 	DEFAULT_LABEL_DISTANCE,
 	DEFAULT_LABEL_POSITION,
 	isAnnotationIcon,
@@ -84,6 +85,8 @@ export interface WireAnnotation {
 	fadeIn: number;
 	/** Fade-out seconds. Default 0. */
 	fadeOut: number;
+	/** Label text colour as 0xRRGGBB. Default = parsed `DEFAULT_ANNOTATION_LABEL_COLOR`. */
+	labelColor: number;
 }
 
 const ANNOTATION_DEFAULTS: WireAnnotation = {
@@ -102,7 +105,9 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	labelPosition: DEFAULT_LABEL_POSITION,
 	labelDistance: DEFAULT_LABEL_DISTANCE,
 	fadeIn: 0,
-	fadeOut: 0
+	fadeOut: 0,
+	// 0x111111 — must match parseHexColor(DEFAULT_ANNOTATION_LABEL_COLOR).
+	labelColor: 0x111111
 };
 
 export const annotationsCodec: Codec<WireAnnotation[]> = {
@@ -190,8 +195,9 @@ export const annotationsCodec: Codec<WireAnnotation[]> = {
 /**
  * V4 codec: 16-bit mask + extra fields beyond V2 — bit 8 iconSize, bit 9
  * labelSize, bit 10 labelPosition, bit 11 labelDistance, bit 12 fadeIn,
- * bit 13 fadeOut. Used only when at least one annotation has a non-default
- * value for any of these; V2/V3 stay byte-stable for share links that don't.
+ * bit 13 fadeOut, bit 14 labelColor. Used only when at least one annotation
+ * has a non-default value for any of these; V2/V3 stay byte-stable for share
+ * links that don't.
  */
 export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 	encode(arr, w) {
@@ -225,6 +231,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (item.labelDistance !== prev.labelDistance) mask |= 1 << 11;
 			if (item.fadeIn !== prev.fadeIn) mask |= 1 << 12;
 			if (item.fadeOut !== prev.fadeOut) mask |= 1 << 13;
+			if (item.labelColor !== prev.labelColor) mask |= 1 << 14;
 
 			if (ins) ins.enter('[mask]', w.totalBits());
 			w.writeBits(mask, 16);
@@ -250,6 +257,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 11)) writeField('labelDistance', labelDistanceCodec, item.labelDistance);
 			if (mask & (1 << 12)) writeField('fadeIn', annotationVisibilityCodec, item.fadeIn);
 			if (mask & (1 << 13)) writeField('fadeOut', annotationVisibilityCodec, item.fadeOut);
+			if (mask & (1 << 14)) writeField('labelColor', annotationColorCodec, item.labelColor);
 
 			if (ins) ins.exit(`[${idx}]`, w.totalBits());
 
@@ -268,6 +276,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 11)) next.labelDistance = item.labelDistance;
 			if (mask & (1 << 12)) next.fadeIn = item.fadeIn;
 			if (mask & (1 << 13)) next.fadeOut = item.fadeOut;
+			if (mask & (1 << 14)) next.labelColor = item.labelColor;
 			prev = next;
 		}
 	},
@@ -292,6 +301,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 11)) item.labelDistance = labelDistanceCodec.decode(r);
 			if (mask & (1 << 12)) item.fadeIn = annotationVisibilityCodec.decode(r);
 			if (mask & (1 << 13)) item.fadeOut = annotationVisibilityCodec.decode(r);
+			if (mask & (1 << 14)) item.labelColor = annotationColorCodec.decode(r);
 			out.push(item);
 			prev = item;
 		}
@@ -358,7 +368,8 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION,
 		labelDistance: Math.max(0, ann.labelDistance ?? DEFAULT_LABEL_DISTANCE),
 		fadeIn: Math.max(0, ann.fadeIn ?? 0),
-		fadeOut: Math.max(0, ann.fadeOut ?? 0)
+		fadeOut: Math.max(0, ann.fadeOut ?? 0),
+		labelColor: parseHexColor(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
 	};
 }
 
@@ -380,5 +391,6 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	if (wire.labelDistance !== DEFAULT_LABEL_DISTANCE) out.labelDistance = wire.labelDistance;
 	if (wire.fadeIn !== 0) out.fadeIn = wire.fadeIn;
 	if (wire.fadeOut !== 0) out.fadeOut = wire.fadeOut;
+	if (wire.labelColor !== 0x111111) out.labelColor = formatHexColor(wire.labelColor);
 	return out;
 }

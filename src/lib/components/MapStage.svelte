@@ -7,6 +7,7 @@
 	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
+		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_INITIAL_VIEW,
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_POSITION,
@@ -14,6 +15,20 @@
 		type CameraState,
 		type LabelPosition
 	} from '../types';
+
+	// Pick a halo colour with the opposite brightness so the label stays
+	// legible regardless of the user's chosen text color. Uses the standard
+	// luminance weights (Rec. 709 coefficients).
+	function haloFor(hex: string): string {
+		const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+		if (!m) return '#fff';
+		const n = parseInt(m[1], 16);
+		const r = (n >> 16) & 0xff;
+		const g = (n >> 8) & 0xff;
+		const b = n & 0xff;
+		const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+		return lum > 0.5 ? '#000' : '#fff';
+	}
 
 	let { store, editMode = false }: { store: AnimationStore; editMode?: boolean } = $props();
 
@@ -117,7 +132,9 @@
 						iconSize: a.iconSize ?? 1,
 						labelSize: a.labelSize ?? 1,
 						textAnchor: LABEL_TEXT_ANCHOR[pos],
-						textOffset: [unit[0] * dist, unit[1] * dist] as [number, number]
+						textOffset: [unit[0] * dist, unit[1] * dist] as [number, number],
+						labelColor: a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR,
+						labelHalo: haloFor(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
 					}
 				};
 			})
@@ -168,8 +185,11 @@
 					// in the brief moment after the layer is re-installed but
 					// before the per-frame effect runs).
 					'icon-opacity': ['coalesce', ['feature-state', 'opacity'], 1],
-					'text-color': '#111',
-					'text-halo-color': '#fff',
+					// Per-feature label colour. Halo is auto-flipped to the
+					// contrasting brightness in `buildAnnotationFeatures`, so
+					// any user-picked text colour stays legible.
+					'text-color': ['get', 'labelColor'],
+					'text-halo-color': ['get', 'labelHalo'],
 					'text-halo-width': 1.5,
 					'text-opacity': ['coalesce', ['feature-state', 'opacity'], 1]
 				}

@@ -68,6 +68,9 @@ export const DEFAULT_ANNOTATION_ICON: AnnotationIcon = 'symbol-marker';
 // satellite, satellite + overlay) — white was nearly invisible on the
 // colourful style, which made freshly-pinned markers easy to lose.
 export const DEFAULT_ANNOTATION_COLOR = '#cc0000';
+// Near-black text reads on the colourful basemap; the auto-flipped halo
+// (white here, black when the label is light) keeps it legible on satellite.
+export const DEFAULT_ANNOTATION_LABEL_COLOR = '#111111';
 
 /**
  * Animation-wide multiplier on annotation icon and label size. The map also
@@ -116,8 +119,14 @@ export interface Annotation {
 	lng: number;
 	lat: number;
 	icon: AnnotationIcon;
-	/** Any CSS hex colour; the canonical wire form is `#RRGGBB`. */
+	/** Icon colour. Any CSS hex; canonical wire form is `#RRGGBB`. */
 	color: string;
+	/**
+	 * Label text colour. Default `DEFAULT_ANNOTATION_LABEL_COLOR` (near-black);
+	 * the halo auto-flips to the contrasting brightness so the label stays
+	 * legible on any basemap.
+	 */
+	labelColor?: string;
 	/** Text shown next to the marker. Empty string = no label. */
 	label: string;
 	/** Degrees clockwise; only meaningful for arrow-style icons. */
