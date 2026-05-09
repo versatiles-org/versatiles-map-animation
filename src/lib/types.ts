@@ -8,7 +8,7 @@ export function isPathStyle(value: unknown): value is PathStyle {
 	return typeof value === 'string' && (PATH_STYLES as readonly string[]).includes(value);
 }
 
-export const MAP_STYLE_IDS = ['colorful', 'satellite', 'satellite-overlay'] as const;
+export const MAP_STYLE_IDS = ['colorful', 'satellite'] as const;
 export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
 
 /**
@@ -78,11 +78,11 @@ export const DEFAULT_ANNOTATION_SCALE = 1;
 
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'Colorful',
-	satellite: 'Satellite',
-	'satellite-overlay': 'Satellite + overlay'
+	satellite: 'Satellite'
 };
 
 export const DEFAULT_STYLE: MapStyleId = 'colorful';
+export const DEFAULT_LABELS = true;
 export const DEFAULT_TERRAIN = false;
 
 export function isMapStyleId(value: unknown): value is MapStyleId {
@@ -198,6 +198,12 @@ export function isLabelPosition(value: unknown): value is LabelPosition {
 export interface Animation {
 	version: number;
 	style: MapStyleId;
+	/**
+	 * For `colorful`: show / hide place names, road names, POIs, etc.
+	 * For `satellite`: show the colorful overlay (roads + labels) on top of
+	 * the imagery, or just the raw imagery on its own.
+	 */
+	labels: boolean;
 	terrain: boolean;
 	keyframes: Keyframe[];
 	annotations: Annotation[];
@@ -218,6 +224,7 @@ export function createEmptyAnimation(): Animation {
 	return {
 		version: SCHEMA_VERSION,
 		style: DEFAULT_STYLE,
+		labels: DEFAULT_LABELS,
 		terrain: DEFAULT_TERRAIN,
 		keyframes: [],
 		annotations: [],

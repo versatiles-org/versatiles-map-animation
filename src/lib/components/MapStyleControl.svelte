@@ -14,6 +14,15 @@
 			{/each}
 		</select>
 	</label>
+	<label
+		class="row checkbox"
+		title={store.style === 'satellite'
+			? 'Show the colorful overlay (roads + place names) on top of the satellite imagery'
+			: 'Show place names, road names, and POIs on the colorful basemap'}
+	>
+		<input type="checkbox" bind:checked={store.labels} />
+		<span>Labels</span>
+	</label>
 	<label class="row checkbox" title="Toggle 3D terrain">
 		<input type="checkbox" bind:checked={store.terrain} />
 		<span>Terrain</span>
@@ -23,12 +32,9 @@
 <style>
 	.map-style-control {
 		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 0.35rem 0.6rem;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid #333;
-		border-radius: 6px;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.4rem;
 		font-size: 12px;
 		color: #ddd;
 	}

@@ -215,9 +215,10 @@
 
 	onMount(async () => {
 		const initialId = untrack(() => store.style);
+		const initialLabels = untrack(() => store.labels);
 		const initialTerrain = untrack(() => store.terrain);
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
-		const style = await buildMapStyle(initialId, initialTerrain);
+		const style = await buildMapStyle(initialId, initialLabels, initialTerrain);
 		map = new maplibregl.Map({
 			container,
 			style,
@@ -336,10 +337,11 @@
 
 	$effect(() => {
 		const id = store.style;
+		const labels = store.labels;
 		const terrain = store.terrain;
 		if (!map || !initialStyleApplied) return;
 		let cancelled = false;
-		buildMapStyle(id, terrain).then((newStyle) => {
+		buildMapStyle(id, labels, terrain).then((newStyle) => {
 			if (cancelled || !map) return;
 			// setStyle({ diff: false }) wipes our custom source/layer along with
 			// the rest. Re-install once the new style has finished loading.
@@ -417,7 +419,7 @@
 
 	// Watermark colours flip with the base map: dark text + light outline reads
 	// best on the colourful style, light text + dark outline on satellite imagery.
-	const onSatellite = $derived(store.style === 'satellite' || store.style === 'satellite-overlay');
+	const onSatellite = $derived(store.style === 'satellite');
 </script>
 
 <div class="map-stage" data-testid="map-stage">

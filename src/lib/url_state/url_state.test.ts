@@ -5,6 +5,7 @@ import { SCHEMA_VERSION, type Animation } from '../types';
 const example: Animation = {
 	version: SCHEMA_VERSION,
 	style: 'colorful',
+	labels: true,
 	terrain: false,
 	keyframes: [
 		{ t: 0, lng: 0, lat: 30, zoom: 1.5, pitch: 0, bearing: 0, roll: 0 },
@@ -27,11 +28,12 @@ describe('encode/decode round-trip', () => {
 		expect(decoded?.keyframes[2].lat).toBeCloseTo(52.52, 5);
 	});
 
-	it('round-trips style and terrain', () => {
+	it('round-trips style, labels, and terrain', () => {
 		const decoded = decodeAnimation(
-			encodeAnimation({ ...example, style: 'satellite-overlay', terrain: true })
+			encodeAnimation({ ...example, style: 'satellite', labels: false, terrain: true })
 		);
-		expect(decoded?.style).toBe('satellite-overlay');
+		expect(decoded?.style).toBe('satellite');
+		expect(decoded?.labels).toBe(false);
 		expect(decoded?.terrain).toBe(true);
 	});
 

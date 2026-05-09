@@ -24,9 +24,12 @@ export const FORMAT_TAG_BINARY_V4 = 0x04;
 
 const styleCodec = enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]]);
 
+// `labels` is animation-wide: shows place names / road shields on `colorful`,
+// or the colorful overlay on top of `satellite` imagery. 1 bit per encoding.
 export const AnimationCodecV1 = struct({
 	version: uint(4),
 	style: styleCodec,
+	labels: bool,
 	terrain: bool,
 	keyframes: keyframesCodec
 });
@@ -34,6 +37,7 @@ export const AnimationCodecV1 = struct({
 export const AnimationCodecV2 = struct({
 	version: uint(4),
 	style: styleCodec,
+	labels: bool,
 	terrain: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodec
@@ -50,6 +54,7 @@ export const annotationScaleCodec: Codec<number> = {
 export const AnimationCodecV3 = struct({
 	version: uint(4),
 	style: styleCodec,
+	labels: bool,
 	terrain: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodec,
@@ -62,6 +67,7 @@ export const AnimationCodecV3 = struct({
 export const AnimationCodecV4 = struct({
 	version: uint(4),
 	style: styleCodec,
+	labels: bool,
 	terrain: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodecV4,

@@ -42,6 +42,7 @@
 		void store.annotations;
 		void store.annotationScale;
 		void store.style;
+		void store.labels;
 		void store.terrain;
 		if (urlTimer) clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {

@@ -26,19 +26,30 @@ function withMarkersSprite(style: StyleSpecification): StyleSpecification {
 	return style;
 }
 
-export async function buildMapStyle(id: MapStyleId, terrain: boolean): Promise<StyleSpecification> {
+export async function buildMapStyle(
+	id: MapStyleId,
+	labels: boolean,
+	terrain: boolean
+): Promise<StyleSpecification> {
 	switch (id) {
 		case 'colorful':
+			// `hideLabels: true` strips every symbol layer (place names, POIs,
+			// shields). For colorful that's the only "show labels" knob the
+			// upstream builder offers.
 			return withMarkersSprite(
-				await colorful({ baseUrl: TILES_BASE_URL, terrain, hillshade: terrain })
+				await colorful({
+					baseUrl: TILES_BASE_URL,
+					hideLabels: !labels,
+					terrain,
+					hillshade: terrain
+				})
 			);
 		case 'satellite':
+			// Satellite imagery is always rendered. The `overlay` flag adds the
+			// colorful basemap (roads, labels, etc.) on top — that's the
+			// satellite equivalent of "show labels".
 			return withMarkersSprite(
-				await satellite({ baseUrl: TILES_BASE_URL, overlay: false, terrain })
-			);
-		case 'satellite-overlay':
-			return withMarkersSprite(
-				await satellite({ baseUrl: TILES_BASE_URL, overlay: true, terrain })
+				await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain })
 			);
 	}
 }

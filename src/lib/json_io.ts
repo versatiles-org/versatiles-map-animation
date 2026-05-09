@@ -2,6 +2,7 @@ import {
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_ANNOTATION_SCALE,
+	DEFAULT_LABELS,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isAnnotationIcon,
@@ -52,6 +53,7 @@ export function validateAnimation(input: unknown): Animation {
 		);
 	}
 	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : DEFAULT_STYLE;
+	const labels = typeof obj.labels === 'boolean' ? obj.labels : DEFAULT_LABELS;
 	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
 	if (!Array.isArray(obj.keyframes)) {
 		throw new Error('Invalid file: "keyframes" missing or not an array.');
@@ -87,7 +89,15 @@ export function validateAnimation(input: unknown): Animation {
 		typeof obj.annotationScale === 'number' && Number.isFinite(obj.annotationScale)
 			? Math.max(0.01, obj.annotationScale)
 			: DEFAULT_ANNOTATION_SCALE;
-	return { version: SCHEMA_VERSION, style, terrain, keyframes, annotations, annotationScale };
+	return {
+		version: SCHEMA_VERSION,
+		style,
+		labels,
+		terrain,
+		keyframes,
+		annotations,
+		annotationScale
+	};
 }
 
 function validateAnnotation(raw: unknown, i: number): Annotation {

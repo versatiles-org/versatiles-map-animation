@@ -70,6 +70,7 @@ export function encodeAnimation(anim: Animation): string {
 			{
 				version: anim.version,
 				style: anim.style,
+				labels: anim.labels,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
@@ -83,6 +84,7 @@ export function encodeAnimation(anim: Animation): string {
 			{
 				version: anim.version,
 				style: anim.style,
+				labels: anim.labels,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
@@ -96,6 +98,7 @@ export function encodeAnimation(anim: Animation): string {
 			{
 				version: anim.version,
 				style: anim.style,
+				labels: anim.labels,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation)
@@ -108,6 +111,7 @@ export function encodeAnimation(anim: Animation): string {
 			{
 				version: anim.version,
 				style: anim.style,
+				labels: anim.labels,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe)
 			},
@@ -149,6 +153,7 @@ function decodeOrThrow(encoded: string): Animation {
 		return {
 			version: SCHEMA_VERSION,
 			style: wire.style,
+			labels: wire.labels,
 			terrain: wire.terrain,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
@@ -161,6 +166,7 @@ function decodeOrThrow(encoded: string): Animation {
 		return {
 			version: SCHEMA_VERSION,
 			style: wire.style,
+			labels: wire.labels,
 			terrain: wire.terrain,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
@@ -173,6 +179,7 @@ function decodeOrThrow(encoded: string): Animation {
 		return {
 			version: SCHEMA_VERSION,
 			style: wire.style,
+			labels: wire.labels,
 			terrain: wire.terrain,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
@@ -184,6 +191,7 @@ function decodeOrThrow(encoded: string): Animation {
 	return {
 		version: SCHEMA_VERSION,
 		style: wire.style,
+		labels: wire.labels,
 		terrain: wire.terrain,
 		keyframes: wire.keyframes.map(denormalizeKeyframe),
 		annotations: [],
@@ -239,6 +247,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 		? inspect(AnimationCodecV4, {
 				version: anim.version,
 				style: anim.style,
+				labels: anim.labels,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
@@ -248,6 +257,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 			? inspect(AnimationCodecV3, {
 					version: anim.version,
 					style: anim.style,
+					labels: anim.labels,
 					terrain: anim.terrain,
 					keyframes: anim.keyframes.map(normalizeKeyframe),
 					annotations: anim.annotations.map(normalizeAnnotation),
@@ -257,6 +267,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				? inspect(AnimationCodecV2, {
 						version: anim.version,
 						style: anim.style,
+						labels: anim.labels,
 						terrain: anim.terrain,
 						keyframes: anim.keyframes.map(normalizeKeyframe),
 						annotations: anim.annotations.map(normalizeAnnotation)
@@ -264,6 +275,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				: inspect(AnimationCodecV1, {
 						version: anim.version,
 						style: anim.style,
+						labels: anim.labels,
 						terrain: anim.terrain,
 						keyframes: anim.keyframes.map(normalizeKeyframe)
 					});

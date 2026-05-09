@@ -185,6 +185,7 @@
 		store.loadFromAnimation({
 			version: SCHEMA_VERSION,
 			style: 'colorful',
+			labels: true,
 			terrain: DEFAULT_TERRAIN,
 			keyframes: [
 				{ t: 0, lng: 0, lat: 30, zoom: 1.5, pitch: 0, bearing: 0, roll: 0 },
