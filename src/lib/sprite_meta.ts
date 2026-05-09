@@ -31,16 +31,22 @@ export const ANNOTATION_SPRITE_POS: Record<AnnotationIcon, [number, number]> = {
 	'icon-information': [32, 64]
 };
 
-/** CSS rules to render a sprite at a given display size (square). */
+/**
+ * Inline style for a square sprite preview chip. Emits the *size* of the
+ * preview directly and exposes the per-icon background position/size as CSS
+ * variables so the consumer's stylesheet can render the sprite via a
+ * `::after` pseudo-element. That layering is what lets us invert just the
+ * icon's pixels (black-on-transparent → white-on-transparent) without also
+ * inverting the surrounding "white on black" chip.
+ */
 export function spritePreviewStyle(icon: AnnotationIcon, displayPx: number): string {
 	const [sx, sy] = ANNOTATION_SPRITE_POS[icon];
 	const scale = displayPx / ANNOTATION_SPRITE_PX;
 	return [
 		`width: ${displayPx}px`,
 		`height: ${displayPx}px`,
-		`background-image: url('${ANNOTATION_SPRITE_PNG_URL}')`,
-		`background-position: -${sx * scale}px -${sy * scale}px`,
-		`background-size: ${ANNOTATION_SPRITE_ATLAS_W * scale}px ${ANNOTATION_SPRITE_ATLAS_H * scale}px`,
-		`background-repeat: no-repeat`
+		`--sprite-bg: url('${ANNOTATION_SPRITE_PNG_URL}')`,
+		`--sprite-pos: -${sx * scale}px -${sy * scale}px`,
+		`--sprite-size: ${ANNOTATION_SPRITE_ATLAS_W * scale}px ${ANNOTATION_SPRITE_ATLAS_H * scale}px`
 	].join('; ');
 }

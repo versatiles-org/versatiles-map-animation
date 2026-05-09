@@ -431,13 +431,24 @@
 		font-size: 11px;
 	}
 	.icon-prev {
+		position: relative;
 		display: inline-block;
 		flex: 0 0 auto;
-		/* The atlas is white-on-transparent SDF, but appears as black/grey
-		   bitmap in the source PNG; show against a slightly lighter chip so
-		   subtle outlines stay visible. */
-		background-color: rgba(255, 255, 255, 0.04);
+		/* The atlas ships as black-on-transparent in the PNG. We render the
+		   sprite via a ::after pseudo-element with `invert(1)` so the icon
+		   pixels flip to white while the parent's black chip background stays
+		   intact. Inline styles set `--sprite-bg / --sprite-pos / --sprite-size`. */
 		border-radius: 2px;
+	}
+	.icon-prev::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-image: var(--sprite-bg);
+		background-position: var(--sprite-pos);
+		background-size: var(--sprite-size);
+		background-repeat: no-repeat;
+		filter: invert(1);
 	}
 	.icon-menu {
 		position: absolute;
