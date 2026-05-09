@@ -37,6 +37,12 @@ const annotationVisibilityCodec: Codec<number> = {
 	encode: (v, w) => vuint.encode(Math.max(0, Math.round(v * 1000)), w),
 	decode: (r) => vuint.decode(r) / 1000
 };
+// Per-annotation iconSize / labelSize: vuint of round(v * 100). Default is 1.0
+// → 100, encoded in 1 byte. The annotation never wants size 0, so we clamp at 1.
+const annotationSizeCodec: Codec<number> = {
+	encode: (v, w) => vuint.encode(Math.max(1, Math.round(v * 100)), w),
+	decode: (r) => vuint.decode(r) / 100
+};
 
 // Sentinel for "always visible" — large enough that no realistic animation
 // will compete with it, small enough to varint in a few bytes when emitted.
@@ -55,6 +61,10 @@ export interface WireAnnotation {
 	rotation: number;
 	visibleFrom: number;
 	visibleUntil: number;
+	/** Default 1. Only emitted on the wire by V4+; older codecs ignore it. */
+	iconSize: number;
+	/** Default 1. Only emitted on the wire by V4+; older codecs ignore it. */
+	labelSize: number;
 }
 
 const ANNOTATION_DEFAULTS: WireAnnotation = {
@@ -65,7 +75,9 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	label: '',
 	rotation: 0,
 	visibleFrom: 0,
-	visibleUntil: ANNOTATION_VISIBLE_FOREVER
+	visibleUntil: ANNOTATION_VISIBLE_FOREVER,
+	iconSize: 1,
+	labelSize: 1
 };
 
 export const annotationsCodec: Codec<WireAnnotation[]> = {
@@ -150,6 +162,101 @@ export const annotationsCodec: Codec<WireAnnotation[]> = {
 	}
 };
 
+/**
+ * V4 codec: 16-bit mask + two new fields (iconSize, labelSize at bits 8 and 9).
+ * Used only when at least one annotation has a non-default per-element size;
+ * V2/V3 stay byte-stable for share links that don't use this feature.
+ */
+export const annotationsCodecV4: Codec<WireAnnotation[]> = {
+	encode(arr, w) {
+		const ins = w.inspector;
+		if (ins) ins.enter('[length]', w.totalBits());
+		vuint.encode(arr.length, w);
+		if (ins) ins.exit('[length]', w.totalBits());
+
+		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
+		for (let idx = 0; idx < arr.length; idx++) {
+			const item = arr[idx];
+			if (ins) ins.enter(`[${idx}]`, w.totalBits());
+
+			const mxInt = Math.round(Math.max(0, Math.min(1, item.mx)) * ANNOTATION_POS_MAX);
+			const myInt = Math.round(Math.max(0, Math.min(1, item.my)) * ANNOTATION_POS_MAX);
+			const prevMxInt = Math.round(prev.mx * ANNOTATION_POS_MAX);
+			const prevMyInt = Math.round(prev.my * ANNOTATION_POS_MAX);
+
+			let mask = 0;
+			if (mxInt !== prevMxInt) mask |= 1 << 0;
+			if (myInt !== prevMyInt) mask |= 1 << 1;
+			if (item.icon !== prev.icon) mask |= 1 << 2;
+			if (item.color !== prev.color) mask |= 1 << 3;
+			if (item.label !== prev.label) mask |= 1 << 4;
+			if (item.rotation !== prev.rotation) mask |= 1 << 5;
+			if (item.visibleFrom !== prev.visibleFrom) mask |= 1 << 6;
+			if (item.visibleUntil !== prev.visibleUntil) mask |= 1 << 7;
+			if (item.iconSize !== prev.iconSize) mask |= 1 << 8;
+			if (item.labelSize !== prev.labelSize) mask |= 1 << 9;
+
+			if (ins) ins.enter('[mask]', w.totalBits());
+			w.writeBits(mask, 16);
+			if (ins) ins.exit('[mask]', w.totalBits());
+
+			const writeField = <T>(name: keyof WireAnnotation, c: Codec<T>, value: T) => {
+				if (ins) ins.enter(name, w.totalBits());
+				c.encode(value, w);
+				if (ins) ins.exit(name, w.totalBits());
+			};
+
+			if (mask & (1 << 0)) writeField('mx', uint(ANNOTATION_POS_BITS), mxInt);
+			if (mask & (1 << 1)) writeField('my', uint(ANNOTATION_POS_BITS), myInt);
+			if (mask & (1 << 2)) writeField('icon', annotationIconCodec, item.icon);
+			if (mask & (1 << 3)) writeField('color', annotationColorCodec, item.color);
+			if (mask & (1 << 4)) writeField('label', stringCodec, item.label);
+			if (mask & (1 << 5)) writeField('rotation', annotationRotationCodec, item.rotation);
+			if (mask & (1 << 6)) writeField('visibleFrom', annotationVisibilityCodec, item.visibleFrom);
+			if (mask & (1 << 7)) writeField('visibleUntil', annotationVisibilityCodec, item.visibleUntil);
+			if (mask & (1 << 8)) writeField('iconSize', annotationSizeCodec, item.iconSize);
+			if (mask & (1 << 9)) writeField('labelSize', annotationSizeCodec, item.labelSize);
+
+			if (ins) ins.exit(`[${idx}]`, w.totalBits());
+
+			const next: WireAnnotation = { ...prev };
+			if (mask & (1 << 0)) next.mx = mxInt / ANNOTATION_POS_MAX;
+			if (mask & (1 << 1)) next.my = myInt / ANNOTATION_POS_MAX;
+			if (mask & (1 << 2)) next.icon = item.icon;
+			if (mask & (1 << 3)) next.color = item.color;
+			if (mask & (1 << 4)) next.label = item.label;
+			if (mask & (1 << 5)) next.rotation = item.rotation;
+			if (mask & (1 << 6)) next.visibleFrom = item.visibleFrom;
+			if (mask & (1 << 7)) next.visibleUntil = item.visibleUntil;
+			if (mask & (1 << 8)) next.iconSize = item.iconSize;
+			if (mask & (1 << 9)) next.labelSize = item.labelSize;
+			prev = next;
+		}
+	},
+	decode(r) {
+		const len = vuint.decode(r);
+		const out: WireAnnotation[] = [];
+		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
+		for (let i = 0; i < len; i++) {
+			const mask = r.readBits(16);
+			const item: WireAnnotation = { ...prev };
+			if (mask & (1 << 0)) item.mx = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
+			if (mask & (1 << 1)) item.my = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
+			if (mask & (1 << 2)) item.icon = annotationIconCodec.decode(r);
+			if (mask & (1 << 3)) item.color = annotationColorCodec.decode(r);
+			if (mask & (1 << 4)) item.label = stringCodec.decode(r);
+			if (mask & (1 << 5)) item.rotation = annotationRotationCodec.decode(r);
+			if (mask & (1 << 6)) item.visibleFrom = annotationVisibilityCodec.decode(r);
+			if (mask & (1 << 7)) item.visibleUntil = annotationVisibilityCodec.decode(r);
+			if (mask & (1 << 8)) item.iconSize = annotationSizeCodec.decode(r);
+			if (mask & (1 << 9)) item.labelSize = annotationSizeCodec.decode(r);
+			out.push(item);
+			prev = item;
+		}
+		return out;
+	}
+};
+
 // ---------------------------------------------------------------------------
 // Hex colour helpers — wire stores RGB as a 24-bit int; in-memory keeps the
 // user's `#rrggbb` string so the UI can round-trip arbitrary case/format.
@@ -203,7 +310,9 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 		label: ann.label ?? '',
 		rotation,
 		visibleFrom,
-		visibleUntil
+		visibleUntil,
+		iconSize: ann.iconSize ?? 1,
+		labelSize: ann.labelSize ?? 1
 	};
 }
 
@@ -219,5 +328,7 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	if (wire.rotation !== 0) out.rotation = wire.rotation;
 	if (wire.visibleFrom !== 0) out.visibleFrom = wire.visibleFrom;
 	if (wire.visibleUntil < ANNOTATION_VISIBLE_FOREVER) out.visibleUntil = wire.visibleUntil;
+	if (wire.iconSize !== 1) out.iconSize = wire.iconSize;
+	if (wire.labelSize !== 1) out.labelSize = wire.labelSize;
 	return out;
 }

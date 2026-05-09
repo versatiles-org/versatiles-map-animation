@@ -44,6 +44,12 @@
 	function onRotation(e: Event) {
 		patch({ rotation: Number((e.currentTarget as HTMLInputElement).value) });
 	}
+	function onIconSize(e: Event) {
+		patch({ iconSize: Number((e.currentTarget as HTMLInputElement).value) });
+	}
+	function onLabelSize(e: Event) {
+		patch({ labelSize: Number((e.currentTarget as HTMLInputElement).value) });
+	}
 	function onVisibleFrom(e: Event) {
 		const raw = (e.currentTarget as HTMLInputElement).value;
 		patch({ visibleFrom: raw === '' ? undefined : Math.max(0, Number(raw)) });
@@ -126,6 +132,32 @@
 				oninput={onRotation}
 			/>
 			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
+		</label>
+
+		<label class="row">
+			<span class="lbl">Icon size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={ann.iconSize ?? 1}
+				oninput={onIconSize}
+			/>
+			<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
+		</label>
+
+		<label class="row">
+			<span class="lbl">Label size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={ann.labelSize ?? 1}
+				oninput={onLabelSize}
+			/>
+			<span class="num">{(ann.labelSize ?? 1).toFixed(2)}×</span>
 		</label>
 
 		<div class="row visibility">

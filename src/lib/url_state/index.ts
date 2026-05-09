@@ -21,9 +21,11 @@ import {
 	AnimationCodecV1,
 	AnimationCodecV2,
 	AnimationCodecV3,
+	AnimationCodecV4,
 	FORMAT_TAG_BINARY_V1,
 	FORMAT_TAG_BINARY_V2,
-	FORMAT_TAG_BINARY_V3
+	FORMAT_TAG_BINARY_V3,
+	FORMAT_TAG_BINARY_V4
 } from './animation_codec';
 import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
 import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
@@ -34,16 +36,34 @@ const HASH_KEY = 'kf';
  * Encode an animation to a base64-url string suitable for URL hashes.
  * Uses the bit-packed binary codec; the first byte is a format tag so the
  * decoder can pick the right struct. Picks the smallest sufficient version:
- * V1 for keyframes-only, V2 when annotations are present at default scale,
- * V3 only when annotationScale differs from the default. Older binary
- * versions stay byte-stable so existing share links don't change.
+ *   V1: keyframes only
+ *   V2: keyframes + annotations at default scale + default per-annotation sizes
+ *   V3: V2 + annotationScale ≠ 1
+ *   V4: V3 + per-annotation iconSize / labelSize
+ * Older binary versions stay byte-stable so existing share links don't change.
  */
 export function encodeAnimation(anim: Animation): string {
 	const w = new BitWriter();
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
+	const needsV4 =
+		hasAnnotations &&
+		anim.annotations.some((a) => (a.iconSize ?? 1) !== 1 || (a.labelSize ?? 1) !== 1);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	if (needsV3) {
+	if (needsV4) {
+		w.writeBits(FORMAT_TAG_BINARY_V4, 8);
+		AnimationCodecV4.encode(
+			{
+				version: anim.version,
+				style: anim.style,
+				terrain: anim.terrain,
+				keyframes: anim.keyframes.map(normalizeKeyframe),
+				annotations: anim.annotations.map(normalizeAnnotation),
+				annotationScale: scale
+			},
+			w
+		);
+	} else if (needsV3) {
 		w.writeBits(FORMAT_TAG_BINARY_V3, 8);
 		AnimationCodecV3.encode(
 			{
@@ -102,12 +122,25 @@ function decodeOrThrow(encoded: string): Animation {
 	if (
 		tag !== FORMAT_TAG_BINARY_V1 &&
 		tag !== FORMAT_TAG_BINARY_V2 &&
-		tag !== FORMAT_TAG_BINARY_V3
+		tag !== FORMAT_TAG_BINARY_V3 &&
+		tag !== FORMAT_TAG_BINARY_V4
 	) {
 		throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
 	}
 	const r = new BitReader(bytes);
 	r.readBits(8); // consume tag
+	if (tag === FORMAT_TAG_BINARY_V4) {
+		const wire = AnimationCodecV4.decode(r);
+		assertVersion(wire.version);
+		return {
+			version: SCHEMA_VERSION,
+			style: wire.style,
+			terrain: wire.terrain,
+			keyframes: wire.keyframes.map(denormalizeKeyframe),
+			annotations: wire.annotations.map(denormalizeAnnotation),
+			annotationScale: wire.annotationScale
+		};
+	}
 	if (tag === FORMAT_TAG_BINARY_V3) {
 		const wire = AnimationCodecV3.decode(r);
 		assertVersion(wire.version);
@@ -176,9 +209,12 @@ export function readAnimationFromUrl(): Animation | null {
 export function inspectAnimation(anim: Animation): InspectionNode {
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
+	const needsV4 =
+		hasAnnotations &&
+		anim.annotations.some((a) => (a.iconSize ?? 1) !== 1 || (a.labelSize ?? 1) !== 1);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	const inner = needsV3
-		? inspect(AnimationCodecV3, {
+	const inner = needsV4
+		? inspect(AnimationCodecV4, {
 				version: anim.version,
 				style: anim.style,
 				terrain: anim.terrain,
@@ -186,20 +222,29 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
 			})
-		: hasAnnotations
-			? inspect(AnimationCodecV2, {
+		: needsV3
+			? inspect(AnimationCodecV3, {
 					version: anim.version,
 					style: anim.style,
 					terrain: anim.terrain,
 					keyframes: anim.keyframes.map(normalizeKeyframe),
-					annotations: anim.annotations.map(normalizeAnnotation)
+					annotations: anim.annotations.map(normalizeAnnotation),
+					annotationScale: scale
 				})
-			: inspect(AnimationCodecV1, {
-					version: anim.version,
-					style: anim.style,
-					terrain: anim.terrain,
-					keyframes: anim.keyframes.map(normalizeKeyframe)
-				});
+			: hasAnnotations
+				? inspect(AnimationCodecV2, {
+						version: anim.version,
+						style: anim.style,
+						terrain: anim.terrain,
+						keyframes: anim.keyframes.map(normalizeKeyframe),
+						annotations: anim.annotations.map(normalizeAnnotation)
+					})
+				: inspect(AnimationCodecV1, {
+						version: anim.version,
+						style: anim.style,
+						terrain: anim.terrain,
+						keyframes: anim.keyframes.map(normalizeKeyframe)
+					});
 	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so
 	// the tree's bit total matches the actual on-the-wire payload.
 	return {

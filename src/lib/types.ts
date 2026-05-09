@@ -126,7 +126,17 @@ export interface Annotation {
 	 * wire as a large sentinel.
 	 */
 	visibleUntil?: number;
+	/**
+	 * Per-annotation icon size multiplier (default 1). Stacks on top of the
+	 * animation-level annotationScale and the container-width auto-scale.
+	 */
+	iconSize?: number;
+	/** Per-annotation label size multiplier (default 1). Stacks like iconSize. */
+	labelSize?: number;
 }
+
+export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
+export const DEFAULT_ANNOTATION_LABEL_SIZE = 1;
 
 export interface Animation {
 	version: number;

@@ -122,5 +122,9 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 	if (visibleFrom !== undefined) out.visibleFrom = visibleFrom;
 	const visibleUntil = optionalNum('visibleUntil');
 	if (visibleUntil !== undefined) out.visibleUntil = visibleUntil;
+	const iconSize = optionalNum('iconSize');
+	if (iconSize !== undefined) out.iconSize = iconSize;
+	const labelSize = optionalNum('labelSize');
+	if (labelSize !== undefined) out.labelSize = labelSize;
 	return out;
 }

@@ -223,3 +223,61 @@ describe('annotationScale (V3)', () => {
 		expect(v2Decoded?.annotationScale).toBe(1);
 	});
 });
+
+describe('per-annotation iconSize / labelSize (V4)', () => {
+	const ann = (extra: Partial<{ iconSize: number; labelSize: number }> = {}): Animation => ({
+		...example,
+		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A', ...extra }]
+	});
+
+	it('default sizes stay in V2 (byte-stable for V2/V3 share links)', () => {
+		const v2 = encodeAnimation(ann());
+		const v4 = encodeAnimation(ann({ iconSize: 1.5 }));
+		// V4 has a wider mask + extra field, so its byte length must exceed V2.
+		expect(v4.length).toBeGreaterThan(v2.length);
+	});
+
+	it('round-trips a per-annotation iconSize', () => {
+		const decoded = decodeAnimation(encodeAnimation(ann({ iconSize: 1.5 })));
+		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
+		expect(decoded?.annotations[0].labelSize).toBeUndefined();
+	});
+
+	it('round-trips a per-annotation labelSize', () => {
+		const decoded = decodeAnimation(encodeAnimation(ann({ labelSize: 0.7 })));
+		expect(decoded?.annotations[0].labelSize).toBeCloseTo(0.7, 2);
+		expect(decoded?.annotations[0].iconSize).toBeUndefined();
+	});
+
+	it('round-trips both at once', () => {
+		const decoded = decodeAnimation(encodeAnimation(ann({ iconSize: 2, labelSize: 0.5 })));
+		expect(decoded?.annotations[0].iconSize).toBeCloseTo(2, 2);
+		expect(decoded?.annotations[0].labelSize).toBeCloseTo(0.5, 2);
+	});
+
+	it('V4 carries annotationScale too (combines V3 + V4 features)', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 }
+			],
+			annotationScale: 1.25
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotationScale).toBeCloseTo(1.25, 2);
+		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
+	});
+
+	it('carry-forward across annotations', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 },
+				{ lng: 1, lat: 1, icon: 'symbol-marker', color: '#fff', label: 'B', iconSize: 1.5 }
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
+		expect(decoded?.annotations[1].iconSize).toBeCloseTo(1.5, 2);
+	});
+});

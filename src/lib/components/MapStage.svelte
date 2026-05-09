@@ -53,7 +53,9 @@
 					color: a.color,
 					label: a.label,
 					rotation: a.rotation ?? 0,
-					offset: ANNOTATION_ICON_OFFSETS[a.icon]
+					offset: ANNOTATION_ICON_OFFSETS[a.icon],
+					iconSize: a.iconSize ?? 1,
+					labelSize: a.labelSize ?? 1
 				}
 			}))
 		};
@@ -299,20 +301,26 @@
 		}
 	});
 
-	// Combined scale = container-width-based factor × user-set annotationScale.
-	// Pushed onto the layer's icon-size + text-size whenever any input changes
-	// or the layer was just re-installed by a style swap. text-offset is in ems
-	// so it auto-scales with text-size; icon-offset is multiplied by icon-size
-	// internally by MapLibre, so the tuned pivot pixels stay correct at any
-	// scale.
+	// Combined scale = container-width factor × user-set annotationScale ×
+	// per-annotation iconSize / labelSize. The per-annotation factor is read
+	// from the feature property, so the layer expression encodes both halves
+	// and we only re-set it when the global half changes.
+	//
+	// text-offset is in ems so it auto-scales with text-size; icon-offset is
+	// multiplied by icon-size internally by MapLibre, so the tuned pivot
+	// pixels stay correct at any scale.
 	$effect(() => {
 		const ready = annotationsReady;
 		const cs = containerScale;
 		const us = store.annotationScale;
 		if (!ready || !map) return;
-		const scale = cs * us;
-		map.setLayoutProperty(ANNOTATION_LAYER, 'icon-size', scale);
-		map.setLayoutProperty(ANNOTATION_LAYER, 'text-size', BASE_TEXT_PX * scale);
+		const globalScale = cs * us;
+		map.setLayoutProperty(ANNOTATION_LAYER, 'icon-size', ['*', ['get', 'iconSize'], globalScale]);
+		map.setLayoutProperty(ANNOTATION_LAYER, 'text-size', [
+			'*',
+			['get', 'labelSize'],
+			BASE_TEXT_PX * globalScale
+		]);
 	});
 
 	// Watermark colours flip with the base map: dark text + light outline reads
