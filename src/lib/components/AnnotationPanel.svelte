@@ -9,15 +9,8 @@
 
 	let { store }: { store: AnimationStore } = $props();
 
-	const ARROW_ICONS: ReadonlySet<AnnotationIcon> = new Set([
-		'symbol-arrow',
-		'symbol-arrow1',
-		'symbol-arrow2'
-	]);
-
 	const ann = $derived(store.selectedAnnotation);
 	const idx = $derived(store.selectedAnnotationIndex);
-	const isArrow = $derived(ann ? ARROW_ICONS.has(ann.icon) : false);
 
 	function patch(p: Partial<Annotation>): void {
 		if (idx !== null) store.updateAnnotation(idx, p);
@@ -122,20 +115,18 @@
 			<span class="hex">{ann.color}</span>
 		</label>
 
-		{#if isArrow}
-			<label class="row">
-				<span class="lbl">Rotation</span>
-				<input
-					type="range"
-					min="0"
-					max="359"
-					step="1"
-					value={ann.rotation ?? 0}
-					oninput={onRotation}
-				/>
-				<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
-			</label>
-		{/if}
+		<label class="row">
+			<span class="lbl">Rotation</span>
+			<input
+				type="range"
+				min="0"
+				max="359"
+				step="1"
+				value={ann.rotation ?? 0}
+				oninput={onRotation}
+			/>
+			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
+		</label>
 
 		<div class="row visibility">
 			<span class="lbl">Visible</span>
