@@ -86,7 +86,9 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	mx: 0,
 	my: 0,
 	icon: DEFAULT_ANNOTATION_ICON,
-	color: 0xffffff,
+	// Must match `parseHexColor(DEFAULT_ANNOTATION_COLOR)` so the default
+	// in-memory annotation skips the color field on the wire (carry-forward).
+	color: 0xcc0000,
 	label: '',
 	rotation: 0,
 	visibleFrom: 0,

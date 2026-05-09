@@ -64,7 +64,10 @@ export const ANNOTATION_ICON_OFFSETS: Record<AnnotationIcon, [number, number]> =
 };
 
 export const DEFAULT_ANNOTATION_ICON: AnnotationIcon = 'symbol-marker';
-export const DEFAULT_ANNOTATION_COLOR = '#ffffff';
+// Red reads as a marker on every basemap we ship (light colourful, dark
+// satellite, satellite + overlay) — white was nearly invisible on the
+// colourful style, which made freshly-pinned markers easy to lose.
+export const DEFAULT_ANNOTATION_COLOR = '#cc0000';
 
 /**
  * Animation-wide multiplier on annotation icon and label size. The map also
