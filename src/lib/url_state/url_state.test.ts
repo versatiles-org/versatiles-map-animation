@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { decodeAnimation, encodeAnimation } from './url_state';
-import { SCHEMA_VERSION, type Animation } from './types';
+import { decodeAnimation, encodeAnimation } from '.';
+import { SCHEMA_VERSION, type Animation } from '../types';
 
 const example: Animation = {
 	version: SCHEMA_VERSION,

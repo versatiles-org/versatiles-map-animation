@@ -22,7 +22,7 @@ import {
 	unpackBase64Url,
 	vsint,
 	vuint
-} from './codec';
+} from '.';
 
 describe('BitWriter / BitReader', () => {
 	it('round-trips non-byte-aligned widths', () => {
