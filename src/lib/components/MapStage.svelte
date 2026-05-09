@@ -160,6 +160,25 @@
 			if (!map) return;
 			store.liveCamera = readCamera();
 		});
+		// Click on an annotation marker → select it. Click on empty map → clear
+		// any annotation selection. The marker click handler stops propagation,
+		// so the empty-map fallback only fires when no marker was hit.
+		map.on('click', ANNOTATION_LAYER, (e) => {
+			const id = e.features?.[0]?.id;
+			if (typeof id === 'number') store.selectAnnotation(id);
+		});
+		map.on('click', (e) => {
+			if (!map) return;
+			const hits = map.queryRenderedFeatures(e.point, { layers: [ANNOTATION_LAYER] });
+			if (hits.length === 0) store.clearAnnotationSelection();
+		});
+		// Cursor feedback for hover-able markers.
+		map.on('mouseenter', ANNOTATION_LAYER, () => {
+			if (map) map.getCanvas().style.cursor = 'pointer';
+		});
+		map.on('mouseleave', ANNOTATION_LAYER, () => {
+			if (map) map.getCanvas().style.cursor = '';
+		});
 		map.once('load', () => {
 			// Fix the camera's altitude reference at sea level; combined with
 			// `freezeElevation: true` on subsequent easeTo calls, this prevents

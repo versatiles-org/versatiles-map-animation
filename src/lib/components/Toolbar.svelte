@@ -2,7 +2,12 @@
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { DEFAULT_TERRAIN, SCHEMA_VERSION } from '../types';
+	import {
+		DEFAULT_ANNOTATION_COLOR,
+		DEFAULT_ANNOTATION_ICON,
+		DEFAULT_TERRAIN,
+		SCHEMA_VERSION
+	} from '../types';
 	import { encodeAnimation } from '../url_state';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -43,6 +48,16 @@
 
 	function onAdd() {
 		store.addKeyframeFromCamera(store.liveCamera);
+	}
+	function onPinAnnotation() {
+		const cam = store.liveCamera;
+		store.addAnnotation({
+			lng: cam.lng,
+			lat: cam.lat,
+			icon: DEFAULT_ANNOTATION_ICON,
+			color: DEFAULT_ANNOTATION_COLOR,
+			label: ''
+		});
 	}
 	function onUpdate() {
 		store.updateSelectedFromCamera(store.liveCamera);
@@ -255,6 +270,13 @@
 				<option value="linear">— Linear</option>
 			</select>
 		</label>
+	</div>
+
+	<div class="group" role="group" aria-label="Annotation">
+		<span class="group-label">Annotation</span>
+		<button type="button" onclick={onPinAnnotation} title="Pin a marker at the current map center">
+			📍 Pin
+		</button>
 	</div>
 
 	<div class="group playback">
