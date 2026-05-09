@@ -691,6 +691,10 @@
 		height: 8px;
 		border-radius: 50%;
 		z-index: 3;
+		/* Sit at the bottom of the lane, where the fade triangle's "0 height"
+		   tip actually is — the centered position floated above empty space
+		   and looked disconnected from the triangle it controls. */
+		top: 100%;
 	}
 	.ann-handle:hover {
 		background: #4a9eff;
