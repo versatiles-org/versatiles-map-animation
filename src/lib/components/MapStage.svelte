@@ -6,7 +6,7 @@
 	import { isAnnotationVisible, type AnimationStore } from '../animation.svelte';
 	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
 	import {
-		ANNOTATION_ICON_ANCHORS,
+		ANNOTATION_ICON_OFFSETS,
 		DEFAULT_INITIAL_VIEW,
 		type Annotation,
 		type CameraState
@@ -39,7 +39,7 @@
 					color: a.color,
 					label: a.label,
 					rotation: a.rotation ?? 0,
-					anchor: ANNOTATION_ICON_ANCHORS[a.icon]
+					offset: ANNOTATION_ICON_OFFSETS[a.icon]
 				}
 			}))
 		};
@@ -60,7 +60,12 @@
 				source: ANNOTATION_SOURCE,
 				layout: {
 					'icon-image': ['concat', `${ANNOTATION_SPRITE_ID}:`, ['get', 'icon']],
-					'icon-anchor': ['get', 'anchor'],
+					// Anchor at the geo point; the per-feature `offset` shifts the
+					// icon so that its tuned pivot pixel sits exactly on the anchor.
+					// `icon-rotate` then pivots around that pixel, which is what we
+					// want for marker tips, arrow tips, etc.
+					'icon-anchor': 'center',
+					'icon-offset': ['get', 'offset'],
 					'icon-rotate': ['get', 'rotation'],
 					'icon-size': 1,
 					'icon-allow-overlap': true,
@@ -68,16 +73,11 @@
 					'text-field': ['get', 'label'],
 					'text-font': ['noto_sans_bold'],
 					'text-size': 13,
-					'text-anchor': ['case', ['==', ['get', 'anchor'], 'bottom'], 'bottom', 'top'],
-					// Push the label clear of the icon. ems are scaled by `text-size`
-					// (13px), so 2.7em ≈ 35px clears a 32px marker; 1.5em ≈ 20px
-					// clears the bottom half of a centered 32px icon.
-					'text-offset': [
-						'case',
-						['==', ['get', 'anchor'], 'bottom'],
-						['literal', [0, -2.7]],
-						['literal', [0, 1.5]]
-					],
+					// Place the label below the geo point. 1.5em ≈ 20px clears the
+					// bottom half of a 32px icon for the worst case (centered icons);
+					// pivot-near-bottom icons (markers) end up with even more clearance.
+					'text-anchor': 'top',
+					'text-offset': [0, 1.5],
 					'text-allow-overlap': false,
 					'text-optional': true
 				},

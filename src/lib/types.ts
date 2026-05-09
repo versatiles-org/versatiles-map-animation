@@ -41,23 +41,26 @@ export function isAnnotationIcon(value: unknown): value is AnnotationIcon {
 }
 
 /**
- * Per-icon icon-anchor for the maplibre symbol layer. Arrows and pin-style
- * markers point at the lng/lat from above, so they anchor at the bottom; the
- * rest are visually centred shapes.
+ * Per-icon `icon-offset` (px) used with `icon-anchor: 'center'` on the symbol
+ * layer. Each value places the icon's intended visual pivot exactly on the
+ * geographic point and makes `icon-rotate` rotate around that pivot — marker
+ * tips stay planted, arrow tips stay glued to the location, etc.
+ *
+ * Tuned visually with the throwaway page at /routes/anchors/+page.svelte.
  */
-export const ANNOTATION_ICON_ANCHORS: Record<AnnotationIcon, 'center' | 'bottom'> = {
-	'symbol-marker': 'bottom',
-	'symbol-marker_outline': 'bottom',
-	'symbol-circle': 'center',
-	'symbol-circle_outline': 'center',
-	'symbol-star': 'center',
-	'symbol-star_outline': 'center',
-	'symbol-arrow': 'bottom',
-	'symbol-arrow1': 'bottom',
-	'symbol-arrow2': 'bottom',
-	'icon-home': 'center',
-	'icon-mountain': 'center',
-	'icon-information': 'center'
+export const ANNOTATION_ICON_OFFSETS: Record<AnnotationIcon, [number, number]> = {
+	'symbol-marker': [0, -11],
+	'symbol-marker_outline': [0, -11],
+	'symbol-circle': [0, 0],
+	'symbol-circle_outline': [0, 0],
+	'symbol-star': [0, -1],
+	'symbol-star_outline': [0, -1],
+	'symbol-arrow': [-11, 0],
+	'symbol-arrow1': [-10, 0],
+	'symbol-arrow2': [-9, 0],
+	'icon-home': [0, 0],
+	'icon-mountain': [0, 0],
+	'icon-information': [0, -8]
 };
 
 export const DEFAULT_ANNOTATION_ICON: AnnotationIcon = 'symbol-marker';
