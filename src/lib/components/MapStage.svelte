@@ -15,7 +15,14 @@
 		type LabelPosition
 	} from '../types';
 
-	let { store }: { store: AnimationStore } = $props();
+	let { store, editMode = false }: { store: AnimationStore; editMode?: boolean } = $props();
+
+	// Detect render mode once — used to suppress edit-mode opacity floor in
+	// rendered video output, where the map should mirror real playback.
+	const renderMode =
+		typeof window !== 'undefined' &&
+		new URLSearchParams(window.location.search).get('render') === '1';
+	const ANNOTATION_OPACITY_FLOOR = 0.1;
 
 	let container: HTMLDivElement;
 	let map: maplibregl.Map | undefined;
@@ -367,16 +374,20 @@
 	// every annotation; the layer's icon/text-opacity expressions read it via
 	// `coalesce`. Pushing a continuous value lets fade-in / fade-out tails
 	// render as smooth ramps rather than hard cuts.
+	//
+	// Edit mode: when the user is composing (not rendering), floor the opacity
+	// at `ANNOTATION_OPACITY_FLOOR` so hidden annotations stay clickable and
+	// findable. Render mode bypasses the floor — rendered videos show the
+	// real fade behaviour.
 	$effect(() => {
 		const anns = store.annotations;
 		const t = store.currentTime;
 		const ready = annotationsReady;
+		const floor = editMode && !renderMode ? ANNOTATION_OPACITY_FLOOR : 0;
 		if (!ready || !map) return;
 		for (let i = 0; i < anns.length; i++) {
-			map.setFeatureState(
-				{ source: ANNOTATION_SOURCE, id: i },
-				{ opacity: getAnnotationOpacity(anns[i], t) }
-			);
+			const o = getAnnotationOpacity(anns[i], t);
+			map.setFeatureState({ source: ANNOTATION_SOURCE, id: i }, { opacity: Math.max(floor, o) });
 		}
 	});
 

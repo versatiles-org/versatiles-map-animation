@@ -15,6 +15,10 @@
 
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
+	// Edit-mode keeps hidden annotations faintly visible (floor 20%) so the
+	// user can spot and click markers that are outside their visibility window.
+	// Off mirrors the real production output (and is forced off when rendering).
+	let editMode = $state(true);
 
 	// Load before children mount so MapStage sees the correct style/terrain on
 	// first build. Precedence: URL hash (shared link) > localStorage (last
@@ -67,7 +71,7 @@
 			<h1>Map Animation</h1>
 			<p class="lede">Prototype — drop keyframes on a map, hit play.</p>
 		</div>
-		<MapStyleControl {store} />
+		<MapStyleControl {store} bind:editMode />
 	</header>
 
 	{#if urlError}
@@ -79,7 +83,7 @@
 
 	<div class="stage-wrap">
 		<div class="map-area">
-			<MapStage {store} />
+			<MapStage {store} {editMode} />
 			<AnnotationPanel {store} />
 			{#if store.keyframes.length === 0}
 				<div class="empty-overlay">
