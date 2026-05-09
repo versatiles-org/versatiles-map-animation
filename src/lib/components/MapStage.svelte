@@ -8,6 +8,7 @@
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		DEFAULT_INITIAL_VIEW,
+		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
 		type CameraState,
@@ -25,9 +26,10 @@
 
 	// Translate user-facing labelPosition ("where the label sits relative to
 	// the icon") into MapLibre's text-anchor (which corner of the text touches
-	// the offset point) + text-offset (in ems). text-offset auto-scales with
-	// text-size, so the label keeps a constant em-distance from the icon at
-	// any annotationScale.
+	// the offset point) + a unit direction vector. The actual text-offset is
+	// `unit × labelDistance` (in ems), computed per-feature so each annotation
+	// can pick its own distance. text-offset is in ems, so it auto-scales with
+	// text-size and stays a constant em-distance at any annotationScale.
 	const LABEL_TEXT_ANCHOR: Record<LabelPosition, string> = {
 		center: 'center',
 		top: 'bottom',
@@ -39,16 +41,16 @@
 		'bottom-left': 'top-right',
 		'bottom-right': 'top-left'
 	};
-	const LABEL_TEXT_OFFSET: Record<LabelPosition, [number, number]> = {
+	const LABEL_OFFSET_UNIT: Record<LabelPosition, [number, number]> = {
 		center: [0, 0],
-		top: [0, -1.5],
-		bottom: [0, 1.5],
-		left: [-1.5, 0],
-		right: [1.5, 0],
-		'top-left': [-1.5, -1.5],
-		'top-right': [1.5, -1.5],
-		'bottom-left': [-1.5, 1.5],
-		'bottom-right': [1.5, 1.5]
+		top: [0, -1],
+		bottom: [0, 1],
+		left: [-1, 0],
+		right: [1, 0],
+		'top-left': [-1, -1],
+		'top-right': [1, -1],
+		'bottom-left': [-1, 1],
+		'bottom-right': [1, 1]
 	};
 
 	// Reference width for container-based scaling. At this width, scale = 1
@@ -93,6 +95,8 @@
 			type: 'FeatureCollection',
 			features: anns.map((a, i) => {
 				const pos = a.labelPosition ?? DEFAULT_LABEL_POSITION;
+				const dist = a.labelDistance ?? DEFAULT_LABEL_DISTANCE;
+				const unit = LABEL_OFFSET_UNIT[pos];
 				return {
 					type: 'Feature',
 					id: i,
@@ -106,7 +110,7 @@
 						iconSize: a.iconSize ?? 1,
 						labelSize: a.labelSize ?? 1,
 						textAnchor: LABEL_TEXT_ANCHOR[pos],
-						textOffset: LABEL_TEXT_OFFSET[pos]
+						textOffset: [unit[0] * dist, unit[1] * dist] as [number, number]
 					}
 				};
 			})

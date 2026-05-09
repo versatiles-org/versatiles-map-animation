@@ -15,7 +15,12 @@
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
-import { DEFAULT_ANNOTATION_SCALE, DEFAULT_LABEL_POSITION, SCHEMA_VERSION } from '../types';
+import {
+	DEFAULT_ANNOTATION_SCALE,
+	DEFAULT_LABEL_DISTANCE,
+	DEFAULT_LABEL_POSITION,
+	SCHEMA_VERSION
+} from '../types';
 import type { Animation } from '../types';
 import {
 	AnimationCodecV1,
@@ -53,7 +58,8 @@ export function encodeAnimation(anim: Animation): string {
 			(a) =>
 				(a.iconSize ?? 1) !== 1 ||
 				(a.labelSize ?? 1) !== 1 ||
-				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION
+				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
+				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	if (needsV4) {
@@ -221,7 +227,8 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 			(a) =>
 				(a.iconSize ?? 1) !== 1 ||
 				(a.labelSize ?? 1) !== 1 ||
-				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION
+				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
+				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	const inner = needsV4

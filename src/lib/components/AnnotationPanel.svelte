@@ -4,6 +4,7 @@
 	import {
 		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
+		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
 		type AnnotationIcon,
@@ -69,6 +70,9 @@
 	}
 	function onLabelPosition(p: LabelPosition) {
 		patch({ labelPosition: p });
+	}
+	function onLabelDistance(e: Event) {
+		patch({ labelDistance: Number((e.currentTarget as HTMLInputElement).value) });
 	}
 
 	// 3×3 grid of label-position options. The dot in the center represents
@@ -228,6 +232,19 @@
 				{/each}
 			</div>
 		</div>
+
+		<label class="row">
+			<span class="lbl">Label gap</span>
+			<input
+				type="range"
+				min="0"
+				max="5"
+				step="0.1"
+				value={ann.labelDistance ?? DEFAULT_LABEL_DISTANCE}
+				oninput={onLabelDistance}
+			/>
+			<span class="num">{(ann.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
+		</label>
 
 		<div class="row visibility">
 			<span class="lbl">Visible</span>

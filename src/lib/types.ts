@@ -138,6 +138,11 @@ export interface Annotation {
 	 * `LABEL_POSITIONS`.
 	 */
 	labelPosition?: LabelPosition;
+	/**
+	 * Gap (in `em`) between the geo point and the label, in the direction
+	 * `labelPosition` points. Default `DEFAULT_LABEL_DISTANCE` (1.5).
+	 */
+	labelDistance?: number;
 }
 
 export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
@@ -163,6 +168,13 @@ export const LABEL_POSITIONS = [
 ] as const;
 export type LabelPosition = (typeof LABEL_POSITIONS)[number];
 export const DEFAULT_LABEL_POSITION: LabelPosition = 'bottom';
+
+/**
+ * Default gap (in `em` of `text-size`) between the geo point and the nearest
+ * edge of the label. With `text-size = 13 px` that's ≈20 px — enough to clear
+ * a default-size icon without floating away from it.
+ */
+export const DEFAULT_LABEL_DISTANCE = 1.5;
 
 export function isLabelPosition(value: unknown): value is LabelPosition {
 	return typeof value === 'string' && (LABEL_POSITIONS as readonly string[]).includes(value);

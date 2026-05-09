@@ -128,5 +128,7 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 	const labelSize = optionalNum('labelSize');
 	if (labelSize !== undefined) out.labelSize = labelSize;
 	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
+	const labelDistance = optionalNum('labelDistance');
+	if (labelDistance !== undefined) out.labelDistance = labelDistance;
 	return out;
 }

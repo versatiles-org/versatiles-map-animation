@@ -16,6 +16,7 @@ import {
 	ANNOTATION_ICONS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
+	DEFAULT_LABEL_DISTANCE,
 	DEFAULT_LABEL_POSITION,
 	isAnnotationIcon,
 	isLabelPosition,
@@ -47,6 +48,12 @@ const annotationSizeCodec: Codec<number> = {
 	decode: (r) => vuint.decode(r) / 100
 };
 const labelPositionCodec = enumOf(LABEL_POSITIONS as readonly [LabelPosition, ...LabelPosition[]]);
+// labelDistance: vuint of round(v * 100). Default 1.5 → 150 (1-byte vuint).
+// 0 collapses the label onto the geo point; >5 em is silly but legal.
+const labelDistanceCodec: Codec<number> = {
+	encode: (v, w) => vuint.encode(Math.max(0, Math.round(v * 100)), w),
+	decode: (r) => vuint.decode(r) / 100
+};
 
 // Sentinel for "always visible" — large enough that no realistic animation
 // will compete with it, small enough to varint in a few bytes when emitted.
@@ -71,6 +78,8 @@ export interface WireAnnotation {
 	labelSize: number;
 	/** Default `bottom`. Only emitted on the wire by V4+. */
 	labelPosition: LabelPosition;
+	/** em-distance from the geo point. Default `DEFAULT_LABEL_DISTANCE` (1.5). */
+	labelDistance: number;
 }
 
 const ANNOTATION_DEFAULTS: WireAnnotation = {
@@ -84,7 +93,8 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	visibleUntil: ANNOTATION_VISIBLE_FOREVER,
 	iconSize: 1,
 	labelSize: 1,
-	labelPosition: DEFAULT_LABEL_POSITION
+	labelPosition: DEFAULT_LABEL_POSITION,
+	labelDistance: DEFAULT_LABEL_DISTANCE
 };
 
 export const annotationsCodec: Codec<WireAnnotation[]> = {
@@ -171,9 +181,9 @@ export const annotationsCodec: Codec<WireAnnotation[]> = {
 
 /**
  * V4 codec: 16-bit mask + extra fields beyond V2 (iconSize at bit 8, labelSize
- * at bit 9, labelPosition at bit 10). Used only when at least one annotation
- * has a non-default value for any of these; V2/V3 stay byte-stable for share
- * links that don't use these features.
+ * at bit 9, labelPosition at bit 10, labelDistance at bit 11). Used only when
+ * at least one annotation has a non-default value for any of these; V2/V3 stay
+ * byte-stable for share links that don't use these features.
  */
 export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 	encode(arr, w) {
@@ -204,6 +214,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (item.iconSize !== prev.iconSize) mask |= 1 << 8;
 			if (item.labelSize !== prev.labelSize) mask |= 1 << 9;
 			if (item.labelPosition !== prev.labelPosition) mask |= 1 << 10;
+			if (item.labelDistance !== prev.labelDistance) mask |= 1 << 11;
 
 			if (ins) ins.enter('[mask]', w.totalBits());
 			w.writeBits(mask, 16);
@@ -226,6 +237,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 8)) writeField('iconSize', annotationSizeCodec, item.iconSize);
 			if (mask & (1 << 9)) writeField('labelSize', annotationSizeCodec, item.labelSize);
 			if (mask & (1 << 10)) writeField('labelPosition', labelPositionCodec, item.labelPosition);
+			if (mask & (1 << 11)) writeField('labelDistance', labelDistanceCodec, item.labelDistance);
 
 			if (ins) ins.exit(`[${idx}]`, w.totalBits());
 
@@ -241,6 +253,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 8)) next.iconSize = item.iconSize;
 			if (mask & (1 << 9)) next.labelSize = item.labelSize;
 			if (mask & (1 << 10)) next.labelPosition = item.labelPosition;
+			if (mask & (1 << 11)) next.labelDistance = item.labelDistance;
 			prev = next;
 		}
 	},
@@ -262,6 +275,7 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 8)) item.iconSize = annotationSizeCodec.decode(r);
 			if (mask & (1 << 9)) item.labelSize = annotationSizeCodec.decode(r);
 			if (mask & (1 << 10)) item.labelPosition = labelPositionCodec.decode(r);
+			if (mask & (1 << 11)) item.labelDistance = labelDistanceCodec.decode(r);
 			out.push(item);
 			prev = item;
 		}
@@ -325,7 +339,8 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 		visibleUntil,
 		iconSize: ann.iconSize ?? 1,
 		labelSize: ann.labelSize ?? 1,
-		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION
+		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION,
+		labelDistance: Math.max(0, ann.labelDistance ?? DEFAULT_LABEL_DISTANCE)
 	};
 }
 
@@ -344,5 +359,6 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	if (wire.iconSize !== 1) out.iconSize = wire.iconSize;
 	if (wire.labelSize !== 1) out.labelSize = wire.labelSize;
 	if (wire.labelPosition !== DEFAULT_LABEL_POSITION) out.labelPosition = wire.labelPosition;
+	if (wire.labelDistance !== DEFAULT_LABEL_DISTANCE) out.labelDistance = wire.labelDistance;
 	return out;
 }
