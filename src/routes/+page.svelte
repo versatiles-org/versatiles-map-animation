@@ -7,9 +7,8 @@
 		writeAnimationToStorage,
 		writeAnimationToUrl
 	} from '$lib/url_state';
-	import AnnotationPanel from '$lib/components/AnnotationPanel.svelte';
 	import MapStage from '$lib/components/MapStage.svelte';
-	import MapStyleControl from '$lib/components/MapStyleControl.svelte';
+	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Timeline from '$lib/components/Timeline.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
 
@@ -66,14 +65,6 @@
 </svelte:head>
 
 <main class="page">
-	<header class="header">
-		<div class="header-text">
-			<h1>Map Animation</h1>
-			<p class="lede">Prototype — drop keyframes on a map, hit play.</p>
-		</div>
-		<MapStyleControl {store} bind:editMode />
-	</header>
-
 	{#if urlError}
 		<div class="banner" role="alert">
 			<span>Couldn’t load shared link: {urlError}</span>
@@ -81,20 +72,26 @@
 		</div>
 	{/if}
 
-	<div class="stage-wrap">
-		<div class="map-area">
-			<MapStage {store} {editMode} />
-			<AnnotationPanel {store} />
-			{#if store.keyframes.length === 0}
-				<div class="empty-overlay">
-					Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or open the
-					<strong>⋯</strong> menu and pick <strong>Load example</strong>.
+	<div class="body">
+		<Sidebar {store} bind:editMode />
+
+		<div class="main">
+			<div class="stage-wrap">
+				<div class="map-area">
+					<MapStage {store} {editMode} />
+					{#if store.keyframes.length === 0}
+						<div class="empty-overlay">
+							Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or open the
+							<strong>⋯</strong>
+							menu and pick <strong>Load example</strong>.
+						</div>
+					{/if}
 				</div>
-			{/if}
+			</div>
+			<Toolbar {store} />
 		</div>
 	</div>
 
-	<Toolbar {store} />
 	<Timeline {store} />
 </main>
 
@@ -124,27 +121,6 @@
 		color-scheme: dark;
 	}
 
-	.header {
-		flex: 0 0 auto;
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 1rem;
-	}
-	.header-text {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	h1 {
-		margin: 0;
-		font-size: 1.4rem;
-	}
-	.lede {
-		margin: 0.2rem 0 0;
-		color: #888;
-		font-size: 0.9rem;
-	}
-
 	.banner {
 		display: flex;
 		justify-content: space-between;
@@ -169,6 +145,22 @@
 		color: #fff;
 	}
 
+	/* Top half of the viewport: sidebar on the left, main column (map +
+	   toolbar) on the right. Timeline sits below this row, full width. */
+	.body {
+		flex: 1 1 auto;
+		min-height: 0;
+		display: flex;
+		gap: 0.75rem;
+	}
+	.main {
+		flex: 1 1 auto;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
 	.stage-wrap {
 		flex: 1 1 auto;
 		min-height: 0;
@@ -184,9 +176,6 @@
 		aspect-ratio: 16 / 9;
 		border: 1px solid #222;
 		border-radius: 4px;
-		/* No `overflow: hidden` here so the AnnotationPanel (positioned inside)
-		   can extend below the 16:9 map box on short viewports. The maplibre
-		   canvas keeps its rounded corners via clipping inside `.map-stage`. */
 	}
 	.empty-overlay {
 		position: absolute;

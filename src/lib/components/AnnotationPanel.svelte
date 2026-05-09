@@ -191,14 +191,20 @@
 	}
 </script>
 
-{#if ann && idx !== null}
-	<aside class="annotation-panel" role="region" aria-label="Annotation editor">
-		<header>
+<div class="annotation-panel">
+	{#if ann && idx !== null}
+		<div class="title-row">
 			<span class="title">Annotation #{idx + 1}</span>
-			<button type="button" class="close" onclick={onClose} aria-label="Close" title="Close">
+			<button
+				type="button"
+				class="close"
+				onclick={onClose}
+				aria-label="Deselect annotation"
+				title="Deselect"
+			>
 				✕
 			</button>
-		</header>
+		</div>
 
 		<label class="row">
 			<span class="lbl">Label</span>
@@ -417,30 +423,29 @@
 		<footer>
 			<button type="button" class="danger" onclick={onDelete}>✕ Delete</button>
 		</footer>
-	</aside>
-{/if}
+	{:else}
+		<p class="placeholder">
+			No annotation selected. Click <strong>📍 Pin</strong> below to add one, or click an annotation marker
+			on the map to edit it.
+		</p>
+	{/if}
+</div>
 
 <style>
 	.annotation-panel {
-		position: absolute;
-		top: 0.6rem;
-		right: 0.6rem;
-		z-index: 5;
-		min-width: 250px;
-		max-width: 280px;
-		padding: 0.65rem 0.75rem 0.55rem;
-		background: rgba(13, 17, 23, 0.92);
-		border: 1px solid #2a2f37;
-		border-radius: 6px;
 		color: #ddd;
 		font-size: 12px;
 		display: flex;
 		flex-direction: column;
 		gap: 0.45rem;
-		backdrop-filter: blur(8px);
-		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
 	}
-	header {
+	.placeholder {
+		margin: 0.2rem 0;
+		font-size: 12px;
+		color: #888;
+		line-height: 1.45;
+	}
+	.title-row {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
