@@ -49,6 +49,7 @@
 		e.preventDefault();
 		trackEl.setPointerCapture(e.pointerId);
 		store.pause();
+		store.isScrubbing = true;
 		store.seekTo(tFromClientX(e.clientX));
 
 		function onMove(ev: PointerEvent) {
@@ -59,6 +60,7 @@
 			window.removeEventListener('pointermove', onMove);
 			window.removeEventListener('pointerup', onUp);
 			window.removeEventListener('pointercancel', onUp);
+			store.isScrubbing = false;
 		}
 		window.addEventListener('pointermove', onMove);
 		window.addEventListener('pointerup', onUp);
@@ -72,6 +74,10 @@
 		handle.setPointerCapture(e.pointerId);
 		store.selectAt(index);
 		store.pause();
+		// Dragging a keyframe re-seeks the playhead each frame, so it's a scrub
+		// in disguise — flag it so the editor's edit-mode chrome bows out and
+		// the user sees the real animation pose at the dragged time.
+		store.isScrubbing = true;
 
 		function onMove(ev: PointerEvent) {
 			store.setKeyframeTime(index, tFromClientX(ev.clientX));
@@ -82,6 +88,7 @@
 			handle.releasePointerCapture(ev.pointerId);
 			window.removeEventListener('pointermove', onMove);
 			window.removeEventListener('pointerup', onUp);
+			store.isScrubbing = false;
 		}
 		window.addEventListener('pointermove', onMove);
 		window.addEventListener('pointerup', onUp);

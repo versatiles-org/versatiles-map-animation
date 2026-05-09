@@ -375,15 +375,17 @@
 	// `coalesce`. Pushing a continuous value lets fade-in / fade-out tails
 	// render as smooth ramps rather than hard cuts.
 	//
-	// Edit mode: when the user is composing (not rendering), floor the opacity
-	// at `ANNOTATION_OPACITY_FLOOR` so hidden annotations stay clickable and
-	// findable. Render mode bypasses the floor — rendered videos show the
-	// real fade behaviour.
+	// Edit mode: when the user is composing (not rendering, not playing, not
+	// scrubbing), floor the opacity at `ANNOTATION_OPACITY_FLOOR` so hidden
+	// annotations stay clickable and findable. The moment the user plays the
+	// animation or drags the playhead, the floor lifts so they see the real
+	// fade behaviour — same as the rendered MP4 would show.
 	$effect(() => {
 		const anns = store.annotations;
 		const t = store.currentTime;
 		const ready = annotationsReady;
-		const floor = editMode && !renderMode ? ANNOTATION_OPACITY_FLOOR : 0;
+		const previewing = store.isPlaying || store.isScrubbing;
+		const floor = editMode && !renderMode && !previewing ? ANNOTATION_OPACITY_FLOOR : 0;
 		if (!ready || !map) return;
 		for (let i = 0; i < anns.length; i++) {
 			const o = getAnnotationOpacity(anns[i], t);

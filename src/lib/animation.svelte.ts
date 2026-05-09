@@ -57,6 +57,14 @@ export class AnimationStore {
 	annotations = $state<Annotation[]>([]);
 	currentTime = $state(0);
 	isPlaying = $state(false);
+	/**
+	 * True while the user is actively scrubbing the timeline playhead or
+	 * dragging a keyframe. Like `isPlaying`, it signals "the user is watching
+	 * the animation move", which the editor uses to suppress edit-mode chrome
+	 * (e.g., the annotation opacity floor) so the on-screen result matches
+	 * what the rendered video would show.
+	 */
+	isScrubbing = $state(false);
 	selectedIndex = $state<number | null>(null);
 	selectedAnnotationIndex = $state<number | null>(null);
 	style = $state<MapStyleId>(DEFAULT_STYLE);
