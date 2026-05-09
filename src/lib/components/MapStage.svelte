@@ -1,16 +1,98 @@
 <script lang="ts">
+	import type { FeatureCollection } from 'geojson';
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { onDestroy, onMount, untrack } from 'svelte';
-	import type { AnimationStore } from '../animation.svelte';
-	import { buildMapStyle } from '../map_style';
-	import { DEFAULT_INITIAL_VIEW, type CameraState } from '../types';
+	import { isAnnotationVisible, type AnimationStore } from '../animation.svelte';
+	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
+	import {
+		ANNOTATION_ICON_ANCHORS,
+		DEFAULT_INITIAL_VIEW,
+		type Annotation,
+		type CameraState
+	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
 
 	let container: HTMLDivElement;
 	let map: maplibregl.Map | undefined;
 	let rafId = 0;
+
+	const ANNOTATION_SOURCE = 'annotations';
+	const ANNOTATION_LAYER = 'annotations-layer';
+
+	// Reactive flag set to true once the annotation source + layer exist on the
+	// current style. Flips to false during a style switch and back to true after
+	// the new style finishes loading and we've re-installed our layer. The
+	// data + visibility effects depend on it so they re-run after style swaps.
+	let annotationsReady = $state(false);
+
+	function buildAnnotationFeatures(anns: Annotation[]): FeatureCollection {
+		return {
+			type: 'FeatureCollection',
+			features: anns.map((a, i) => ({
+				type: 'Feature',
+				id: i,
+				geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+				properties: {
+					icon: a.icon,
+					color: a.color,
+					label: a.label,
+					rotation: a.rotation ?? 0,
+					anchor: ANNOTATION_ICON_ANCHORS[a.icon]
+				}
+			}))
+		};
+	}
+
+	function setupAnnotationLayer(): void {
+		if (!map) return;
+		if (!map.getSource(ANNOTATION_SOURCE)) {
+			map.addSource(ANNOTATION_SOURCE, {
+				type: 'geojson',
+				data: { type: 'FeatureCollection', features: [] }
+			});
+		}
+		if (!map.getLayer(ANNOTATION_LAYER)) {
+			map.addLayer({
+				id: ANNOTATION_LAYER,
+				type: 'symbol',
+				source: ANNOTATION_SOURCE,
+				layout: {
+					'icon-image': ['concat', `${ANNOTATION_SPRITE_ID}:`, ['get', 'icon']],
+					'icon-anchor': ['get', 'anchor'],
+					'icon-rotate': ['get', 'rotation'],
+					'icon-size': 1,
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+					'text-field': ['get', 'label'],
+					'text-font': ['noto_sans_bold'],
+					'text-size': 13,
+					'text-anchor': ['case', ['==', ['get', 'anchor'], 'bottom'], 'bottom', 'top'],
+					// Push the label clear of the icon. ems are scaled by `text-size`
+					// (13px), so 2.7em ≈ 35px clears a 32px marker; 1.5em ≈ 20px
+					// clears the bottom half of a centered 32px icon.
+					'text-offset': [
+						'case',
+						['==', ['get', 'anchor'], 'bottom'],
+						['literal', [0, -2.7]],
+						['literal', [0, 1.5]]
+					],
+					'text-allow-overlap': false,
+					'text-optional': true
+				},
+				paint: {
+					'icon-color': ['get', 'color'],
+					'icon-opacity': ['case', ['==', ['feature-state', 'visible'], false], 0, 1],
+					'text-color': '#111',
+					'text-halo-color': '#fff',
+					'text-halo-width': 1.5,
+					'text-opacity': ['case', ['==', ['feature-state', 'visible'], false], 0, 1]
+				}
+			});
+		}
+		annotationsReady = true;
+	}
 
 	function readCamera(): CameraState {
 		if (!map) return { ...DEFAULT_INITIAL_VIEW };
@@ -83,6 +165,7 @@
 			// `freezeElevation: true` on subsequent easeTo calls, this prevents
 			// MapLibre from updating transform.elevation each frame.
 			map?.setCenterElevation(0);
+			setupAnnotationLayer();
 			// Expose the map instance for the offline renderer (see render/).
 			if (new URLSearchParams(window.location.search).get('render') === '1') {
 				(window as unknown as { __map: unknown }).__map = map;
@@ -137,11 +220,48 @@
 		let cancelled = false;
 		buildMapStyle(id, terrain).then((newStyle) => {
 			if (cancelled || !map) return;
+			// setStyle({ diff: false }) wipes our custom source/layer along with
+			// the rest. Re-install once the new style has finished loading.
+			annotationsReady = false;
 			map.setStyle(newStyle, { diff: false });
+			map.once('style.load', () => {
+				if (cancelled) return;
+				setupAnnotationLayer();
+			});
 		});
 		return () => {
 			cancelled = true;
 		};
+	});
+
+	// Push the annotation array to the GeoJSON source whenever it changes
+	// (or after a style swap re-installed the source). Re-using `setData()`
+	// instead of recreating the source preserves any feature state we set.
+	// Read `annotationsReady` before the `map` check so JS short-circuit
+	// can't skip its tracking on the first run (when map is still undefined).
+	$effect(() => {
+		const anns = store.annotations;
+		const ready = annotationsReady;
+		if (!ready || !map) return;
+		const source = map.getSource(ANNOTATION_SOURCE) as maplibregl.GeoJSONSource | undefined;
+		if (!source) return;
+		source.setData(buildAnnotationFeatures(anns));
+	});
+
+	// Per-frame visibility. Tracks `currentTime` and `annotations` so it re-runs
+	// during playback and after edits. Sets `visible` feature-state on every
+	// annotation; the layer's opacity expressions read it.
+	$effect(() => {
+		const anns = store.annotations;
+		const t = store.currentTime;
+		const ready = annotationsReady;
+		if (!ready || !map) return;
+		for (let i = 0; i < anns.length; i++) {
+			map.setFeatureState(
+				{ source: ANNOTATION_SOURCE, id: i },
+				{ visible: isAnnotationVisible(anns[i], t) }
+			);
+		}
 	});
 
 	// Watermark colours flip with the base map: dark text + light outline reads

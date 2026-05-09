@@ -21,6 +21,7 @@
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
 		void store.keyframes;
+		void store.annotations;
 		void store.style;
 		void store.terrain;
 		if (urlTimer) clearTimeout(urlTimer);

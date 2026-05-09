@@ -1,18 +1,44 @@
 import { colorful, satellite } from '@versatiles/style';
-import type { StyleSpecification } from 'maplibre-gl';
+import type { SpriteSpecification, StyleSpecification } from 'maplibre-gl';
 import type { MapStyleId } from './types';
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
 
+/**
+ * Sprite sheet that backs annotation icons. Referenced from the symbol layer
+ * via the `markers:` namespace (e.g. `markers:symbol-marker`). Loaded as an
+ * additional sprite alongside the base style's own sprite.
+ */
+export const ANNOTATION_SPRITE_ID = 'markers';
+const ANNOTATION_SPRITE_URL = `${TILES_BASE_URL}/assets/sprites/markers/sprites`;
+
+function withMarkersSprite(style: StyleSpecification): StyleSpecification {
+	const existing: SpriteSpecification | undefined = style.sprite;
+	const markers = { id: ANNOTATION_SPRITE_ID, url: ANNOTATION_SPRITE_URL };
+	if (Array.isArray(existing)) {
+		style.sprite = [...existing, markers];
+	} else if (typeof existing === 'string') {
+		// Older string form — promote to the array form so we can append.
+		style.sprite = [{ id: 'default', url: existing }, markers];
+	} else {
+		style.sprite = [markers];
+	}
+	return style;
+}
+
 export async function buildMapStyle(id: MapStyleId, terrain: boolean): Promise<StyleSpecification> {
 	switch (id) {
-		case 'colorful': {
-			const style = colorful({ baseUrl: TILES_BASE_URL, terrain, hillshade: terrain });
-			return style;
-		}
+		case 'colorful':
+			return withMarkersSprite(
+				await colorful({ baseUrl: TILES_BASE_URL, terrain, hillshade: terrain })
+			);
 		case 'satellite':
-			return satellite({ baseUrl: TILES_BASE_URL, overlay: false, terrain });
+			return withMarkersSprite(
+				await satellite({ baseUrl: TILES_BASE_URL, overlay: false, terrain })
+			);
 		case 'satellite-overlay':
-			return satellite({ baseUrl: TILES_BASE_URL, overlay: true, terrain });
+			return withMarkersSprite(
+				await satellite({ baseUrl: TILES_BASE_URL, overlay: true, terrain })
+			);
 	}
 }
