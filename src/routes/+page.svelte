@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { AnimationStore } from '$lib/animation.svelte';
-	import { clearUrlHash, readAnimationFromUrl, writeAnimationToUrl } from '$lib/url_state';
+	import {
+		clearUrlHash,
+		readAnimationFromStorage,
+		readAnimationFromUrl,
+		writeAnimationToStorage,
+		writeAnimationToUrl
+	} from '$lib/url_state';
 	import AnnotationPanel from '$lib/components/AnnotationPanel.svelte';
 	import MapStage from '$lib/components/MapStage.svelte';
 	import MapStyleControl from '$lib/components/MapStyleControl.svelte';
@@ -10,10 +16,18 @@
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
 
-	// Load before children mount so MapStage sees the correct style/terrain on first build.
+	// Load before children mount so MapStage sees the correct style/terrain on
+	// first build. Precedence: URL hash (shared link) > localStorage (last
+	// session) > empty. URL wins so opening a share link in an existing tab
+	// always shows what was shared, not what the user happened to be editing.
 	try {
 		const fromUrl = readAnimationFromUrl();
-		if (fromUrl) store.loadFromAnimation(fromUrl);
+		if (fromUrl) {
+			store.loadFromAnimation(fromUrl);
+		} else {
+			const fromStorage = readAnimationFromStorage();
+			if (fromStorage) store.loadFromAnimation(fromStorage);
+		}
 	} catch (err) {
 		urlError = err instanceof Error ? err.message : 'Could not load shared link.';
 		clearUrlHash();
@@ -28,7 +42,9 @@
 		void store.terrain;
 		if (urlTimer) clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
-			writeAnimationToUrl(store.toAnimation());
+			const anim = store.toAnimation();
+			writeAnimationToUrl(anim);
+			writeAnimationToStorage(anim);
 		}, 250);
 		return () => {
 			if (urlTimer) clearTimeout(urlTimer);

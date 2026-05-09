@@ -31,6 +31,7 @@ import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
 import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
 
 const HASH_KEY = 'kf';
+const STORAGE_KEY = 'versatiles-map-animation';
 
 /**
  * Encode an animation to a base64-url string suitable for URL hashes.
@@ -257,6 +258,47 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 export function clearUrlHash(): void {
 	if (typeof window === 'undefined') return;
 	history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+/**
+ * Reads the most recently saved animation from localStorage. Used as a
+ * fallback when the URL hash is empty (e.g., the user reloaded the bare
+ * editor URL after closing the tab). Returns null on a fresh browser, on
+ * any decode failure, or in environments without localStorage.
+ */
+export function readAnimationFromStorage(): Animation | null {
+	if (typeof window === 'undefined') return null;
+	try {
+		const raw = window.localStorage.getItem(STORAGE_KEY);
+		if (!raw) return null;
+		return decodeAnimation(raw);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Mirror the current animation to localStorage so a page reload (without a
+ * URL hash) restores it. Stored as the same base64-url string that the URL
+ * hash would carry, so encode/decode is one code path. Silent on quota /
+ * disabled-storage errors — it's a best-effort UX nicety.
+ */
+export function writeAnimationToStorage(anim: Animation): void {
+	if (typeof window === 'undefined') return;
+	try {
+		window.localStorage.setItem(STORAGE_KEY, encodeAnimation(anim));
+	} catch {
+		// localStorage may be disabled (Safari private mode, quota full); ignore.
+	}
+}
+
+export function clearAnimationStorage(): void {
+	if (typeof window === 'undefined') return;
+	try {
+		window.localStorage.removeItem(STORAGE_KEY);
+	} catch {
+		// ignore
+	}
 }
 
 export function writeAnimationToUrl(anim: Animation): void {
