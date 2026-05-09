@@ -11,12 +11,26 @@ import type { Animation, Annotation, CameraState, Keyframe, MapStyleId, PathStyl
 
 const MIN_TIME_GAP = 0.01;
 
+/**
+ * Visibility window check. Both bounds are optional: missing `visibleFrom`
+ * means "from the start"; missing `visibleUntil` means "always". Bounds are
+ * half-open at the upper end so an annotation with `visibleUntil = 5` is
+ * gone exactly at `t = 5`, matching how keyframes treat the end of an
+ * interval (the next keyframe's pose wins at its own timestamp).
+ */
+export function isAnnotationVisible(ann: Annotation, t: number): boolean {
+	if (ann.visibleFrom !== undefined && t < ann.visibleFrom) return false;
+	if (ann.visibleUntil !== undefined && t >= ann.visibleUntil) return false;
+	return true;
+}
+
 export class AnimationStore {
 	keyframes = $state<Keyframe[]>([]);
 	annotations = $state<Annotation[]>([]);
 	currentTime = $state(0);
 	isPlaying = $state(false);
 	selectedIndex = $state<number | null>(null);
+	selectedAnnotationIndex = $state<number | null>(null);
 	style = $state<MapStyleId>(DEFAULT_STYLE);
 	terrain = $state(DEFAULT_TERRAIN);
 	/** Live camera state from the map; not part of the saved animation. */
@@ -28,7 +42,20 @@ export class AnimationStore {
 	selectedKeyframe = $derived(
 		this.selectedIndex !== null ? (this.keyframes[this.selectedIndex] ?? null) : null
 	);
+	selectedAnnotation = $derived(
+		this.selectedAnnotationIndex !== null
+			? (this.annotations[this.selectedAnnotationIndex] ?? null)
+			: null
+	);
 	sampledCamera = $derived(sampleAt(this.keyframes, this.currentTime));
+	/**
+	 * Annotations whose visibility window contains `currentTime`. Used by
+	 * MapStage to drive the symbol-layer feature state per frame, and by the
+	 * renderer to decide which markers to draw.
+	 */
+	sampledAnnotations = $derived(
+		this.annotations.filter((a) => isAnnotationVisible(a, this.currentTime))
+	);
 
 	addKeyframeFromCamera(cam: CameraState): void {
 		let t = this.currentTime;
@@ -104,11 +131,57 @@ export class AnimationStore {
 	selectAt(index: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
 		this.selectedIndex = index;
+		this.selectedAnnotationIndex = null;
 		this.currentTime = this.keyframes[index].t;
 	}
 
 	clearSelection(): void {
 		this.selectedIndex = null;
+	}
+
+	// -------------------------------------------------------------------------
+	// Annotations
+	// -------------------------------------------------------------------------
+
+	addAnnotation(ann: Annotation): void {
+		this.annotations = [...this.annotations, { ...ann }];
+		this.selectedAnnotationIndex = this.annotations.length - 1;
+		this.selectedIndex = null;
+	}
+
+	updateAnnotation(index: number, patch: Partial<Annotation>): void {
+		if (index < 0 || index >= this.annotations.length) return;
+		const updated: Annotation = { ...this.annotations[index], ...patch };
+		// Drop optional fields that were explicitly set to undefined so the
+		// JSON/URL round-trip stays stable (don't emit "rotation: undefined").
+		for (const key of ['rotation', 'visibleFrom', 'visibleUntil'] as const) {
+			if (patch[key] === undefined && key in patch) delete updated[key];
+		}
+		this.annotations = [
+			...this.annotations.slice(0, index),
+			updated,
+			...this.annotations.slice(index + 1)
+		];
+	}
+
+	deleteAnnotation(index: number): void {
+		if (index < 0 || index >= this.annotations.length) return;
+		this.annotations = this.annotations.filter((_, i) => i !== index);
+		if (this.selectedAnnotationIndex === index) {
+			this.selectedAnnotationIndex = null;
+		} else if (this.selectedAnnotationIndex !== null && this.selectedAnnotationIndex > index) {
+			this.selectedAnnotationIndex -= 1;
+		}
+	}
+
+	selectAnnotation(index: number): void {
+		if (index < 0 || index >= this.annotations.length) return;
+		this.selectedAnnotationIndex = index;
+		this.selectedIndex = null;
+	}
+
+	clearAnnotationSelection(): void {
+		this.selectedAnnotationIndex = null;
 	}
 
 	seekTo(t: number): void {
@@ -143,6 +216,7 @@ export class AnimationStore {
 		this.style = anim.style ?? DEFAULT_STYLE;
 		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
 		this.selectedIndex = null;
+		this.selectedAnnotationIndex = null;
 		this.currentTime = 0;
 		this.isPlaying = false;
 	}
