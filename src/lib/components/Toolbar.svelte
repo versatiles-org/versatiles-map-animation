@@ -191,7 +191,8 @@
 				{ t: 3, lng: 13.405, lat: 52.52, zoom: 9, pitch: 60, bearing: 30, roll: 0 },
 				{ t: 6, lng: 13.405, lat: 52.52, zoom: 14, pitch: 70, bearing: 120, roll: 0 }
 			],
-			annotations: []
+			annotations: [],
+			annotationScale: 1
 		});
 	}
 
@@ -277,6 +278,23 @@
 		<button type="button" onclick={onPinAnnotation} title="Pin a marker at the current map center">
 			📍 Pin
 		</button>
+		<label
+			class="control-label scale-control"
+			title="Scale all annotations (markers and labels). Stacks on top of automatic container-size scaling."
+		>
+			<span class="lbl">Size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={store.annotationScale}
+				oninput={(e) => {
+					store.annotationScale = Number((e.currentTarget as HTMLInputElement).value);
+				}}
+			/>
+			<span class="num">{store.annotationScale.toFixed(2)}×</span>
+		</label>
 	</div>
 
 	<div class="group playback">
@@ -454,6 +472,28 @@
 	.path-picker select:disabled {
 		opacity: 0.4;
 		cursor: not-allowed;
+	}
+	.scale-control {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin-left: 0.4rem;
+		font-size: 12px;
+		color: #aaa;
+	}
+	.scale-control .lbl {
+		font-size: 10px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #777;
+	}
+	.scale-control input[type='range'] {
+		width: 90px;
+	}
+	.scale-control .num {
+		font-variant-numeric: tabular-nums;
+		min-width: 2.6em;
+		text-align: right;
 	}
 	.spacer {
 		flex: 1 1 auto;

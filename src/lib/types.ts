@@ -66,6 +66,13 @@ export const ANNOTATION_ICON_OFFSETS: Record<AnnotationIcon, [number, number]> =
 export const DEFAULT_ANNOTATION_ICON: AnnotationIcon = 'symbol-marker';
 export const DEFAULT_ANNOTATION_COLOR = '#ffffff';
 
+/**
+ * Animation-wide multiplier on annotation icon and label size. The map also
+ * auto-scales annotations by container width (so a 4K render gets bigger
+ * markers than a 480p embed); this factor stacks on top of that.
+ */
+export const DEFAULT_ANNOTATION_SCALE = 1;
+
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'Colorful',
 	satellite: 'Satellite',
@@ -127,6 +134,8 @@ export interface Animation {
 	terrain: boolean;
 	keyframes: Keyframe[];
 	annotations: Annotation[];
+	/** Multiplier for icon + label size. Defaults to 1. */
+	annotationScale: number;
 }
 
 export const DEFAULT_INITIAL_VIEW: CameraState = {
@@ -144,7 +153,8 @@ export function createEmptyAnimation(): Animation {
 		style: DEFAULT_STYLE,
 		terrain: DEFAULT_TERRAIN,
 		keyframes: [],
-		annotations: []
+		annotations: [],
+		annotationScale: DEFAULT_ANNOTATION_SCALE
 	};
 }
 

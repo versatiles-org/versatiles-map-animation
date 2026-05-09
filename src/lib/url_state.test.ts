@@ -11,7 +11,8 @@ const example: Animation = {
 		{ t: 3, lng: 13.405, lat: 52.52, zoom: 9, pitch: 60, bearing: 30, roll: 0 },
 		{ t: 6, lng: 13.405, lat: 52.52, zoom: 14, pitch: 70, bearing: 120, roll: 0 }
 	],
-	annotations: []
+	annotations: [],
+	annotationScale: 1
 };
 
 describe('toCompact', () => {
@@ -314,5 +315,39 @@ describe('annotations round-trip', () => {
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
 		expect(decoded?.annotations[0].label).toBe('Köln 🦊');
+	});
+});
+
+describe('annotationScale (V3)', () => {
+	const oneAnn: Animation = {
+		...example,
+		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A' }]
+	};
+
+	it('default scale stays in V2 (no extra bytes for byte-stable share URLs)', () => {
+		const v2 = encodeAnimation({ ...oneAnn, annotationScale: 1 });
+		const v3 = encodeAnimation({ ...oneAnn, annotationScale: 1.5 });
+		// V3 carries an extra annotationScale field, so it must be longer than V2.
+		expect(v3.length).toBeGreaterThan(v2.length);
+	});
+
+	it('non-default scale switches to V3 and round-trips', () => {
+		const decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 1.75 }));
+		expect(decoded?.annotationScale).toBeCloseTo(1.75, 2);
+		expect(decoded?.annotations.length).toBe(1);
+	});
+
+	it('two-decimal scale precision is preserved', () => {
+		const decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 0.55 }));
+		expect(decoded?.annotationScale).toBeCloseTo(0.55, 2);
+	});
+
+	it('V1 + V2 decode default scale 1', () => {
+		// No annotations → V1 path; decoded animation gets default scale.
+		const v1Decoded = decodeAnimation(encodeAnimation({ ...example, annotationScale: 1 }));
+		expect(v1Decoded?.annotationScale).toBe(1);
+		// Annotations + default scale → V2 path; decoded animation gets default scale.
+		const v2Decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 1 }));
+		expect(v2Decoded?.annotationScale).toBe(1);
 	});
 });

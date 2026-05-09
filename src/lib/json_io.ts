@@ -1,6 +1,7 @@
 import {
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
+	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isAnnotationIcon,
@@ -81,7 +82,11 @@ export function validateAnimation(input: unknown): Animation {
 	const annotations: Annotation[] = Array.isArray(obj.annotations)
 		? obj.annotations.map((raw, i) => validateAnnotation(raw, i))
 		: [];
-	return { version: SCHEMA_VERSION, style, terrain, keyframes, annotations };
+	const annotationScale =
+		typeof obj.annotationScale === 'number' && Number.isFinite(obj.annotationScale)
+			? Math.max(0.01, obj.annotationScale)
+			: DEFAULT_ANNOTATION_SCALE;
+	return { version: SCHEMA_VERSION, style, terrain, keyframes, annotations, annotationScale };
 }
 
 function validateAnnotation(raw: unknown, i: number): Annotation {

@@ -2,6 +2,7 @@ import { sampleAt } from './interpolate';
 import {
 	cameraOf,
 	createEmptyAnimation,
+	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_INITIAL_VIEW,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
@@ -33,6 +34,7 @@ export class AnimationStore {
 	selectedAnnotationIndex = $state<number | null>(null);
 	style = $state<MapStyleId>(DEFAULT_STYLE);
 	terrain = $state(DEFAULT_TERRAIN);
+	annotationScale = $state(DEFAULT_ANNOTATION_SCALE);
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 
@@ -215,6 +217,7 @@ export class AnimationStore {
 		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
 		this.style = anim.style ?? DEFAULT_STYLE;
 		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
+		this.annotationScale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
 		this.currentTime = 0;
@@ -227,7 +230,8 @@ export class AnimationStore {
 			style: this.style,
 			terrain: this.terrain,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),
-			annotations: this.annotations.map((a) => ({ ...a }))
+			annotations: this.annotations.map((a) => ({ ...a })),
+			annotationScale: this.annotationScale
 		};
 	}
 

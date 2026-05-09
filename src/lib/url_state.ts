@@ -18,6 +18,7 @@ import {
 	ANNOTATION_ICONS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
+	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_PATH,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
@@ -41,9 +42,11 @@ const HASH_KEY = 'kf';
 // First byte of the encoded payload tells us which format follows.
 //   0x01: bit-packed binary v1 (no annotations)
 //   0x02: bit-packed binary v2 (adds annotations array at the end)
+//   0x03: bit-packed binary v3 (adds animation-level annotationScale)
 //   0x7B ('{'): legacy JSON-base64 (kept for backward compatibility)
 const FORMAT_TAG_BINARY_V1 = 0x01;
 const FORMAT_TAG_BINARY_V2 = 0x02;
+const FORMAT_TAG_BINARY_V3 = 0x03;
 const FORMAT_TAG_JSON_LEGACY = 0x7b;
 
 // ---------------------------------------------------------------------------
@@ -444,6 +447,23 @@ const AnimationCodecV2 = struct({
 	annotations: annotationsCodec
 });
 
+// V3 adds an animation-level `annotationScale` (vuint of round(scale*100)).
+// Stored last so the V2 prefix is still parseable bit-by-bit; we only emit V3
+// when the scale differs from the default, so no-scale animations remain V2.
+const annotationScaleCodec: Codec<number> = {
+	encode: (v, w) => vuint.encode(Math.max(1, Math.round(v * 100)), w),
+	decode: (r) => vuint.decode(r) / 100
+};
+
+const AnimationCodecV3 = struct({
+	version: uint(4),
+	style: enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]]),
+	terrain: bool,
+	keyframes: keyframesCodec,
+	annotations: annotationsCodec,
+	annotationScale: annotationScaleCodec
+});
+
 function normalizeKeyframe(kf: Keyframe): WireKeyframe {
 	const { mx, my } = lngLatToMercator(kf.lng, kf.lat);
 	return {
@@ -682,7 +702,14 @@ export function fromCompact(input: unknown): Animation {
 		keyframes.push(kf);
 		prev = num;
 	}
-	return { version: SCHEMA_VERSION, style, terrain, keyframes, annotations: [] };
+	return {
+		version: SCHEMA_VERSION,
+		style,
+		terrain,
+		keyframes,
+		annotations: [],
+		annotationScale: DEFAULT_ANNOTATION_SCALE
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -692,14 +719,31 @@ export function fromCompact(input: unknown): Animation {
 /**
  * Encode an animation to a base64-url string suitable for URL hashes.
  * Uses the bit-packed binary codec; the first byte is a format tag so
- * older formats (binary v1, legacy JSON-base64) can still be decoded by
- * `decodeAnimation`. Animations without annotations fall back to the
- * smaller v1 encoding so existing share links stay byte-for-byte stable.
+ * older formats (binary v1/v2, legacy JSON-base64) can still be decoded
+ * by `decodeAnimation`. Picks the smallest sufficient version: V1 for
+ * keyframes-only, V2 when annotations are present at default scale, V3
+ * only when annotationScale differs from the default. This keeps already-
+ * shared URLs byte-stable across this schema bump.
  */
 export function encodeAnimation(anim: Animation): string {
 	const w = new BitWriter();
+	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
-	if (hasAnnotations) {
+	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
+	if (needsV3) {
+		w.writeBits(FORMAT_TAG_BINARY_V3, 8);
+		AnimationCodecV3.encode(
+			{
+				version: anim.version,
+				style: anim.style,
+				terrain: anim.terrain,
+				keyframes: anim.keyframes.map(normalizeKeyframe),
+				annotations: anim.annotations.map(normalizeAnnotation),
+				annotationScale: scale
+			},
+			w
+		);
+	} else if (hasAnnotations) {
 		w.writeBits(FORMAT_TAG_BINARY_V2, 8);
 		AnimationCodecV2.encode(
 			{
@@ -743,9 +787,29 @@ function decodeOrThrow(encoded: string): Animation {
 	const bytes = base64UrlToBytes(encoded);
 	if (bytes.length === 0) throw new Error('Empty payload');
 	const tag = bytes[0];
-	if (tag === FORMAT_TAG_BINARY_V1 || tag === FORMAT_TAG_BINARY_V2) {
+	if (
+		tag === FORMAT_TAG_BINARY_V1 ||
+		tag === FORMAT_TAG_BINARY_V2 ||
+		tag === FORMAT_TAG_BINARY_V3
+	) {
 		const r = new BitReader(bytes);
 		r.readBits(8); // consume tag
+		if (tag === FORMAT_TAG_BINARY_V3) {
+			const wire = AnimationCodecV3.decode(r);
+			if (wire.version > SCHEMA_VERSION) {
+				throw new Error(
+					`File was made with a newer version (v${wire.version}); supported: v${SCHEMA_VERSION}.`
+				);
+			}
+			return {
+				version: SCHEMA_VERSION,
+				style: wire.style,
+				terrain: wire.terrain,
+				keyframes: wire.keyframes.map(denormalizeKeyframe),
+				annotations: wire.annotations.map(denormalizeAnnotation),
+				annotationScale: wire.annotationScale
+			};
+		}
 		if (tag === FORMAT_TAG_BINARY_V2) {
 			const wire = AnimationCodecV2.decode(r);
 			if (wire.version > SCHEMA_VERSION) {
@@ -758,7 +822,8 @@ function decodeOrThrow(encoded: string): Animation {
 				style: wire.style,
 				terrain: wire.terrain,
 				keyframes: wire.keyframes.map(denormalizeKeyframe),
-				annotations: wire.annotations.map(denormalizeAnnotation)
+				annotations: wire.annotations.map(denormalizeAnnotation),
+				annotationScale: DEFAULT_ANNOTATION_SCALE
 			};
 		}
 		const wire = AnimationCodecV1.decode(r);
@@ -772,7 +837,8 @@ function decodeOrThrow(encoded: string): Animation {
 			style: wire.style,
 			terrain: wire.terrain,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
-			annotations: []
+			annotations: [],
+			annotationScale: DEFAULT_ANNOTATION_SCALE
 		};
 	}
 	if (tag === FORMAT_TAG_JSON_LEGACY) {
@@ -806,21 +872,32 @@ export function readAnimationFromUrl(): Animation | null {
  * to print a "lat: 28 bits, zoom: 20 bits, …" tree.
  */
 export function inspectAnimation(anim: Animation): InspectionNode {
+	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
-	const inner = hasAnnotations
-		? inspect(AnimationCodecV2, {
+	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
+	const inner = needsV3
+		? inspect(AnimationCodecV3, {
 				version: anim.version,
 				style: anim.style,
 				terrain: anim.terrain,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation)
+				annotations: anim.annotations.map(normalizeAnnotation),
+				annotationScale: scale
 			})
-		: inspect(AnimationCodecV1, {
-				version: anim.version,
-				style: anim.style,
-				terrain: anim.terrain,
-				keyframes: anim.keyframes.map(normalizeKeyframe)
-			});
+		: hasAnnotations
+			? inspect(AnimationCodecV2, {
+					version: anim.version,
+					style: anim.style,
+					terrain: anim.terrain,
+					keyframes: anim.keyframes.map(normalizeKeyframe),
+					annotations: anim.annotations.map(normalizeAnnotation)
+				})
+			: inspect(AnimationCodecV1, {
+					version: anim.version,
+					style: anim.style,
+					terrain: anim.terrain,
+					keyframes: anim.keyframes.map(normalizeKeyframe)
+				});
 	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so
 	// the tree's bit total matches the actual on-the-wire payload.
 	return {

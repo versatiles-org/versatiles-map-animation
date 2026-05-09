@@ -21,11 +21,25 @@
 	const ANNOTATION_SOURCE = 'annotations';
 	const ANNOTATION_LAYER = 'annotations-layer';
 
+	// Reference width for container-based scaling. At this width, scale = 1
+	// and annotations render at their natural sprite size. Embeds smaller than
+	// this get smaller annotations; 4K renders get larger ones. Clamped so
+	// extreme viewports don't produce unreadable or absurd sizes.
+	const REFERENCE_WIDTH = 1280;
+	const BASE_TEXT_PX = 13;
+
 	// Reactive flag set to true once the annotation source + layer exist on the
 	// current style. Flips to false during a style switch and back to true after
 	// the new style finishes loading and we've re-installed our layer. The
 	// data + visibility effects depend on it so they re-run after style swaps.
 	let annotationsReady = $state(false);
+	let containerScale = $state(1);
+
+	function updateContainerScale(): void {
+		if (!map) return;
+		const w = map.getContainer().clientWidth;
+		if (w > 0) containerScale = Math.max(0.5, Math.min(3, w / REFERENCE_WIDTH));
+	}
 
 	function buildAnnotationFeatures(anns: Annotation[]): FeatureCollection {
 		return {
@@ -160,6 +174,8 @@
 			if (!map) return;
 			store.liveCamera = readCamera();
 		});
+		map.on('resize', updateContainerScale);
+		updateContainerScale();
 		// Click on an annotation marker → select it. Click on empty map → clear
 		// any annotation selection. The marker click handler stops propagation,
 		// so the empty-map fallback only fires when no marker was hit.
@@ -281,6 +297,22 @@
 				{ visible: isAnnotationVisible(anns[i], t) }
 			);
 		}
+	});
+
+	// Combined scale = container-width-based factor × user-set annotationScale.
+	// Pushed onto the layer's icon-size + text-size whenever any input changes
+	// or the layer was just re-installed by a style swap. text-offset is in ems
+	// so it auto-scales with text-size; icon-offset is multiplied by icon-size
+	// internally by MapLibre, so the tuned pivot pixels stay correct at any
+	// scale.
+	$effect(() => {
+		const ready = annotationsReady;
+		const cs = containerScale;
+		const us = store.annotationScale;
+		if (!ready || !map) return;
+		const scale = cs * us;
+		map.setLayoutProperty(ANNOTATION_LAYER, 'icon-size', scale);
+		map.setLayoutProperty(ANNOTATION_LAYER, 'text-size', BASE_TEXT_PX * scale);
 	});
 
 	// Watermark colours flip with the base map: dark text + light outline reads
