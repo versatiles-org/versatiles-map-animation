@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
+	import { spritePreviewStyle } from '../sprite_meta';
 	import {
 		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
@@ -10,6 +11,9 @@
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
+
+	let iconMenuOpen = $state(false);
+	let iconMenuEl: HTMLDivElement | undefined = $state();
 
 	const ann = $derived(store.selectedAnnotation);
 	const idx = $derived(store.selectedAnnotationIndex);
@@ -42,7 +46,18 @@
 	}
 	function onIcon(icon: AnnotationIcon) {
 		patch({ icon });
+		iconMenuOpen = false;
 	}
+
+	function handleDocClick(e: MouseEvent) {
+		if (!iconMenuOpen || !iconMenuEl) return;
+		if (!iconMenuEl.contains(e.target as Node)) iconMenuOpen = false;
+	}
+
+	$effect(() => {
+		document.addEventListener('click', handleDocClick);
+		return () => document.removeEventListener('click', handleDocClick);
+	});
 	function onRotation(e: Event) {
 		patch({ rotation: Number((e.currentTarget as HTMLInputElement).value) });
 	}
@@ -111,21 +126,39 @@
 
 		<div class="row">
 			<span class="lbl">Icon</span>
-			<div class="icon-grid">
-				{#each ANNOTATION_ICONS as icon (icon)}
-					<button
-						type="button"
-						class:selected={ann.icon === icon}
-						onclick={() => onIcon(icon)}
-						title={icon}
-						aria-label={icon}
-					>
-						<!-- Use the same sprite the map uses, fetched separately. The
-							 sprite sheet ships SVG-style atlases; rendering here would
-							 require slicing. As a placeholder, show the short name. -->
-						<span class="icon-name">{shortName(icon)}</span>
-					</button>
-				{/each}
+			<div class="icon-dropdown" bind:this={iconMenuEl}>
+				<button
+					type="button"
+					class="icon-trigger"
+					onclick={() => (iconMenuOpen = !iconMenuOpen)}
+					aria-haspopup="listbox"
+					aria-expanded={iconMenuOpen}
+					title={ann.icon}
+				>
+					<span class="icon-prev" style={spritePreviewStyle(ann.icon, 22)}></span>
+					<span class="icon-name">{shortName(ann.icon)}</span>
+					<span class="caret" aria-hidden="true">▾</span>
+				</button>
+				{#if iconMenuOpen}
+					<ul class="icon-menu" role="listbox" aria-label="Icon">
+						{#each ANNOTATION_ICONS as icon (icon)}
+							<li>
+								<button
+									type="button"
+									class="icon-option"
+									class:selected={ann.icon === icon}
+									onclick={() => onIcon(icon)}
+									role="option"
+									aria-selected={ann.icon === icon}
+									title={icon}
+								>
+									<span class="icon-prev" style={spritePreviewStyle(icon, 22)}></span>
+									<span class="icon-name">{shortName(icon)}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			</div>
 		</div>
 
@@ -364,11 +397,96 @@
 		flex: 1 1 auto;
 	}
 
-	.icon-grid {
+	.icon-dropdown {
 		flex: 1 1 auto;
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 3px;
+		position: relative;
+		min-width: 0;
+	}
+	.icon-trigger {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.25rem 0.4rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font: inherit;
+		cursor: pointer;
+		text-align: left;
+	}
+	.icon-trigger:hover {
+		border-color: #4a9eff;
+	}
+	.icon-trigger .icon-name {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.icon-trigger .caret {
+		color: #888;
+		font-size: 11px;
+	}
+	.icon-prev {
+		display: inline-block;
+		flex: 0 0 auto;
+		/* The atlas is white-on-transparent SDF, but appears as black/grey
+		   bitmap in the source PNG; show against a slightly lighter chip so
+		   subtle outlines stay visible. */
+		background-color: rgba(255, 255, 255, 0.04);
+		border-radius: 2px;
+	}
+	.icon-menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		max-height: 240px;
+		overflow-y: auto;
+		margin: 0;
+		padding: 3px;
+		list-style: none;
+		background: #11161e;
+		border: 1px solid #333;
+		border-radius: 4px;
+		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+		z-index: 10;
+	}
+	.icon-menu li {
+		margin: 0;
+	}
+	.icon-option {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.25rem 0.4rem;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		color: #ccc;
+		font: inherit;
+		cursor: pointer;
+		text-align: left;
+	}
+	.icon-option:hover {
+		background: rgba(74, 158, 255, 0.12);
+		border-color: rgba(74, 158, 255, 0.4);
+	}
+	.icon-option.selected {
+		background: rgba(74, 158, 255, 0.18);
+		border-color: #4a9eff;
+		color: #fff;
+	}
+	.icon-option .icon-name {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.pos-grid {
 		display: grid;
@@ -396,35 +514,6 @@
 		border-color: #4a9eff;
 		color: #fff;
 	}
-	.icon-grid button {
-		padding: 0.25rem 0.1rem;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid #2a2f37;
-		border-radius: 3px;
-		color: #aaa;
-		font-size: 10px;
-		font-family: inherit;
-		cursor: pointer;
-		min-height: 26px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.icon-grid button:hover {
-		border-color: #4a9eff;
-		color: #ddd;
-	}
-	.icon-grid button.selected {
-		border-color: #4a9eff;
-		background: rgba(74, 158, 255, 0.18);
-		color: #fff;
-	}
-	.icon-name {
-		display: block;
-		text-align: center;
-		line-height: 1.1;
-		word-break: break-all;
-	}
-
 	.visibility-grid {
 		flex: 1 1 auto;
 		display: grid;
