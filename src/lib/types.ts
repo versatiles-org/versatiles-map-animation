@@ -133,10 +133,40 @@ export interface Annotation {
 	iconSize?: number;
 	/** Per-annotation label size multiplier (default 1). Stacks like iconSize. */
 	labelSize?: number;
+	/**
+	 * Where the label sits relative to the icon (default `bottom`). See
+	 * `LABEL_POSITIONS`.
+	 */
+	labelPosition?: LabelPosition;
 }
 
 export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
 export const DEFAULT_ANNOTATION_LABEL_SIZE = 1;
+
+/**
+ * Where the label sits relative to the icon. The name describes where the
+ * *label* appears, not which corner of the text touches the geo point — so
+ * `top` means "label above the icon", `bottom-left` means "label down-left
+ * of the icon". The `MapStage` translates each value to MapLibre's
+ * `text-anchor` + `text-offset` pair internally.
+ */
+export const LABEL_POSITIONS = [
+	'center',
+	'top',
+	'bottom',
+	'left',
+	'right',
+	'top-left',
+	'top-right',
+	'bottom-left',
+	'bottom-right'
+] as const;
+export type LabelPosition = (typeof LABEL_POSITIONS)[number];
+export const DEFAULT_LABEL_POSITION: LabelPosition = 'bottom';
+
+export function isLabelPosition(value: unknown): value is LabelPosition {
+	return typeof value === 'string' && (LABEL_POSITIONS as readonly string[]).includes(value);
+}
 
 export interface Animation {
 	version: number;

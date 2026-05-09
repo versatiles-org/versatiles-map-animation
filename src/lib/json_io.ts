@@ -5,6 +5,7 @@ import {
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isAnnotationIcon,
+	isLabelPosition,
 	isMapStyleId,
 	isPathStyle,
 	SCHEMA_VERSION,
@@ -126,5 +127,6 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 	if (iconSize !== undefined) out.iconSize = iconSize;
 	const labelSize = optionalNum('labelSize');
 	if (labelSize !== undefined) out.labelSize = labelSize;
+	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
 	return out;
 }

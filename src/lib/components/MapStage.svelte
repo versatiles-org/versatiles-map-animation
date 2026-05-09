@@ -8,8 +8,10 @@
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		DEFAULT_INITIAL_VIEW,
+		DEFAULT_LABEL_POSITION,
 		type Annotation,
-		type CameraState
+		type CameraState,
+		type LabelPosition
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -20,6 +22,34 @@
 
 	const ANNOTATION_SOURCE = 'annotations';
 	const ANNOTATION_LAYER = 'annotations-layer';
+
+	// Translate user-facing labelPosition ("where the label sits relative to
+	// the icon") into MapLibre's text-anchor (which corner of the text touches
+	// the offset point) + text-offset (in ems). text-offset auto-scales with
+	// text-size, so the label keeps a constant em-distance from the icon at
+	// any annotationScale.
+	const LABEL_TEXT_ANCHOR: Record<LabelPosition, string> = {
+		center: 'center',
+		top: 'bottom',
+		bottom: 'top',
+		left: 'right',
+		right: 'left',
+		'top-left': 'bottom-right',
+		'top-right': 'bottom-left',
+		'bottom-left': 'top-right',
+		'bottom-right': 'top-left'
+	};
+	const LABEL_TEXT_OFFSET: Record<LabelPosition, [number, number]> = {
+		center: [0, 0],
+		top: [0, -1.5],
+		bottom: [0, 1.5],
+		left: [-1.5, 0],
+		right: [1.5, 0],
+		'top-left': [-1.5, -1.5],
+		'top-right': [1.5, -1.5],
+		'bottom-left': [-1.5, 1.5],
+		'bottom-right': [1.5, 1.5]
+	};
 
 	// Reference width for container-based scaling. At this width, scale = 1
 	// and annotations render at their natural sprite size. Embeds smaller than
@@ -61,20 +91,25 @@
 	function buildAnnotationFeatures(anns: Annotation[]): FeatureCollection {
 		return {
 			type: 'FeatureCollection',
-			features: anns.map((a, i) => ({
-				type: 'Feature',
-				id: i,
-				geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
-				properties: {
-					icon: a.icon,
-					color: a.color,
-					label: a.label,
-					rotation: a.rotation ?? 0,
-					offset: ANNOTATION_ICON_OFFSETS[a.icon],
-					iconSize: a.iconSize ?? 1,
-					labelSize: a.labelSize ?? 1
-				}
-			}))
+			features: anns.map((a, i) => {
+				const pos = a.labelPosition ?? DEFAULT_LABEL_POSITION;
+				return {
+					type: 'Feature',
+					id: i,
+					geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+					properties: {
+						icon: a.icon,
+						color: a.color,
+						label: a.label,
+						rotation: a.rotation ?? 0,
+						offset: ANNOTATION_ICON_OFFSETS[a.icon],
+						iconSize: a.iconSize ?? 1,
+						labelSize: a.labelSize ?? 1,
+						textAnchor: LABEL_TEXT_ANCHOR[pos],
+						textOffset: LABEL_TEXT_OFFSET[pos]
+					}
+				};
+			})
 		};
 	}
 
@@ -106,11 +141,12 @@
 					'text-field': ['get', 'label'],
 					'text-font': ['noto_sans_bold'],
 					'text-size': 13,
-					// Place the label below the geo point. 1.5em ≈ 20px clears the
-					// bottom half of a 32px icon for the worst case (centered icons);
-					// pivot-near-bottom icons (markers) end up with even more clearance.
-					'text-anchor': 'top',
-					'text-offset': [0, 1.5],
+					// Per-feature label placement (computed in `buildAnnotationFeatures`
+					// from the annotation's `labelPosition`). text-offset is in ems so
+					// it auto-scales with text-size, keeping the label a constant
+					// em-distance from the icon at any annotationScale.
+					'text-anchor': ['get', 'textAnchor'],
+					'text-offset': ['get', 'textOffset'],
 					'text-allow-overlap': false,
 					'text-optional': true
 				},

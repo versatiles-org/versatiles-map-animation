@@ -3,8 +3,10 @@
 	import {
 		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
+		DEFAULT_LABEL_POSITION,
 		type Annotation,
-		type AnnotationIcon
+		type AnnotationIcon,
+		type LabelPosition
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -50,6 +52,23 @@
 	function onLabelSize(e: Event) {
 		patch({ labelSize: Number((e.currentTarget as HTMLInputElement).value) });
 	}
+	function onLabelPosition(p: LabelPosition) {
+		patch({ labelPosition: p });
+	}
+
+	// 3×3 grid of label-position options. The dot in the center represents
+	// the icon; each surrounding slot is one cardinal/diagonal placement.
+	const POSITION_GRID: { label: string; value: LabelPosition }[] = [
+		{ label: '↖', value: 'top-left' },
+		{ label: '↑', value: 'top' },
+		{ label: '↗', value: 'top-right' },
+		{ label: '←', value: 'left' },
+		{ label: '·', value: 'center' },
+		{ label: '→', value: 'right' },
+		{ label: '↙', value: 'bottom-left' },
+		{ label: '↓', value: 'bottom' },
+		{ label: '↘', value: 'bottom-right' }
+	];
 	function onVisibleFrom(e: Event) {
 		const raw = (e.currentTarget as HTMLInputElement).value;
 		patch({ visibleFrom: raw === '' ? undefined : Math.max(0, Number(raw)) });
@@ -159,6 +178,23 @@
 			/>
 			<span class="num">{(ann.labelSize ?? 1).toFixed(2)}×</span>
 		</label>
+
+		<div class="row">
+			<span class="lbl">Label pos</span>
+			<div class="pos-grid">
+				{#each POSITION_GRID as p (p.value)}
+					<button
+						type="button"
+						class:active={(ann.labelPosition ?? DEFAULT_LABEL_POSITION) === p.value}
+						onclick={() => onLabelPosition(p.value)}
+						title={p.value}
+						aria-label={`Place label ${p.value}`}
+					>
+						{p.label}
+					</button>
+				{/each}
+			</div>
+		</div>
 
 		<div class="row visibility">
 			<span class="lbl">Visible</span>
@@ -333,6 +369,32 @@
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		gap: 3px;
+	}
+	.pos-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 22px);
+		grid-template-rows: repeat(3, 22px);
+		gap: 2px;
+	}
+	.pos-grid button {
+		padding: 0;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid #2a2f37;
+		border-radius: 3px;
+		color: #888;
+		font:
+			14px/1 ui-monospace,
+			monospace;
+		cursor: pointer;
+	}
+	.pos-grid button:hover {
+		border-color: #4a9eff;
+		color: #ddd;
+	}
+	.pos-grid button.active {
+		background: rgba(74, 158, 255, 0.18);
+		border-color: #4a9eff;
+		color: #fff;
 	}
 	.icon-grid button {
 		padding: 0.25rem 0.1rem;

@@ -280,4 +280,44 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
 		expect(decoded?.annotations[1].iconSize).toBeCloseTo(1.5, 2);
 	});
+
+	it('non-default labelPosition switches to V4 and round-trips', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					color: '#fff',
+					label: 'A',
+					labelPosition: 'right'
+				}
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].labelPosition).toBe('right');
+	});
+
+	it('default labelPosition (bottom) stays in V2', () => {
+		const v2 = encodeAnimation(ann());
+		const v4 = encodeAnimation(ann({ labelSize: 1.5 })); // forces V4
+		const v2WithBottom = encodeAnimation({
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					color: '#fff',
+					label: 'A',
+					labelPosition: 'bottom'
+				}
+			]
+		});
+		// Setting labelPosition explicitly to the default doesn't bump the codec.
+		expect(v2WithBottom.length).toBe(v2.length);
+		// Sanity: V4 is bigger than V2.
+		expect(v4.length).toBeGreaterThan(v2.length);
+	});
 });

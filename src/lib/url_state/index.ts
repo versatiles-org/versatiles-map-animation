@@ -15,7 +15,7 @@
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
-import { DEFAULT_ANNOTATION_SCALE, SCHEMA_VERSION } from '../types';
+import { DEFAULT_ANNOTATION_SCALE, DEFAULT_LABEL_POSITION, SCHEMA_VERSION } from '../types';
 import type { Animation } from '../types';
 import {
 	AnimationCodecV1,
@@ -49,7 +49,12 @@ export function encodeAnimation(anim: Animation): string {
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
 	const needsV4 =
 		hasAnnotations &&
-		anim.annotations.some((a) => (a.iconSize ?? 1) !== 1 || (a.labelSize ?? 1) !== 1);
+		anim.annotations.some(
+			(a) =>
+				(a.iconSize ?? 1) !== 1 ||
+				(a.labelSize ?? 1) !== 1 ||
+				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION
+		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	if (needsV4) {
 		w.writeBits(FORMAT_TAG_BINARY_V4, 8);
@@ -212,7 +217,12 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
 	const needsV4 =
 		hasAnnotations &&
-		anim.annotations.some((a) => (a.iconSize ?? 1) !== 1 || (a.labelSize ?? 1) !== 1);
+		anim.annotations.some(
+			(a) =>
+				(a.iconSize ?? 1) !== 1 ||
+				(a.labelSize ?? 1) !== 1 ||
+				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION
+		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	const inner = needsV4
 		? inspect(AnimationCodecV4, {
