@@ -10,8 +10,8 @@
  *   npm run inspect -- 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3ALuNzC9wkRcDawXcA'
  *   npm run inspect -- 'http://localhost:5173/#kf=AVYw...'
  */
-import { base64UrlToBytes, formatInspection } from '../src/lib/codec.ts';
-import { decodeAnimation, inspectAnimation } from '../src/lib/url_state.ts';
+import { base64UrlToBytes, formatInspection } from '../src/lib/codec/index.ts';
+import { decodeAnimation, inspectAnimation } from '../src/lib/url_state/index.ts';
 
 function extractHash(input: string): string {
 	const trimmed = input.trim();
