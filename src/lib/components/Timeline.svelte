@@ -3,6 +3,12 @@
 
 	let { store }: { store: AnimationStore } = $props();
 
+	// Selected-annotation lane data. Only rendered when an annotation is
+	// selected; visualizes its visibility window with triangular fade tails on
+	// each side. Rectangles outside the current view are clipped by the track's
+	// overflow: hidden — pct() may return negative or >100 values.
+	const selAnn = $derived(store.selectedAnnotation);
+
 	let trackEl: HTMLDivElement;
 	let panbarEl: HTMLDivElement;
 
@@ -252,6 +258,41 @@
 			></div>
 		{/if}
 
+		{#if selAnn}
+			{@const vFrom = selAnn.visibleFrom}
+			{@const vUntil = selAnn.visibleUntil}
+			{@const fIn = Math.max(0, selAnn.fadeIn ?? 0)}
+			{@const fOut = Math.max(0, selAnn.fadeOut ?? 0)}
+			{@const trackEndT = Math.max(end, store.totalDuration)}
+			{@const barL = vFrom ?? start - 1}
+			{@const barR = vUntil ?? trackEndT + 1}
+			<div class="ann-lane" aria-hidden="true">
+				{#if vFrom !== undefined && fIn > 0}
+					<div
+						class="ann-fade-in"
+						style="left: {pct(vFrom - fIn)}%; width: {pct(vFrom) -
+							pct(vFrom - fIn)}%; background: {selAnn.color};"
+						title="Fade in {fIn.toFixed(2)}s"
+					></div>
+				{/if}
+				<div
+					class="ann-bar"
+					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {selAnn.color};"
+					title={vFrom !== undefined || vUntil !== undefined
+						? `Visible ${vFrom !== undefined ? fmt(vFrom) + 's' : 'start'} → ${vUntil !== undefined ? fmt(vUntil) + 's' : 'end'}`
+						: 'Always visible'}
+				></div>
+				{#if vUntil !== undefined && fOut > 0}
+					<div
+						class="ann-fade-out"
+						style="left: {pct(vUntil)}%; width: {pct(vUntil + fOut) -
+							pct(vUntil)}%; background: {selAnn.color};"
+						title="Fade out {fOut.toFixed(2)}s"
+					></div>
+				{/if}
+			</div>
+		{/if}
+
 		<div class="playhead" style="left: {pct(store.currentTime)}%" aria-hidden="true">
 			<div class="playhead-line"></div>
 			<div class="playhead-handle" title="Playhead at {fmt(store.currentTime)}s"></div>
@@ -408,6 +449,40 @@
 			transparent 8px
 		);
 		pointer-events: none;
+	}
+
+	/* Selected-annotation lane: a colored bar at the bottom of the track,
+	   with triangular tails on each side for fade-in / fade-out durations.
+	   `background` is set per element from the annotation's color. */
+	.ann-lane {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 4px;
+		height: 10px;
+		pointer-events: none;
+	}
+	.ann-bar {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		opacity: 0.7;
+		border-radius: 1px;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+	}
+	.ann-fade-in,
+	.ann-fade-out {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		opacity: 0.7;
+	}
+	/* Triangle: 0 height on the outside edge, full height on the inside edge. */
+	.ann-fade-in {
+		clip-path: polygon(0 100%, 100% 0, 100% 100%);
+	}
+	.ann-fade-out {
+		clip-path: polygon(0 0, 100% 100%, 0 100%);
 	}
 
 	.panbar {

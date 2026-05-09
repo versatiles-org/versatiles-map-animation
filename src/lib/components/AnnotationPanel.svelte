@@ -102,6 +102,14 @@
 	function onClearUntil() {
 		patch({ visibleUntil: undefined });
 	}
+	function onFadeIn(e: Event) {
+		const v = Number((e.currentTarget as HTMLInputElement).value);
+		patch({ fadeIn: Number.isFinite(v) ? Math.max(0, v) : 0 });
+	}
+	function onFadeOut(e: Event) {
+		const v = Number((e.currentTarget as HTMLInputElement).value);
+		patch({ fadeOut: Number.isFinite(v) ? Math.max(0, v) : 0 });
+	}
 	function onMoveHere() {
 		const cam = store.liveCamera;
 		patch({ lng: cam.lng, lat: cam.lat });
@@ -285,6 +293,40 @@
 				>
 					⟲
 				</button>
+			</div>
+		</div>
+
+		<div class="row visibility">
+			<span class="lbl">Fade</span>
+			<div class="visibility-grid">
+				<span class="sublbl">in</span>
+				<input
+					type="number"
+					min="0"
+					step="0.1"
+					value={ann.fadeIn ?? 0}
+					oninput={onFadeIn}
+					disabled={ann.visibleFrom === undefined}
+					title={ann.visibleFrom === undefined
+						? 'Fade-in needs a "Visible from" time'
+						: 'Seconds the marker takes to fade in before its visible-from time'}
+					placeholder="0"
+				/>
+				<span class="sublbl">s</span>
+				<span class="sublbl">out</span>
+				<input
+					type="number"
+					min="0"
+					step="0.1"
+					value={ann.fadeOut ?? 0}
+					oninput={onFadeOut}
+					disabled={ann.visibleUntil === undefined}
+					title={ann.visibleUntil === undefined
+						? 'Fade-out needs a "Visible until" time'
+						: 'Seconds the marker takes to fade out after its visible-until time'}
+					placeholder="0"
+				/>
+				<span class="sublbl">s</span>
 			</div>
 		</div>
 

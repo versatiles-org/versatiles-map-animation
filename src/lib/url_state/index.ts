@@ -59,7 +59,9 @@ export function encodeAnimation(anim: Animation): string {
 				(a.iconSize ?? 1) !== 1 ||
 				(a.labelSize ?? 1) !== 1 ||
 				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
-				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE
+				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
+				(a.fadeIn ?? 0) !== 0 ||
+				(a.fadeOut ?? 0) !== 0
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	if (needsV4) {
@@ -228,7 +230,9 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				(a.iconSize ?? 1) !== 1 ||
 				(a.labelSize ?? 1) !== 1 ||
 				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
-				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE
+				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
+				(a.fadeIn ?? 0) !== 0 ||
+				(a.fadeOut ?? 0) !== 0
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
 	const inner = needsV4

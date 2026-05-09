@@ -13,16 +13,43 @@ import type { Animation, Annotation, CameraState, Keyframe, MapStyleId, PathStyl
 const MIN_TIME_GAP = 0.01;
 
 /**
- * Visibility window check. Both bounds are optional: missing `visibleFrom`
- * means "from the start"; missing `visibleUntil` means "always". Bounds are
- * half-open at the upper end so an annotation with `visibleUntil = 5` is
- * gone exactly at `t = 5`, matching how keyframes treat the end of an
- * interval (the next keyframe's pose wins at its own timestamp).
+ * Continuous opacity at time `t`. Inside the visibility window the opacity is
+ * 1; outside it's 0; within `fadeIn` seconds before `visibleFrom` it ramps 0→1,
+ * within `fadeOut` seconds after `visibleUntil` it ramps 1→0. Missing bounds
+ * mean "from the start" / "always": with no `visibleFrom`, the corresponding
+ * fade-in is moot (the annotation is already on screen); same for fade-out.
+ *
+ * Bounds are half-open at the upper end so an annotation with
+ * `visibleUntil = 5` and `fadeOut = 0` is gone exactly at `t = 5`, matching
+ * how keyframes treat the end of an interval.
+ */
+export function getAnnotationOpacity(ann: Annotation, t: number): number {
+	const from = ann.visibleFrom;
+	const until = ann.visibleUntil;
+	const fadeIn = Math.max(0, ann.fadeIn ?? 0);
+	const fadeOut = Math.max(0, ann.fadeOut ?? 0);
+	if (from !== undefined) {
+		if (t < from - fadeIn) return 0;
+		if (t < from) return fadeIn === 0 ? 0 : (t - (from - fadeIn)) / fadeIn;
+	}
+	if (until !== undefined) {
+		if (fadeOut === 0) {
+			if (t >= until) return 0;
+		} else {
+			if (t >= until + fadeOut) return 0;
+			if (t >= until) return 1 - (t - until) / fadeOut;
+		}
+	}
+	return 1;
+}
+
+/**
+ * Backwards-compatible boolean check used in places that just want "is this
+ * annotation on screen at all?" (e.g., per-frame setFeatureState skips work
+ * for fully-hidden annotations).
  */
 export function isAnnotationVisible(ann: Annotation, t: number): boolean {
-	if (ann.visibleFrom !== undefined && t < ann.visibleFrom) return false;
-	if (ann.visibleUntil !== undefined && t >= ann.visibleUntil) return false;
-	return true;
+	return getAnnotationOpacity(ann, t) > 0;
 }
 
 export class AnimationStore {

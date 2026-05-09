@@ -130,5 +130,9 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
 	const labelDistance = optionalNum('labelDistance');
 	if (labelDistance !== undefined) out.labelDistance = labelDistance;
+	const fadeIn = optionalNum('fadeIn');
+	if (fadeIn !== undefined) out.fadeIn = fadeIn;
+	const fadeOut = optionalNum('fadeOut');
+	if (fadeOut !== undefined) out.fadeOut = fadeOut;
 	return out;
 }

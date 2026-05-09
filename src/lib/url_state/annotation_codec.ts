@@ -80,6 +80,10 @@ export interface WireAnnotation {
 	labelPosition: LabelPosition;
 	/** em-distance from the geo point. Default `DEFAULT_LABEL_DISTANCE` (1.5). */
 	labelDistance: number;
+	/** Fade-in seconds. Default 0. */
+	fadeIn: number;
+	/** Fade-out seconds. Default 0. */
+	fadeOut: number;
 }
 
 const ANNOTATION_DEFAULTS: WireAnnotation = {
@@ -96,7 +100,9 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	iconSize: 1,
 	labelSize: 1,
 	labelPosition: DEFAULT_LABEL_POSITION,
-	labelDistance: DEFAULT_LABEL_DISTANCE
+	labelDistance: DEFAULT_LABEL_DISTANCE,
+	fadeIn: 0,
+	fadeOut: 0
 };
 
 export const annotationsCodec: Codec<WireAnnotation[]> = {
@@ -182,10 +188,10 @@ export const annotationsCodec: Codec<WireAnnotation[]> = {
 };
 
 /**
- * V4 codec: 16-bit mask + extra fields beyond V2 (iconSize at bit 8, labelSize
- * at bit 9, labelPosition at bit 10, labelDistance at bit 11). Used only when
- * at least one annotation has a non-default value for any of these; V2/V3 stay
- * byte-stable for share links that don't use these features.
+ * V4 codec: 16-bit mask + extra fields beyond V2 — bit 8 iconSize, bit 9
+ * labelSize, bit 10 labelPosition, bit 11 labelDistance, bit 12 fadeIn,
+ * bit 13 fadeOut. Used only when at least one annotation has a non-default
+ * value for any of these; V2/V3 stay byte-stable for share links that don't.
  */
 export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 	encode(arr, w) {
@@ -217,6 +223,8 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (item.labelSize !== prev.labelSize) mask |= 1 << 9;
 			if (item.labelPosition !== prev.labelPosition) mask |= 1 << 10;
 			if (item.labelDistance !== prev.labelDistance) mask |= 1 << 11;
+			if (item.fadeIn !== prev.fadeIn) mask |= 1 << 12;
+			if (item.fadeOut !== prev.fadeOut) mask |= 1 << 13;
 
 			if (ins) ins.enter('[mask]', w.totalBits());
 			w.writeBits(mask, 16);
@@ -240,6 +248,8 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 9)) writeField('labelSize', annotationSizeCodec, item.labelSize);
 			if (mask & (1 << 10)) writeField('labelPosition', labelPositionCodec, item.labelPosition);
 			if (mask & (1 << 11)) writeField('labelDistance', labelDistanceCodec, item.labelDistance);
+			if (mask & (1 << 12)) writeField('fadeIn', annotationVisibilityCodec, item.fadeIn);
+			if (mask & (1 << 13)) writeField('fadeOut', annotationVisibilityCodec, item.fadeOut);
 
 			if (ins) ins.exit(`[${idx}]`, w.totalBits());
 
@@ -256,6 +266,8 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 9)) next.labelSize = item.labelSize;
 			if (mask & (1 << 10)) next.labelPosition = item.labelPosition;
 			if (mask & (1 << 11)) next.labelDistance = item.labelDistance;
+			if (mask & (1 << 12)) next.fadeIn = item.fadeIn;
+			if (mask & (1 << 13)) next.fadeOut = item.fadeOut;
 			prev = next;
 		}
 	},
@@ -278,6 +290,8 @@ export const annotationsCodecV4: Codec<WireAnnotation[]> = {
 			if (mask & (1 << 9)) item.labelSize = annotationSizeCodec.decode(r);
 			if (mask & (1 << 10)) item.labelPosition = labelPositionCodec.decode(r);
 			if (mask & (1 << 11)) item.labelDistance = labelDistanceCodec.decode(r);
+			if (mask & (1 << 12)) item.fadeIn = annotationVisibilityCodec.decode(r);
+			if (mask & (1 << 13)) item.fadeOut = annotationVisibilityCodec.decode(r);
 			out.push(item);
 			prev = item;
 		}
@@ -342,7 +356,9 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 		iconSize: ann.iconSize ?? 1,
 		labelSize: ann.labelSize ?? 1,
 		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION,
-		labelDistance: Math.max(0, ann.labelDistance ?? DEFAULT_LABEL_DISTANCE)
+		labelDistance: Math.max(0, ann.labelDistance ?? DEFAULT_LABEL_DISTANCE),
+		fadeIn: Math.max(0, ann.fadeIn ?? 0),
+		fadeOut: Math.max(0, ann.fadeOut ?? 0)
 	};
 }
 
@@ -362,5 +378,7 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	if (wire.labelSize !== 1) out.labelSize = wire.labelSize;
 	if (wire.labelPosition !== DEFAULT_LABEL_POSITION) out.labelPosition = wire.labelPosition;
 	if (wire.labelDistance !== DEFAULT_LABEL_DISTANCE) out.labelDistance = wire.labelDistance;
+	if (wire.fadeIn !== 0) out.fadeIn = wire.fadeIn;
+	if (wire.fadeOut !== 0) out.fadeOut = wire.fadeOut;
 	return out;
 }

@@ -3,7 +3,7 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { onDestroy, onMount, untrack } from 'svelte';
-	import { isAnnotationVisible, type AnimationStore } from '../animation.svelte';
+	import { getAnnotationOpacity, type AnimationStore } from '../animation.svelte';
 	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
@@ -156,11 +156,15 @@
 				},
 				paint: {
 					'icon-color': ['get', 'color'],
-					'icon-opacity': ['case', ['==', ['feature-state', 'visible'], false], 0, 1],
+					// Opacity flows from feature-state, set per frame from
+					// `getAnnotationOpacity`. Default 1 if state is missing (e.g.
+					// in the brief moment after the layer is re-installed but
+					// before the per-frame effect runs).
+					'icon-opacity': ['coalesce', ['feature-state', 'opacity'], 1],
 					'text-color': '#111',
 					'text-halo-color': '#fff',
 					'text-halo-width': 1.5,
-					'text-opacity': ['case', ['==', ['feature-state', 'visible'], false], 0, 1]
+					'text-opacity': ['coalesce', ['feature-state', 'opacity'], 1]
 				}
 			});
 		}
@@ -358,9 +362,11 @@
 		source.setData(buildAnnotationFeatures(anns));
 	});
 
-	// Per-frame visibility. Tracks `currentTime` and `annotations` so it re-runs
-	// during playback and after edits. Sets `visible` feature-state on every
-	// annotation; the layer's opacity expressions read it.
+	// Per-frame opacity. Tracks `currentTime` and `annotations` so it re-runs
+	// during playback and after edits. Sets `opacity` feature-state (0..1) on
+	// every annotation; the layer's icon/text-opacity expressions read it via
+	// `coalesce`. Pushing a continuous value lets fade-in / fade-out tails
+	// render as smooth ramps rather than hard cuts.
 	$effect(() => {
 		const anns = store.annotations;
 		const t = store.currentTime;
@@ -369,7 +375,7 @@
 		for (let i = 0; i < anns.length; i++) {
 			map.setFeatureState(
 				{ source: ANNOTATION_SOURCE, id: i },
-				{ visible: isAnnotationVisible(anns[i], t) }
+				{ opacity: getAnnotationOpacity(anns[i], t) }
 			);
 		}
 	});

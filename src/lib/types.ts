@@ -146,6 +146,18 @@ export interface Annotation {
 	 * `labelPosition` points. Default `DEFAULT_LABEL_DISTANCE` (1.5).
 	 */
 	labelDistance?: number;
+	/**
+	 * Fade-in duration in seconds. Begins `fadeIn` seconds *before*
+	 * `visibleFrom` and reaches full opacity at `visibleFrom`. Default 0
+	 * (hard cut-in). Ignored if `visibleFrom` is undefined.
+	 */
+	fadeIn?: number;
+	/**
+	 * Fade-out duration in seconds. Begins at `visibleUntil` and reaches
+	 * opacity 0 at `visibleUntil + fadeOut`. Default 0 (hard cut-out).
+	 * Ignored if `visibleUntil` is undefined.
+	 */
+	fadeOut?: number;
 }
 
 export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
