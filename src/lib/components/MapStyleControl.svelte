@@ -2,8 +2,7 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { MAP_STYLE_IDS, MAP_STYLE_LABELS } from '../types';
 
-	let { store, editMode = $bindable(true) }: { store: AnimationStore; editMode?: boolean } =
-		$props();
+	let { store }: { store: AnimationStore } = $props();
 </script>
 
 <div class="map-style-control" role="group" aria-label="Map style">
@@ -18,13 +17,6 @@
 	<label class="row checkbox" title="Toggle 3D terrain">
 		<input type="checkbox" bind:checked={store.terrain} />
 		<span>Terrain</span>
-	</label>
-	<label
-		class="row checkbox"
-		title="Edit mode keeps hidden annotations faintly visible (20%) so you can find and click them. Turn off to preview the real fade behavior. Always off in rendered video output."
-	>
-		<input type="checkbox" bind:checked={editMode} />
-		<span>Edit</span>
 	</label>
 </div>
 

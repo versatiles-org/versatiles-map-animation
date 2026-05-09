@@ -3,8 +3,7 @@
 	import AnnotationPanel from './AnnotationPanel.svelte';
 	import MapStyleControl from './MapStyleControl.svelte';
 
-	let { store, editMode = $bindable(true) }: { store: AnimationStore; editMode?: boolean } =
-		$props();
+	let { store }: { store: AnimationStore } = $props();
 </script>
 
 <aside class="sidebar" aria-label="Editor sidebar">
@@ -16,7 +15,7 @@
 	<details class="sub-panel" open>
 		<summary>Map style</summary>
 		<div class="sub-body">
-			<MapStyleControl {store} bind:editMode />
+			<MapStyleControl {store} />
 		</div>
 	</details>
 

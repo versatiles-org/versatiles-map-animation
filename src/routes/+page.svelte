@@ -14,10 +14,10 @@
 
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
-	// Edit-mode keeps hidden annotations faintly visible (floor 20%) so the
-	// user can spot and click markers that are outside their visibility window.
-	// Off mirrors the real production output (and is forced off when rendering).
-	let editMode = $state(true);
+	// Edit-mode (always on in the editor; off in /view + render) keeps hidden
+	// annotations faintly visible at 20% opacity so the user can spot and
+	// click markers that are outside their visibility window.
+	const EDIT_MODE = true;
 
 	// Load before children mount so MapStage sees the correct style/terrain on
 	// first build. Precedence: URL hash (shared link) > localStorage (last
@@ -73,12 +73,12 @@
 	{/if}
 
 	<div class="body">
-		<Sidebar {store} bind:editMode />
+		<Sidebar {store} />
 
 		<div class="main">
 			<div class="stage-wrap">
 				<div class="map-area">
-					<MapStage {store} {editMode} />
+					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
 							Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or open the
