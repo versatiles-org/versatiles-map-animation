@@ -88,13 +88,57 @@
 		{ label: '↓', value: 'bottom' },
 		{ label: '↘', value: 'bottom-right' }
 	];
-	function onVisibleFrom(e: Event) {
+	// Visibility/fade are time values displayed as numbers in the panel and
+	// also driven by the timeline drag handles. Two invariants we enforce
+	// uniformly here:
+	//   1. visibleFrom + ANN_MIN_GAP ≤ visibleUntil (matches the timeline)
+	//   2. fadeIn / fadeOut ≥ 0 and stay ≤ their reference bound
+	// Plus we round all four to centi-second precision so dragged values
+	// don't stick floating-point dust into the input fields.
+	const ANN_MIN_GAP = 0.01;
+	const round2 = (v: number) => Math.round(v * 100) / 100;
+
+	function readNonNegativeOrUndefined(e: Event): number | undefined {
 		const raw = (e.currentTarget as HTMLInputElement).value;
-		patch({ visibleFrom: raw === '' ? undefined : Math.max(0, Number(raw)) });
+		if (raw === '') return undefined;
+		const v = Number(raw);
+		return Number.isFinite(v) ? Math.max(0, v) : undefined;
+	}
+
+	// Svelte 5 short-circuits `<input value={x}>` updates when `x` is unchanged
+	// from the previous render — but the user's intermediate typing may have
+	// changed the DOM in between, so the clamped value never makes it back to
+	// the field. Force the DOM to mirror the clamped value after every patch.
+	function syncInput(input: HTMLInputElement, v: number | undefined): void {
+		const want = v === undefined ? '' : String(v);
+		if (input.value !== want) input.value = want;
+	}
+
+	function onVisibleFrom(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const raw = readNonNegativeOrUndefined(e);
+		if (raw === undefined) {
+			patch({ visibleFrom: undefined });
+			return;
+		}
+		const until = ann?.visibleUntil;
+		const max = until !== undefined ? until - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
+		const clamped = round2(Math.min(max, raw));
+		patch({ visibleFrom: clamped });
+		syncInput(input, clamped);
 	}
 	function onVisibleUntil(e: Event) {
-		const raw = (e.currentTarget as HTMLInputElement).value;
-		patch({ visibleUntil: raw === '' ? undefined : Math.max(0, Number(raw)) });
+		const input = e.currentTarget as HTMLInputElement;
+		const raw = readNonNegativeOrUndefined(e);
+		if (raw === undefined) {
+			patch({ visibleUntil: undefined });
+			return;
+		}
+		const from = ann?.visibleFrom;
+		const min = from !== undefined ? from + ANN_MIN_GAP : 0;
+		const clamped = round2(Math.max(min, raw));
+		patch({ visibleUntil: clamped });
+		syncInput(input, clamped);
 	}
 	function onClearFrom() {
 		patch({ visibleFrom: undefined });
@@ -103,12 +147,33 @@
 		patch({ visibleUntil: undefined });
 	}
 	function onFadeIn(e: Event) {
-		const v = Number((e.currentTarget as HTMLInputElement).value);
-		patch({ fadeIn: Number.isFinite(v) ? Math.max(0, v) : 0 });
+		const input = e.currentTarget as HTMLInputElement;
+		const v = Number(input.value);
+		if (!Number.isFinite(v)) {
+			patch({ fadeIn: 0 });
+			syncInput(input, 0);
+			return;
+		}
+		// Fade-in can't extend past the visible-from time (would push the
+		// fade-in tip into negative time). With no visibleFrom set, fade-in
+		// has no anchor — clamp to a sane upper bound to keep the input tidy.
+		const from = ann?.visibleFrom;
+		const max = from !== undefined ? from : Number.POSITIVE_INFINITY;
+		const clamped = round2(Math.max(0, Math.min(max, v)));
+		patch({ fadeIn: clamped });
+		syncInput(input, clamped);
 	}
 	function onFadeOut(e: Event) {
-		const v = Number((e.currentTarget as HTMLInputElement).value);
-		patch({ fadeOut: Number.isFinite(v) ? Math.max(0, v) : 0 });
+		const input = e.currentTarget as HTMLInputElement;
+		const v = Number(input.value);
+		if (!Number.isFinite(v)) {
+			patch({ fadeOut: 0 });
+			syncInput(input, 0);
+			return;
+		}
+		const clamped = round2(Math.max(0, v));
+		patch({ fadeOut: clamped });
+		syncInput(input, clamped);
 	}
 	function onMoveHere() {
 		const cam = store.liveCamera;

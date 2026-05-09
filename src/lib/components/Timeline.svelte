@@ -77,6 +77,7 @@
 	// ---------------------------------------------------------------------------
 
 	const ANN_MIN_GAP = 0.01; // seconds; keeps the inner handles distinguishable
+	const round2 = (v: number) => Math.round(v * 100) / 100;
 
 	type FadeHandle = 'fadeIn' | 'visibleFrom' | 'visibleUntil' | 'fadeOut';
 
@@ -103,7 +104,7 @@
 				// Outer-left tip = visibleFrom - fadeIn → fadeIn = vFrom - tip.
 				// Clamp tip ≤ vFrom (no negative fade) and tip ≥ 0 (no negative time).
 				const tip = Math.min(vFrom, Math.max(0, t));
-				store.updateAnnotation(idx, { fadeIn: vFrom - tip });
+				store.updateAnnotation(idx, { fadeIn: round2(vFrom - tip) });
 			} else if (kind === 'visibleFrom' && vFrom !== undefined) {
 				// Inner-left translates visibleFrom; fadeIn stays the same so the
 				// outer tip moves with it. Clamp so the tip doesn't go negative
@@ -111,17 +112,17 @@
 				const max = vUntil !== undefined ? vUntil - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
 				const min = fIn; // visibleFrom - fadeIn ≥ 0 ⇒ visibleFrom ≥ fadeIn
 				store.updateAnnotation(idx, {
-					visibleFrom: Math.max(min, Math.min(max, t))
+					visibleFrom: round2(Math.max(min, Math.min(max, t)))
 				});
 			} else if (kind === 'visibleUntil' && vUntil !== undefined) {
 				const min = vFrom !== undefined ? vFrom + ANN_MIN_GAP : 0;
 				store.updateAnnotation(idx, {
-					visibleUntil: Math.max(min, t)
+					visibleUntil: round2(Math.max(min, t))
 				});
 			} else if (kind === 'fadeOut' && vUntil !== undefined) {
 				// Outer-right tip = visibleUntil + fadeOut → fadeOut = tip - vUntil.
 				const tip = Math.max(vUntil, t);
-				store.updateAnnotation(idx, { fadeOut: tip - vUntil });
+				store.updateAnnotation(idx, { fadeOut: round2(tip - vUntil) });
 			}
 			// `fOut` participates only in the outer-right branch's bookkeeping;
 			// other branches don't read it. Reference it to keep TS quiet.
@@ -165,8 +166,8 @@
 			const minDt = fIn - startVFrom;
 			if (dt < minDt) dt = minDt;
 			store.updateAnnotation(idx, {
-				visibleFrom: startVFrom + dt,
-				visibleUntil: startVUntil + dt
+				visibleFrom: round2(startVFrom + dt),
+				visibleUntil: round2(startVUntil + dt)
 			});
 		}
 		function onUp(ev: PointerEvent) {
