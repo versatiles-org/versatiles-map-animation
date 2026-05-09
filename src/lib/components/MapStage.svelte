@@ -440,6 +440,12 @@
 		/* Make `.map-stage` a query container so the watermark can size itself
 		   relative to the actual map width via `cqw` units. */
 		container-type: inline-size;
+		/* Clip the maplibre canvas + watermark to the rounded box. The clip
+		   used to live on the parent `.map-area` but that also clipped the
+		   AnnotationPanel — which is a sibling of `.map-stage` and needs to
+		   extend below the map on short viewports. */
+		overflow: hidden;
+		border-radius: inherit;
 	}
 	.map-canvas {
 		width: 100%;

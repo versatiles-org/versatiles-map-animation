@@ -184,7 +184,9 @@
 		aspect-ratio: 16 / 9;
 		border: 1px solid #222;
 		border-radius: 4px;
-		overflow: hidden;
+		/* No `overflow: hidden` here so the AnnotationPanel (positioned inside)
+		   can extend below the 16:9 map box on short viewports. The maplibre
+		   canvas keeps its rounded corners via clipping inside `.map-stage`. */
 	}
 	.empty-overlay {
 		position: absolute;
