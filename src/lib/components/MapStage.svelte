@@ -35,10 +35,27 @@
 	let annotationsReady = $state(false);
 	let containerScale = $state(1);
 
+	// ID of the annotation currently being dragged (undefined when not dragging).
+	// Lives outside Svelte state because it's only read by handlers, not rendered.
+	let dragId: number | undefined;
+
 	function updateContainerScale(): void {
 		if (!map) return;
 		const w = map.getContainer().clientWidth;
 		if (w > 0) containerScale = Math.max(0.5, Math.min(3, w / REFERENCE_WIDTH));
+	}
+
+	function onDragMove(e: maplibregl.MapMouseEvent): void {
+		if (dragId === undefined) return;
+		const { lng, lat } = e.lngLat;
+		store.updateAnnotation(dragId, { lng, lat });
+	}
+
+	function onDragEnd(): void {
+		if (!map) return;
+		map.off('mousemove', onDragMove);
+		map.getCanvas().style.cursor = '';
+		dragId = undefined;
 	}
 
 	function buildAnnotationFeatures(anns: Annotation[]): FeatureCollection {
@@ -192,10 +209,26 @@
 		});
 		// Cursor feedback for hover-able markers.
 		map.on('mouseenter', ANNOTATION_LAYER, () => {
-			if (map) map.getCanvas().style.cursor = 'pointer';
+			if (map && dragId === undefined) map.getCanvas().style.cursor = 'pointer';
 		});
 		map.on('mouseleave', ANNOTATION_LAYER, () => {
-			if (map) map.getCanvas().style.cursor = '';
+			if (map && dragId === undefined) map.getCanvas().style.cursor = '';
+		});
+		// Drag to reposition: mousedown on a marker captures it, subsequent
+		// mousemoves rewrite its lng/lat in the store (which flows back into
+		// the source via the data effect), mouseup releases. We disable the
+		// map's drag-pan for the duration so the camera doesn't slide along
+		// with the pointer.
+		map.on('mousedown', ANNOTATION_LAYER, (e) => {
+			if (!map) return;
+			const id = e.features?.[0]?.id;
+			if (typeof id !== 'number') return;
+			e.preventDefault(); // suppress default map drag-pan
+			dragId = id;
+			store.selectAnnotation(id);
+			map.getCanvas().style.cursor = 'grabbing';
+			map.on('mousemove', onDragMove);
+			map.once('mouseup', onDragEnd);
 		});
 		map.once('load', () => {
 			// Fix the camera's altitude reference at sea level; combined with
