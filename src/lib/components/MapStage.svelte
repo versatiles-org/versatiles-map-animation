@@ -166,6 +166,9 @@
 		width: 100%;
 		height: 100%;
 		background: #111;
+		/* Make `.map-stage` a query container so the watermark can size itself
+		   relative to the actual map width via `cqw` units. */
+		container-type: inline-size;
 	}
 	.map-canvas {
 		width: 100%;
@@ -176,11 +179,14 @@
 	}
 	.watermark {
 		position: absolute;
-		bottom: 4px;
-		right: 6px;
+		/* Sized as a fraction of the map width via `cqw` so the watermark scales
+		   with the canvas (4K renders get a chunkier label, narrow embeds a
+		   smaller one). The `clamp()` keeps it readable at the extremes. */
+		bottom: 0.4cqw;
+		right: 0.6cqw;
 		z-index: 1;
 		font:
-			600 11px/1 system-ui,
+			600 clamp(10px, 1.1cqw, 28px) / 1 system-ui,
 			-apple-system,
 			'Segoe UI',
 			sans-serif;
@@ -188,12 +194,14 @@
 		paint-order: stroke fill; /* stroke under the fill */
 		user-select: none;
 		letter-spacing: 0.02em;
+		/* Stroke width grows with the font (em-relative). */
+		-webkit-text-stroke-width: 0.18em;
 		/* Default: colourful style — dark glyphs on a light halo. */
 		color: #000;
-		-webkit-text-stroke: 2px #fff;
+		-webkit-text-stroke-color: #fff;
 	}
 	.watermark.on-satellite {
 		color: #fff;
-		-webkit-text-stroke: 2px #000;
+		-webkit-text-stroke-color: #000;
 	}
 </style>
