@@ -67,6 +67,120 @@
 		window.addEventListener('pointercancel', onUp);
 	}
 
+	// ---------------------------------------------------------------------------
+	// Selected-annotation drag handles. Each of the four time-significant points
+	// in the visibility window can be dragged directly on the lane. Constraints
+	// keep the four times ordered (fade-in tip ≤ visibleFrom ≤ visibleUntil ≤
+	// fade-out tip) with a small minimum gap so nothing collapses past zero.
+	// Dragging the bar middle translates `visibleFrom`/`visibleUntil` together
+	// while leaving fade durations attached.
+	// ---------------------------------------------------------------------------
+
+	const ANN_MIN_GAP = 0.01; // seconds; keeps the inner handles distinguishable
+
+	type FadeHandle = 'fadeIn' | 'visibleFrom' | 'visibleUntil' | 'fadeOut';
+
+	function startAnnHandleDrag(e: PointerEvent, kind: FadeHandle): void {
+		e.stopPropagation();
+		e.preventDefault();
+		const idx = store.selectedAnnotationIndex;
+		if (idx === null) return;
+		const handle = e.target as HTMLElement;
+		handle.setPointerCapture(e.pointerId);
+		store.pause();
+		store.isScrubbing = true; // lifts the edit-mode floor — real opacity preview
+
+		function onMove(ev: PointerEvent) {
+			const ann = store.selectedAnnotation;
+			if (!ann || idx === null) return;
+			const t = Math.max(0, tFromClientX(ev.clientX));
+			const vFrom = ann.visibleFrom;
+			const vUntil = ann.visibleUntil;
+			const fIn = Math.max(0, ann.fadeIn ?? 0);
+			const fOut = Math.max(0, ann.fadeOut ?? 0);
+
+			if (kind === 'fadeIn' && vFrom !== undefined) {
+				// Outer-left tip = visibleFrom - fadeIn → fadeIn = vFrom - tip.
+				// Clamp tip ≤ vFrom (no negative fade) and tip ≥ 0 (no negative time).
+				const tip = Math.min(vFrom, Math.max(0, t));
+				store.updateAnnotation(idx, { fadeIn: vFrom - tip });
+			} else if (kind === 'visibleFrom' && vFrom !== undefined) {
+				// Inner-left translates visibleFrom; fadeIn stays the same so the
+				// outer tip moves with it. Clamp so the tip doesn't go negative
+				// and visibleFrom stays below visibleUntil.
+				const max = vUntil !== undefined ? vUntil - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
+				const min = fIn; // visibleFrom - fadeIn ≥ 0 ⇒ visibleFrom ≥ fadeIn
+				store.updateAnnotation(idx, {
+					visibleFrom: Math.max(min, Math.min(max, t))
+				});
+			} else if (kind === 'visibleUntil' && vUntil !== undefined) {
+				const min = vFrom !== undefined ? vFrom + ANN_MIN_GAP : 0;
+				store.updateAnnotation(idx, {
+					visibleUntil: Math.max(min, t)
+				});
+			} else if (kind === 'fadeOut' && vUntil !== undefined) {
+				// Outer-right tip = visibleUntil + fadeOut → fadeOut = tip - vUntil.
+				const tip = Math.max(vUntil, t);
+				store.updateAnnotation(idx, { fadeOut: tip - vUntil });
+			}
+			// `fOut` participates only in the outer-right branch's bookkeeping;
+			// other branches don't read it. Reference it to keep TS quiet.
+			void fOut;
+		}
+		function onUp(ev: PointerEvent) {
+			handle.releasePointerCapture(ev.pointerId);
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('pointercancel', onUp);
+			store.isScrubbing = false;
+		}
+		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointerup', onUp);
+		window.addEventListener('pointercancel', onUp);
+	}
+
+	function startAnnBarDrag(e: PointerEvent): void {
+		e.stopPropagation();
+		e.preventDefault();
+		const idx = store.selectedAnnotationIndex;
+		const ann = store.selectedAnnotation;
+		if (!ann || idx === null) return;
+		// Translation only makes sense when both bounds are defined; with one
+		// side open-ended, "shifting the window" is ambiguous (the open side
+		// stretches forever). Bail silently — the user can still drag handles.
+		if (ann.visibleFrom === undefined || ann.visibleUntil === undefined) return;
+		const startVFrom = ann.visibleFrom;
+		const startVUntil = ann.visibleUntil;
+		const fIn = Math.max(0, ann.fadeIn ?? 0);
+		const startT = tFromClientX(e.clientX);
+		const handle = e.target as HTMLElement;
+		handle.setPointerCapture(e.pointerId);
+		store.pause();
+		store.isScrubbing = true;
+
+		function onMove(ev: PointerEvent) {
+			if (idx === null) return;
+			let dt = tFromClientX(ev.clientX) - startT;
+			// Don't push the fade-in tip past 0 (and therefore never below 0).
+			const minDt = fIn - startVFrom;
+			if (dt < minDt) dt = minDt;
+			store.updateAnnotation(idx, {
+				visibleFrom: startVFrom + dt,
+				visibleUntil: startVUntil + dt
+			});
+		}
+		function onUp(ev: PointerEvent) {
+			handle.releasePointerCapture(ev.pointerId);
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			window.removeEventListener('pointercancel', onUp);
+			store.isScrubbing = false;
+		}
+		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointerup', onUp);
+		window.addEventListener('pointercancel', onUp);
+	}
+
 	function startDragMarker(e: PointerEvent, index: number) {
 		e.stopPropagation();
 		e.preventDefault();
@@ -273,21 +387,31 @@
 			{@const trackEndT = Math.max(end, store.totalDuration)}
 			{@const barL = vFrom ?? start - 1}
 			{@const barR = vUntil ?? trackEndT + 1}
-			<div class="ann-lane" aria-hidden="true">
+			{@const barDraggable = vFrom !== undefined && vUntil !== undefined}
+			<div class="ann-lane">
 				{#if vFrom !== undefined && fIn > 0}
 					<div
 						class="ann-fade-in"
 						style="left: {pct(vFrom - fIn)}%; width: {pct(vFrom) -
 							pct(vFrom - fIn)}%; background: {selAnn.color};"
 						title="Fade in {fIn.toFixed(2)}s"
+						aria-hidden="true"
 					></div>
 				{/if}
 				<div
 					class="ann-bar"
+					class:draggable={barDraggable}
 					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {selAnn.color};"
-					title={vFrom !== undefined || vUntil !== undefined
-						? `Visible ${vFrom !== undefined ? fmt(vFrom) + 's' : 'start'} → ${vUntil !== undefined ? fmt(vUntil) + 's' : 'end'}`
-						: 'Always visible'}
+					title={barDraggable
+						? `Drag to shift the visibility window (${fmt(vFrom)}s → ${fmt(vUntil)}s)`
+						: vFrom !== undefined || vUntil !== undefined
+							? `Visible ${vFrom !== undefined ? fmt(vFrom) + 's' : 'start'} → ${vUntil !== undefined ? fmt(vUntil) + 's' : 'end'}`
+							: 'Always visible'}
+					role={barDraggable ? 'slider' : 'presentation'}
+					aria-label={barDraggable ? 'Shift annotation visibility window' : undefined}
+					tabindex={barDraggable ? 0 : undefined}
+					onpointerdown={barDraggable ? startAnnBarDrag : null}
+					onkeydown={() => {}}
 				></div>
 				{#if vUntil !== undefined && fOut > 0}
 					<div
@@ -295,7 +419,45 @@
 						style="left: {pct(vUntil)}%; width: {pct(vUntil + fOut) -
 							pct(vUntil)}%; background: {selAnn.color};"
 						title="Fade out {fOut.toFixed(2)}s"
+						aria-hidden="true"
 					></div>
+				{/if}
+
+				{#if vFrom !== undefined}
+					<button
+						type="button"
+						class="ann-handle outer"
+						style="left: {pct(vFrom - fIn)}%"
+						onpointerdown={(e) => startAnnHandleDrag(e, 'fadeIn')}
+						title="Fade in: {fIn.toFixed(2)}s — drag to adjust"
+						aria-label="Adjust fade-in start"
+					></button>
+					<button
+						type="button"
+						class="ann-handle inner"
+						style="left: {pct(vFrom)}%"
+						onpointerdown={(e) => startAnnHandleDrag(e, 'visibleFrom')}
+						title="Visible from {fmt(vFrom)}s — drag to adjust"
+						aria-label="Adjust visible-from time"
+					></button>
+				{/if}
+				{#if vUntil !== undefined}
+					<button
+						type="button"
+						class="ann-handle inner"
+						style="left: {pct(vUntil)}%"
+						onpointerdown={(e) => startAnnHandleDrag(e, 'visibleUntil')}
+						title="Visible until {fmt(vUntil)}s — drag to adjust"
+						aria-label="Adjust visible-until time"
+					></button>
+					<button
+						type="button"
+						class="ann-handle outer"
+						style="left: {pct(vUntil + fOut)}%"
+						onpointerdown={(e) => startAnnHandleDrag(e, 'fadeOut')}
+						title="Fade out: {fOut.toFixed(2)}s — drag to adjust"
+						aria-label="Adjust fade-out end"
+					></button>
 				{/if}
 			</div>
 		{/if}
@@ -459,8 +621,11 @@
 	}
 
 	/* Selected-annotation lane: a colored bar at the bottom of the track,
-	   with triangular tails on each side for fade-in / fade-out durations.
-	   `background` is set per element from the annotation's color. */
+	   with triangular tails on each side for fade-in / fade-out durations,
+	   and four drag handles at the four time-significant points. The lane
+	   itself is non-interactive — only the bar (when both bounds are set)
+	   and the handles capture pointer events. `background` on the bar/tails
+	   is set per-element from the annotation's color. */
 	.ann-lane {
 		position: absolute;
 		left: 0;
@@ -476,6 +641,14 @@
 		opacity: 0.7;
 		border-radius: 1px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+		touch-action: none;
+	}
+	.ann-bar.draggable {
+		pointer-events: auto;
+		cursor: grab;
+	}
+	.ann-bar.draggable:active {
+		cursor: grabbing;
 	}
 	.ann-fade-in,
 	.ann-fade-out {
@@ -490,6 +663,38 @@
 	}
 	.ann-fade-out {
 		clip-path: polygon(0 0, 100% 100%, 0 100%);
+	}
+	/* Drag handles. `inner` marks the visibleFrom/visibleUntil edges (where
+	   full opacity starts/ends); `outer` marks the fade tips (where opacity
+	   is 0). Inner is bigger and more prominent so users grab it for the
+	   common "extend the bar" interaction. Outer is a small dot stuck to the
+	   tip — visible even at fade=0 because it sits on top of the inner. */
+	.ann-handle {
+		position: absolute;
+		top: 50%;
+		padding: 0;
+		background: #fff;
+		border: 1px solid rgba(0, 0, 0, 0.6);
+		cursor: ew-resize;
+		touch-action: none;
+		pointer-events: auto;
+		transform: translate(-50%, -50%);
+	}
+	.ann-handle.inner {
+		width: 4px;
+		height: 16px;
+		border-radius: 1px;
+		z-index: 2;
+	}
+	.ann-handle.outer {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		z-index: 3;
+	}
+	.ann-handle:hover {
+		background: #4a9eff;
+		border-color: #fff;
 	}
 
 	.panbar {
