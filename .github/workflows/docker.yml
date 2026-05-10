@@ -13,8 +13,11 @@ permissions:
   packages: write
 
 concurrency:
+  # Per-branch (and per-tag) group: a new push supersedes any in-flight build
+  # on the same ref. Tag pushes have unique refs, so concurrent releases won't
+  # cancel each other.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   build:

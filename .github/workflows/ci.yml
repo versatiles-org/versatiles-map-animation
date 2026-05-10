@@ -11,8 +11,10 @@ permissions:
   contents: read
 
 concurrency:
+  # Per-branch group: a new push or PR-update supersedes any in-flight run on
+  # the same ref. Pages deploys are atomic, so cancelling mid-deploy is safe.
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   check:
