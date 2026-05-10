@@ -15,7 +15,8 @@ const example: Animation = {
 	],
 	annotations: [],
 	annotationScale: 1,
-	aspectRatio: '16:9'
+	aspectRatio: '16:9',
+	defaultAnnotation: {}
 };
 
 describe('encode/decode round-trip', () => {

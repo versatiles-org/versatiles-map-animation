@@ -101,6 +101,12 @@ export class AnimationStore {
 	sky = $state(DEFAULT_SKY);
 	annotationScale = $state(DEFAULT_ANNOTATION_SCALE);
 	aspectRatio = $state<AspectRatio>(DEFAULT_ASPECT_RATIO);
+	/**
+	 * Per-animation marker style defaults. New markers start from these; the
+	 * URL/JSON codec uses them as the carry-forward baseline so annotations
+	 * matching the defaults emit no per-field bytes.
+	 */
+	defaultAnnotation = $state<Partial<Annotation>>({});
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 
@@ -194,7 +200,10 @@ export class AnimationStore {
 	// -------------------------------------------------------------------------
 
 	addAnnotation(ann: Annotation): void {
-		this.annotations = [...this.annotations, { ...ann }];
+		// Apply per-animation marker defaults under the caller's fields, so the
+		// Pin button (which only knows lng/lat/icon/iconColor/label) inherits
+		// the user-tuned style (font, halo, sizes, etc.).
+		this.annotations = [...this.annotations, { ...this.defaultAnnotation, ...ann }];
 		this.selectedAnnotationIndex = this.annotations.length - 1;
 		this.selectedIndex = null;
 	}
@@ -202,10 +211,15 @@ export class AnimationStore {
 	updateAnnotation(index: number, patch: Partial<Annotation>): void {
 		if (index < 0 || index >= this.annotations.length) return;
 		const updated: Annotation = { ...this.annotations[index], ...patch };
-		// Drop optional fields that were explicitly set to undefined so the
-		// JSON/URL round-trip stays stable (don't emit "rotation: undefined").
-		for (const key of ['rotation', 'visibleFrom', 'visibleUntil'] as const) {
-			if (patch[key] === undefined && key in patch) delete updated[key];
+		// Patch values explicitly set to `undefined` are treated as
+		// "remove this override" — delete the field so the JSON/URL stays
+		// clean and renderers fall back to their defaults. Callers must
+		// avoid passing `undefined` for truly-required fields (lng, lat,
+		// icon, iconColor, label) — none of the editor handlers do.
+		for (const key in patch) {
+			if (patch[key as keyof Annotation] === undefined) {
+				delete (updated as unknown as Record<string, unknown>)[key];
+			}
 		}
 		this.annotations = replaceAt(this.annotations, index, updated);
 	}
@@ -261,6 +275,7 @@ export class AnimationStore {
 		this.sky = anim.sky ?? DEFAULT_SKY;
 		this.annotationScale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 		this.aspectRatio = anim.aspectRatio ?? DEFAULT_ASPECT_RATIO;
+		this.defaultAnnotation = { ...(anim.defaultAnnotation ?? {}) };
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
 		this.currentTime = 0;
@@ -277,7 +292,8 @@ export class AnimationStore {
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),
 			annotations: this.annotations.map((a) => ({ ...a })),
 			annotationScale: this.annotationScale,
-			aspectRatio: this.aspectRatio
+			aspectRatio: this.aspectRatio,
+			defaultAnnotation: { ...this.defaultAnnotation }
 		};
 	}
 

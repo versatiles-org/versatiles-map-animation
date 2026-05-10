@@ -146,6 +146,21 @@ describe('AnimationStore - keyframe CRUD', () => {
 });
 
 describe('AnimationStore - annotation CRUD', () => {
+	it('addAnnotation applies the per-animation defaultAnnotation under caller fields', () => {
+		const s = new AnimationStore();
+		s.defaultAnnotation = {
+			labelFont: 'roboto_bold_italic',
+			labelHaloWidth: 2.5
+		};
+		s.addAnnotation(ann({ label: 'X' }));
+		// Caller-provided fields (label, lng, lat, etc.) win; default-only
+		// fields (font, halo width) are inherited from store.defaultAnnotation.
+		const a = s.annotations[0];
+		expect(a.label).toBe('X');
+		expect(a.labelFont).toBe('roboto_bold_italic');
+		expect(a.labelHaloWidth).toBe(2.5);
+	});
+
 	it('addAnnotation appends, selects it, and clears keyframe selection', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());
@@ -172,6 +187,19 @@ describe('AnimationStore - annotation CRUD', () => {
 		expect(s.annotations[0]).not.toHaveProperty('visibleFrom');
 		// visibleUntil wasn't touched
 		expect(s.annotations[0].visibleUntil).toBe(5);
+	});
+
+	it('updateAnnotation deletes any optional field set to undefined (generic)', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ iconSize: 1.5, labelFont: 'roboto_bold', labelHaloWidth: 2 }));
+		s.updateAnnotation(0, {
+			iconSize: undefined,
+			labelFont: undefined,
+			labelHaloWidth: undefined
+		});
+		expect(s.annotations[0]).not.toHaveProperty('iconSize');
+		expect(s.annotations[0]).not.toHaveProperty('labelFont');
+		expect(s.annotations[0]).not.toHaveProperty('labelHaloWidth');
 	});
 
 	it('updateAnnotation ignores out-of-range index', () => {
@@ -288,7 +316,8 @@ describe('AnimationStore - load/serialise', () => {
 			],
 			annotations: [],
 			annotationScale: 1,
-			aspectRatio: '16:9'
+			aspectRatio: '16:9',
+			defaultAnnotation: {}
 		});
 		expect(s.keyframes.map((k) => k.t)).toEqual([0, 2]);
 		expect(s.terrain).toBe(true);

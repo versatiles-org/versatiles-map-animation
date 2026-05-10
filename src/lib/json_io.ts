@@ -108,6 +108,10 @@ export function validateAnimation(input: unknown): Animation {
 			? Math.max(0.01, obj.annotationScale)
 			: DEFAULT_ANNOTATION_SCALE;
 	const aspectRatio = isAspectRatio(obj.aspectRatio) ? obj.aspectRatio : DEFAULT_ASPECT_RATIO;
+	const defaultAnnotation =
+		obj.defaultAnnotation && typeof obj.defaultAnnotation === 'object'
+			? validatePartialAnnotation(obj.defaultAnnotation as Record<string, unknown>)
+			: {};
 	return {
 		version: SCHEMA_VERSION,
 		style,
@@ -117,8 +121,25 @@ export function validateAnimation(input: unknown): Animation {
 		keyframes,
 		annotations,
 		annotationScale,
-		aspectRatio
+		aspectRatio,
+		defaultAnnotation
 	};
+}
+
+/**
+ * Read a partial annotation — used for the `defaultAnnotation` style block,
+ * where lng/lat/label are not meaningful (only style fields are). Each style
+ * field flows through the same FIELD_SPECS table the per-annotation validator
+ * uses, so they share parsing behaviour.
+ */
+function validatePartialAnnotation(o: Record<string, unknown>): Partial<Annotation> {
+	const out = {} as Annotation;
+	if (isAnnotationIcon(o.icon)) out.icon = o.icon;
+	if (typeof o.iconColor === 'string') out.iconColor = o.iconColor;
+	else if (typeof o.color === 'string') out.iconColor = o.color;
+	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
+	for (const f of FIELD_SPECS) f.fromJson(o, out, -1);
+	return out;
 }
 
 function validateAnnotation(raw: unknown, i: number): Annotation {

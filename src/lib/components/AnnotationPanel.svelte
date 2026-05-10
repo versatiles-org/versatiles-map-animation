@@ -5,6 +5,7 @@
 		ANNOTATION_ICONS,
 		ANNOTATION_LABEL_FONTS,
 		DEFAULT_ANNOTATION_COLOR,
+		DEFAULT_ANNOTATION_ICON,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_ANNOTATION_LABEL_FONT,
 		DEFAULT_ICON_HALO_COLOR,
@@ -60,30 +61,101 @@
 		return DEFAULT_ANNOTATION_COLOR;
 	}
 
-	// Generic field binders — text/color inputs go through `onText`, numeric
-	// range inputs through `onNum`. Saves a one-line handler per field; the
-	// handler's identity changes per render but Svelte 5's event handling makes
-	// that cheap. Only inputs that need extra logic (clamping, side effects)
-	// keep a named handler below.
-	function onText<K extends keyof Annotation>(key: K) {
-		return (e: Event) =>
-			patch({ [key]: (e.currentTarget as HTMLInputElement).value } as Partial<Annotation>);
+	// Generic field binders parameterised by the target (annotation vs default
+	// style) so the same input markup can edit either. The `styleFields`
+	// snippet at the bottom of the template uses these factories with the
+	// per-call `doPatch`, so handlers always update the right target.
+	function makeOnText(doPatch: (p: Partial<Annotation>) => void) {
+		return <K extends keyof Annotation>(key: K) =>
+			(e: Event) =>
+				doPatch({ [key]: (e.currentTarget as HTMLInputElement).value } as Partial<Annotation>);
 	}
-	function onNum<K extends keyof Annotation>(key: K) {
-		return (e: Event) =>
-			patch({
-				[key]: Number((e.currentTarget as HTMLInputElement).value)
-			} as Partial<Annotation>);
+	function makeOnNum(doPatch: (p: Partial<Annotation>) => void) {
+		return <K extends keyof Annotation>(key: K) =>
+			(e: Event) =>
+				doPatch({
+					[key]: Number((e.currentTarget as HTMLInputElement).value)
+				} as Partial<Annotation>);
 	}
+
+	// Per-annotation handlers (the `selected` markup uses these directly).
+	const onText = makeOnText(patch);
+	const onNum = makeOnNum(patch);
+
+	/**
+	 * Hardcoded fallbacks for fields that need a real value at render time.
+	 * Used by per-annotation reset to guarantee required fields (icon,
+	 * iconColor) end up with a usable value when neither the annotation nor
+	 * `defaultAnnotation` has one. Optional fields not listed here resolve
+	 * to `undefined` on reset, which `updateAnnotation` then deletes.
+	 */
+	const HARDCODED_DEFAULTS: Partial<Annotation> = {
+		icon: DEFAULT_ANNOTATION_ICON,
+		iconColor: DEFAULT_ANNOTATION_COLOR
+	};
+
+	/**
+	 * Reset the listed fields on the currently-selected annotation.
+	 * Resolves each field through user defaults → hardcoded baseline; sets
+	 * the result on the annotation. `undefined` (no defaults at any layer)
+	 * is treated by `updateAnnotation` as "remove the override" so the field
+	 * disappears from the JSON/URL.
+	 */
+	function resetAnnFields(...keys: (keyof Annotation)[]): void {
+		if (idx === null) return;
+		const p: Record<string, unknown> = {};
+		for (const k of keys) {
+			const fromDefault = (store.defaultAnnotation as Record<string, unknown>)[k];
+			const hardcoded = (HARDCODED_DEFAULTS as Record<string, unknown>)[k];
+			p[k] = fromDefault ?? hardcoded;
+		}
+		store.updateAnnotation(idx, p as Partial<Annotation>);
+	}
+	function isAnnSet(...keys: (keyof Annotation)[]): boolean {
+		return ann !== null && keys.some((k) => k in ann);
+	}
+
+	// Default-style mode: the AnnotationPanel shows the same Icon/Label fields
+	// when no marker is selected, but they edit `store.defaultAnnotation`
+	// instead of any specific annotation.
+	function patchDefault(p: Partial<Annotation>): void {
+		store.defaultAnnotation = { ...store.defaultAnnotation, ...p };
+	}
+	/**
+	 * Remove the given fields from `store.defaultAnnotation` — the input then
+	 * shows the hardcoded baseline (DEFAULT_X) and new markers no longer
+	 * inherit a value for that field. Called by per-row reset buttons.
+	 */
+	function unsetDefaults(...keys: (keyof Annotation)[]): void {
+		const next = { ...store.defaultAnnotation };
+		for (const k of keys) delete next[k];
+		store.defaultAnnotation = next;
+	}
+	function isDefaultSet(...keys: (keyof Annotation)[]): boolean {
+		return keys.some((k) => k in store.defaultAnnotation);
+	}
+	const defaults = $derived(store.defaultAnnotation);
+	const onTextDefault = makeOnText(patchDefault);
+	const onNumDefault = makeOnNum(patchDefault);
 
 	function onIcon(icon: AnnotationIcon) {
 		patch({ icon });
 		iconMenuOpen = false;
 	}
+	function onIconDefault(icon: AnnotationIcon) {
+		patchDefault({ icon });
+		iconMenuDefaultOpen = false;
+	}
+
+	// Icon menu open state per surface (selected vs default), so opening the
+	// picker in one mode doesn't leak into the other.
+	let iconMenuDefaultOpen = $state(false);
+	let iconMenuDefaultEl: HTMLDivElement | undefined = $state();
 
 	function handleDocClick(e: MouseEvent) {
-		if (!iconMenuOpen || !iconMenuEl) return;
-		if (!iconMenuEl.contains(e.target as Node)) iconMenuOpen = false;
+		if (iconMenuOpen && iconMenuEl && !iconMenuEl.contains(e.target as Node)) iconMenuOpen = false;
+		if (iconMenuDefaultOpen && iconMenuDefaultEl && !iconMenuDefaultEl.contains(e.target as Node))
+			iconMenuDefaultOpen = false;
 	}
 
 	$effect(() => {
@@ -121,6 +193,10 @@
 	function onLabelFont(e: Event) {
 		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
 		patch({ labelFont: v });
+	}
+	function onLabelFontDefault(e: Event) {
+		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
+		patchDefault({ labelFont: v });
 	}
 
 	// 3×3 grid of label-position options. The dot in the center represents
@@ -287,6 +363,13 @@
 					</ul>
 				{/if}
 			</div>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('icon')}
+				title="Reset shape to the current default"
+				aria-label="Reset shape">⟲</button
+			>
 		</div>
 
 		<label class="row">
@@ -298,6 +381,13 @@
 				aria-label="Icon color"
 			/>
 			<span class="hex">{ann.iconColor}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('iconColor')}
+				title="Reset color to the current default"
+				aria-label="Reset icon color">⟲</button
+			>
 		</label>
 
 		<div class="row">
@@ -321,6 +411,14 @@
 				title="Halo width in px. 0 turns the halo off (default)."
 			/>
 			<span class="num">{(ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('iconHaloColor', 'iconHaloWidth')}
+				disabled={!isAnnSet('iconHaloColor', 'iconHaloWidth')}
+				title="Reset icon halo to the current default"
+				aria-label="Reset icon halo">⟲</button
+			>
 		</div>
 
 		<label class="row">
@@ -334,6 +432,14 @@
 				oninput={onNum('iconSize')}
 			/>
 			<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('iconSize')}
+				disabled={!isAnnSet('iconSize')}
+				title="Reset size to the current default"
+				aria-label="Reset icon size">⟲</button
+			>
 		</label>
 
 		<label class="row">
@@ -347,6 +453,14 @@
 				oninput={onNum('rotation')}
 			/>
 			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('rotation')}
+				disabled={!isAnnSet('rotation')}
+				title="Reset rotation to 0"
+				aria-label="Reset rotation">⟲</button
+			>
 		</label>
 
 		<!-- Label section: text + appearance + placement -->
@@ -380,6 +494,14 @@
 					</optgroup>
 				{/each}
 			</select>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelFont')}
+				disabled={!isAnnSet('labelFont')}
+				title="Reset font to the current default"
+				aria-label="Reset font">⟲</button
+			>
 		</label>
 
 		<label class="row">
@@ -392,6 +514,14 @@
 				title="Label text color. The halo defaults to a contrasting brightness; override below."
 			/>
 			<span class="hex">{ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelColor')}
+				disabled={!isAnnSet('labelColor')}
+				title="Reset label color to the current default"
+				aria-label="Reset label color">⟲</button
+			>
 		</label>
 
 		<div class="row">
@@ -417,6 +547,14 @@
 				title="Halo width in px. 0 turns the halo off."
 			/>
 			<span class="num">{(ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelHaloColor', 'labelHaloWidth')}
+				disabled={!isAnnSet('labelHaloColor', 'labelHaloWidth')}
+				title="Reset label halo to the current default"
+				aria-label="Reset label halo">⟲</button
+			>
 		</div>
 
 		<label class="row">
@@ -430,6 +568,14 @@
 				oninput={onNum('labelSize')}
 			/>
 			<span class="num">{(ann.labelSize ?? 1).toFixed(2)}×</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelSize')}
+				disabled={!isAnnSet('labelSize')}
+				title="Reset label size to the current default"
+				aria-label="Reset label size">⟲</button
+			>
 		</label>
 
 		<div class="row">
@@ -447,6 +593,14 @@
 					</button>
 				{/each}
 			</div>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelPosition')}
+				disabled={!isAnnSet('labelPosition')}
+				title="Reset label position to the current default"
+				aria-label="Reset label position">⟲</button
+			>
 		</div>
 
 		<label class="row">
@@ -460,6 +614,14 @@
 				oninput={onNum('labelDistance')}
 			/>
 			<span class="num">{(ann.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => resetAnnFields('labelDistance')}
+				disabled={!isAnnSet('labelDistance')}
+				title="Reset gap to the current default"
+				aria-label="Reset gap">⟲</button
+			>
 		</label>
 
 		<!-- Visibility section: time window + fade tails -->
@@ -563,10 +725,319 @@
 			<button type="button" class="danger" onclick={onDelete}>✕ Delete</button>
 		</footer>
 	{:else}
-		<p class="placeholder">
-			No annotation selected. Click <strong>📍 Pin</strong> below to add one, or click an annotation marker
-			on the map to edit it.
+		<!-- Empty state: list of all markers + a default-style editor.
+		     Both let the user work without first selecting a single marker. -->
+		<h3 class="section">Markers</h3>
+		{#if store.annotations.length === 0}
+			<p class="placeholder">
+				No annotations yet. Click <strong>📍 Pin</strong> below to add one — new markers inherit the default
+				style configured below.
+			</p>
+		{:else}
+			<ul class="marker-list">
+				{#each store.annotations as a, i (i)}
+					<li>
+						<button
+							type="button"
+							class="marker-item"
+							onclick={() => store.selectAnnotation(i)}
+							title="Edit this marker"
+						>
+							<span class="icon-prev" style={spritePreviewStyle(a.icon, 18)}></span>
+							<span
+								class="marker-label"
+								class:empty={!a.label}
+								style="color: {a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR};"
+							>
+								{a.label || '(no label)'}
+							</span>
+							<span class="marker-num">#{i + 1}</span>
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<div class="default-style-header">
+			<h3 class="section">Default style</h3>
+			<button
+				type="button"
+				class="mini"
+				onclick={() => (store.defaultAnnotation = {})}
+				disabled={Object.keys(store.defaultAnnotation).length === 0}
+				title="Clear every default — new markers fall back to the hardcoded baseline"
+			>
+				Reset all
+			</button>
+		</div>
+		<p class="hint">
+			Style applied to <strong>new</strong> markers (Pin button). Doesn't change existing ones. The
+			<strong>⟲</strong> next to each row clears just that field.
 		</p>
+
+		<!-- Icon -->
+		<div class="row">
+			<span class="lbl">Shape</span>
+			<div class="icon-dropdown" bind:this={iconMenuDefaultEl}>
+				<button
+					type="button"
+					class="icon-trigger"
+					onclick={() => (iconMenuDefaultOpen = !iconMenuDefaultOpen)}
+					aria-haspopup="listbox"
+					aria-expanded={iconMenuDefaultOpen}
+					title={defaults.icon ?? DEFAULT_ANNOTATION_ICON}
+				>
+					<span
+						class="icon-prev"
+						style={spritePreviewStyle(defaults.icon ?? DEFAULT_ANNOTATION_ICON, 22)}
+					></span>
+					<span class="icon-name">{shortName(defaults.icon ?? DEFAULT_ANNOTATION_ICON)}</span>
+					<span class="caret" aria-hidden="true">▾</span>
+				</button>
+				{#if iconMenuDefaultOpen}
+					<ul class="icon-menu" role="listbox" aria-label="Default icon">
+						{#each ANNOTATION_ICONS as icon (icon)}
+							<li>
+								<button
+									type="button"
+									class="icon-option"
+									class:selected={(defaults.icon ?? DEFAULT_ANNOTATION_ICON) === icon}
+									onclick={() => onIconDefault(icon)}
+									role="option"
+									aria-selected={(defaults.icon ?? DEFAULT_ANNOTATION_ICON) === icon}
+									title={icon}
+								>
+									<span class="icon-prev" style={spritePreviewStyle(icon, 22)}></span>
+									<span class="icon-name">{shortName(icon)}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('icon')}
+				disabled={!isDefaultSet('icon')}
+				title="Reset shape to the hardcoded default"
+				aria-label="Reset default shape">⟲</button
+			>
+		</div>
+
+		<label class="row">
+			<span class="lbl">Color</span>
+			<input
+				type="color"
+				value={normalizeHex(defaults.iconColor ?? DEFAULT_ANNOTATION_COLOR)}
+				oninput={onTextDefault('iconColor')}
+				aria-label="Default icon color"
+			/>
+			<span class="hex">{defaults.iconColor ?? DEFAULT_ANNOTATION_COLOR}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('iconColor')}
+				disabled={!isDefaultSet('iconColor')}
+				title="Reset icon color to the hardcoded default"
+				aria-label="Reset default icon color">⟲</button
+			>
+		</label>
+
+		<div class="row">
+			<span class="lbl">Halo</span>
+			<input
+				type="color"
+				value={normalizeHex(defaults.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
+				oninput={onTextDefault('iconHaloColor')}
+				aria-label="Default icon halo color"
+			/>
+			<input
+				class="halo-width"
+				type="range"
+				min="0"
+				max="4"
+				step="0.1"
+				value={defaults.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+				oninput={onNumDefault('iconHaloWidth')}
+				aria-label="Default icon halo width"
+			/>
+			<span class="num">{(defaults.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('iconHaloColor', 'iconHaloWidth')}
+				disabled={!isDefaultSet('iconHaloColor', 'iconHaloWidth')}
+				title="Reset icon halo to the hardcoded default"
+				aria-label="Reset default icon halo">⟲</button
+			>
+		</div>
+
+		<label class="row">
+			<span class="lbl">Size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={defaults.iconSize ?? 1}
+				oninput={onNumDefault('iconSize')}
+			/>
+			<span class="num">{(defaults.iconSize ?? 1).toFixed(2)}×</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('iconSize')}
+				disabled={!isDefaultSet('iconSize')}
+				title="Reset icon size to the hardcoded default"
+				aria-label="Reset default icon size">⟲</button
+			>
+		</label>
+
+		<!-- Label -->
+		<h3 class="section">Default label</h3>
+
+		<label class="row">
+			<span class="lbl">Font</span>
+			<select
+				class="font-select"
+				value={defaults.labelFont ?? DEFAULT_ANNOTATION_LABEL_FONT}
+				onchange={onLabelFontDefault}
+			>
+				{#each FONT_GROUPS as g (g.family)}
+					<optgroup label={familyLabel(g.family)}>
+						{#each g.fonts as f (f)}
+							<option value={f}>{fontVariantLabel(f)}</option>
+						{/each}
+					</optgroup>
+				{/each}
+			</select>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelFont')}
+				disabled={!isDefaultSet('labelFont')}
+				title="Reset font to the hardcoded default"
+				aria-label="Reset default font">⟲</button
+			>
+		</label>
+
+		<label class="row">
+			<span class="lbl">Color</span>
+			<input
+				type="color"
+				value={normalizeHex(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
+				oninput={onTextDefault('labelColor')}
+				aria-label="Default label color"
+			/>
+			<span class="hex">{defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelColor')}
+				disabled={!isDefaultSet('labelColor')}
+				title="Reset label color to the hardcoded default"
+				aria-label="Reset default label color">⟲</button
+			>
+		</label>
+
+		<div class="row">
+			<span class="lbl">Halo</span>
+			<input
+				type="color"
+				value={normalizeHex(
+					defaults.labelHaloColor ?? haloAuto(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
+				)}
+				oninput={onTextDefault('labelHaloColor')}
+				aria-label="Default label halo color"
+			/>
+			<input
+				class="halo-width"
+				type="range"
+				min="0"
+				max="4"
+				step="0.1"
+				value={defaults.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
+				oninput={onNumDefault('labelHaloWidth')}
+				aria-label="Default label halo width"
+			/>
+			<span class="num">{(defaults.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelHaloColor', 'labelHaloWidth')}
+				disabled={!isDefaultSet('labelHaloColor', 'labelHaloWidth')}
+				title="Reset label halo to the hardcoded default"
+				aria-label="Reset default label halo">⟲</button
+			>
+		</div>
+
+		<label class="row">
+			<span class="lbl">Size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={defaults.labelSize ?? 1}
+				oninput={onNumDefault('labelSize')}
+			/>
+			<span class="num">{(defaults.labelSize ?? 1).toFixed(2)}×</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelSize')}
+				disabled={!isDefaultSet('labelSize')}
+				title="Reset label size to the hardcoded default"
+				aria-label="Reset default label size">⟲</button
+			>
+		</label>
+
+		<div class="row">
+			<span class="lbl">Side</span>
+			<div class="pos-grid">
+				{#each POSITION_GRID as p (p.value)}
+					<button
+						type="button"
+						class:active={(defaults.labelPosition ?? DEFAULT_LABEL_POSITION) === p.value}
+						onclick={() => patchDefault({ labelPosition: p.value })}
+						title={p.value}
+						aria-label={`Default label position ${p.value}`}
+					>
+						{p.label}
+					</button>
+				{/each}
+			</div>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelPosition')}
+				disabled={!isDefaultSet('labelPosition')}
+				title="Reset label position to the hardcoded default"
+				aria-label="Reset default label position">⟲</button
+			>
+		</div>
+
+		<label class="row">
+			<span class="lbl">Gap</span>
+			<input
+				type="range"
+				min="0"
+				max="5"
+				step="0.1"
+				value={defaults.labelDistance ?? DEFAULT_LABEL_DISTANCE}
+				oninput={onNumDefault('labelDistance')}
+			/>
+			<span class="num">{(defaults.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
+			<button
+				type="button"
+				class="mini reset"
+				onclick={() => unsetDefaults('labelDistance')}
+				disabled={!isDefaultSet('labelDistance')}
+				title="Reset gap to the hardcoded default"
+				aria-label="Reset default gap">⟲</button
+			>
+		</label>
 	{/if}
 </div>
 
@@ -578,11 +1049,69 @@
 		flex-direction: column;
 		gap: 0.45rem;
 	}
-	.placeholder {
+	.placeholder,
+	.hint {
 		margin: 0.2rem 0;
 		font-size: 12px;
 		color: #888;
 		line-height: 1.45;
+	}
+	.hint {
+		font-size: 11px;
+	}
+
+	.marker-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		max-height: 30vh;
+		overflow-y: auto;
+	}
+	.marker-item {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.3rem 0.4rem;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid #2a2f37;
+		border-radius: 3px;
+		color: #ddd;
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+		text-align: left;
+
+		&:hover {
+			background: rgba(74, 158, 255, 0.12);
+			border-color: rgba(74, 158, 255, 0.4);
+		}
+	}
+	.marker-label {
+		flex: 1 1 auto;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		/* The first non-empty line of a multi-line label is enough to
+		   identify the marker; collapse newlines so the row stays one line. */
+		&::first-line {
+			line-height: 1;
+		}
+
+		&.empty {
+			color: #666;
+			font-style: italic;
+		}
+	}
+	.marker-num {
+		flex: 0 0 auto;
+		color: #777;
+		font-variant-numeric: tabular-nums;
+		font-size: 10px;
 	}
 	.title-row {
 		display: flex;
@@ -891,6 +1420,28 @@
 		&:disabled {
 			opacity: 0.35;
 			cursor: not-allowed;
+		}
+	}
+	/* Per-row reset button in the default-style editor — narrower so it
+	   doesn't squeeze the input next to it. */
+	.mini.reset {
+		flex: 0 0 auto;
+		padding: 0.2rem 0.35rem;
+		font-size: 12px;
+		line-height: 1;
+	}
+	/* Section heading + Reset-all button side by side. */
+	.default-style-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.5rem;
+
+		.section {
+			margin: 0;
+			border-top: none;
+			padding: 0;
+			flex: 1 1 auto;
 		}
 	}
 

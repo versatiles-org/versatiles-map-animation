@@ -55,7 +55,11 @@ function fromWire(wire: Wire): Animation {
 		keyframes: wire.keyframes.map(denormalizeKeyframe),
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? DEFAULT_ANNOTATION_SCALE,
-		aspectRatio: wire.aspectRatio ?? DEFAULT_ASPECT_RATIO
+		aspectRatio: wire.aspectRatio ?? DEFAULT_ASPECT_RATIO,
+		// `defaultAnnotation` isn't on the wire yet (UX-only feature for now —
+		// the wire codec optimisation is a follow-up). Decoded animations
+		// always come back with empty defaults.
+		defaultAnnotation: {}
 	};
 }
 

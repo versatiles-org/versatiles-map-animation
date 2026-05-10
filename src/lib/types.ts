@@ -541,6 +541,14 @@ export interface Animation {
 	annotationScale: number;
 	/** Composition aspect ratio. Defaults to 16:9. */
 	aspectRatio: AspectRatio;
+	/**
+	 * Per-animation marker style defaults — fields set here become the
+	 * baseline for new markers (Pin button) AND the codec's carry-forward
+	 * starting point, so annotations matching the defaults emit nothing on
+	 * the wire / in JSON. Position-specific fields (lng/lat/label/rotation)
+	 * are intentionally excluded from this object.
+	 */
+	defaultAnnotation: Partial<Annotation>;
 }
 
 export const DEFAULT_INITIAL_VIEW: CameraState = {
@@ -562,7 +570,8 @@ export function createEmptyAnimation(): Animation {
 		keyframes: [],
 		annotations: [],
 		annotationScale: DEFAULT_ANNOTATION_SCALE,
-		aspectRatio: DEFAULT_ASPECT_RATIO
+		aspectRatio: DEFAULT_ASPECT_RATIO,
+		defaultAnnotation: {}
 	};
 }
 

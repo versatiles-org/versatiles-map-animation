@@ -24,7 +24,8 @@ const sample: Animation = {
 	],
 	annotations: [],
 	annotationScale: 1,
-	aspectRatio: '16:9'
+	aspectRatio: '16:9',
+	defaultAnnotation: {}
 };
 
 beforeEach(() => {
