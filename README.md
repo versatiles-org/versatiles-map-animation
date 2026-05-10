@@ -1,5 +1,9 @@
 # versatiles-map-animation
 
+[![CI](https://github.com/versatiles-org/versatiles-map-animation/actions/workflows/ci.yml/badge.svg)](https://github.com/versatiles-org/versatiles-map-animation/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/versatiles-org/versatiles-map-animation/branch/main/graph/badge.svg)](https://codecov.io/gh/versatiles-org/versatiles-map-animation)
+[![License: MIT](https://img.shields.io/github/license/versatiles-org/versatiles-map-animation)](./LICENSE)
+
 Prototype tool for composing camera animations on a VersaTiles map and previewing them in the browser. Long-term goal: feed the same data model into a headless renderer for TV-grade map animations.
 
 **Status: prototype.** Hosted but not publicly linked. The JSON schema is the durable contract; the editor and renderer talk it.
