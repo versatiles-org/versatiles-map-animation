@@ -183,17 +183,67 @@
 	function onLoadExample() {
 		closeMenu();
 		store.loadFromAnimation({
-			version: SCHEMA_VERSION,
-			style: 'colorful',
-			labels: true,
-			terrain: DEFAULT_TERRAIN,
-			sky: false,
+			version: 1,
+			style: 'satellite',
+			labels: false,
+			terrain: true,
+			sky: true,
 			keyframes: [
-				{ t: 0, lng: 0, lat: 30, zoom: 1.5, pitch: 0, bearing: 0, roll: 0 },
-				{ t: 3, lng: 13.405, lat: 52.52, zoom: 9, pitch: 60, bearing: 30, roll: 0 },
-				{ t: 6, lng: 13.405, lat: 52.52, zoom: 14, pitch: 70, bearing: 120, roll: 0 }
+				{
+					t: 0.024469006348066195,
+					lng: 6.84647616314237,
+					lat: 45.798615612270765,
+					zoom: 10.572679773640692,
+					pitch: 39.76555286241931,
+					bearing: 117.51265012354723,
+					roll: 0
+				},
+				{
+					t: 3.0132790834797563,
+					lng: 6.921565288512056,
+					lat: 45.80448870863336,
+					zoom: 11.410002377806105,
+					pitch: 60.673477227955445,
+					bearing: 119.95753039653846,
+					roll: 0
+				},
+				{
+					t: 6.009478852316307,
+					lng: 6.868558190974994,
+					lat: 45.77464787055277,
+					zoom: 11.410002377806105,
+					pitch: 64.67347722795546,
+					bearing: 167.22040012589594,
+					roll: 0
+				},
+				{
+					t: 8.028256675000446,
+					lng: 6.839890346388415,
+					lat: 45.740722878566515,
+					zoom: 10.823798781193744,
+					pitch: 78.67347722795547,
+					bearing: -179.2305385733937,
+					roll: 0
+				}
 			],
-			annotations: [],
+			annotations: [
+				{
+					lng: 6.862678527832031,
+					lat: 45.83310520549682,
+					icon: 'symbol-arrow1',
+					color: '#b20000',
+					label: 'Mont Blanc',
+					rotation: 0,
+					visibleFrom: 3,
+					iconSize: 2.5,
+					labelSize: 1.75,
+					labelPosition: 'top',
+					labelDistance: 2.5,
+					fadeIn: 1,
+					labelColor: '#b20000',
+					labelHaloWidth: 1
+				}
+			],
 			annotationScale: 1
 		});
 	}
