@@ -34,7 +34,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 ### Sharing & rendering
 
 - **Share by URL** — the entire animation (style, terrain, sky, annotations, scale) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
-- **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload.
+- **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animation/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
 - **Local persistence** — the latest animation is mirrored to `localStorage`, so a reload without a hash restores it.
 - **Export / import as JSON** for archival or hand-off.
 - **Render to MP4** via the published Docker image (button in the editor copies the command):
