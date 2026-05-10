@@ -191,8 +191,7 @@ function presentField<K extends keyof WireAnnotation>(
 		label: key as string,
 		carryForward: 'none',
 		shouldEmit: (item) => item[key] !== undefined,
-		encode: (item, _prev, w) =>
-			codec.encode(item[key] as NonNullable<WireAnnotation[K]>, w),
+		encode: (item, _prev, w) => codec.encode(item[key] as NonNullable<WireAnnotation[K]>, w),
 		decode: (item, _prev, r) => {
 			item[key] = codec.decode(r) as WireAnnotation[K];
 		}
@@ -206,8 +205,7 @@ function presentField<K extends keyof WireAnnotation>(
  * pre-factory hand-coded behaviour byte-for-byte).
  */
 function positionField(bit: number, key: 'mx' | 'my'): AnnField {
-	const quantize = (v: number) =>
-		Math.round(Math.max(0, Math.min(1, v)) * ANNOTATION_POS_MAX);
+	const quantize = (v: number) => Math.round(Math.max(0, Math.min(1, v)) * ANNOTATION_POS_MAX);
 	const inner = uint(ANNOTATION_POS_BITS);
 	return {
 		bit,

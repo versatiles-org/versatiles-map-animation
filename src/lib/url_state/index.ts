@@ -129,7 +129,8 @@ const VERSIONS: VersionEntry[] = [
 			annotations: anim.annotations.map(normalizeAnnotation),
 			annotationScale: scale
 		}),
-		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+		toAnimation: (wire) =>
+			fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
 	},
 	{
 		tag: FORMAT_TAG_BINARY_V4,
@@ -140,7 +141,8 @@ const VERSIONS: VersionEntry[] = [
 			annotations: anim.annotations.map(normalizeAnnotation),
 			annotationScale: scale
 		}),
-		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+		toAnimation: (wire) =>
+			fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
 	},
 	{
 		tag: FORMAT_TAG_BINARY_V3,
@@ -151,7 +153,8 @@ const VERSIONS: VersionEntry[] = [
 			annotations: anim.annotations.map(normalizeAnnotation),
 			annotationScale: scale
 		}),
-		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+		toAnimation: (wire) =>
+			fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
 	},
 	{
 		tag: FORMAT_TAG_BINARY_V2,
