@@ -17,8 +17,8 @@ export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
  * them to any value at runtime. See:
  *   https://tiles.versatiles.org/assets/sprites/markers/sprites.json
  *
- * Order matters: the first entry is the deltaArray default and the icon picker
- * default for new annotations.
+ * Order matters: the first entry is the codec carry-forward default and the
+ * icon picker default for new annotations.
  */
 export const ANNOTATION_ICONS = [
 	'symbol-marker',
@@ -68,8 +68,6 @@ export const ANNOTATION_ICON_ROTATION_OFFSETS: Record<AnnotationIcon, number> = 
  * layer. Each value places the icon's intended visual pivot exactly on the
  * geographic point and makes `icon-rotate` rotate around that pivot — marker
  * tips stay planted, arrow tips stay glued to the location, etc.
- *
- * Tuned visually with the throwaway page at /routes/anchors/+page.svelte.
  */
 export const ANNOTATION_ICON_OFFSETS: Record<AnnotationIcon, [number, number]> = {
 	'symbol-marker': [0, -11],
