@@ -68,8 +68,13 @@
 		<div class="message">No animation to play.</div>
 	{:else if !store.isPlaying && !renderMode}
 		<button type="button" class="play-overlay" onclick={onPlay} aria-label="Play animation">
+			<!-- Triangle drawn so its centroid sits at viewBox (12, 12). For a
+			     play triangle with left edge x = a and right tip x = b,
+			     centroid_x = (2a + b) / 3 — picking a = 8, b = 20 puts the
+			     centroid exactly at the viewBox centre, so no margin nudge
+			     is needed to optically centre it in the circle. -->
 			<svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true">
-				<path d="M8 5v14l11-7z" fill="currentColor" />
+				<path d="M8 5v14l12-7z" fill="currentColor" />
 			</svg>
 		</button>
 	{/if}
@@ -124,7 +129,6 @@
 	}
 	.play-overlay svg {
 		display: block;
-		margin-left: 6px;
 	}
 
 	.message {
