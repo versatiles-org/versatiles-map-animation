@@ -237,13 +237,11 @@
 			</button>
 		</div>
 
-		<label class="row">
-			<span class="lbl">Label</span>
-			<input type="text" value={ann.label} oninput={onLabel} placeholder="(no label)" />
-		</label>
+		<!-- Icon section: shape + appearance + orientation -->
+		<h3 class="section">Icon</h3>
 
 		<div class="row">
-			<span class="lbl">Icon</span>
+			<span class="lbl">Shape</span>
 			<div class="icon-dropdown" bind:this={iconMenuEl}>
 				<button
 					type="button"
@@ -281,7 +279,7 @@
 		</div>
 
 		<label class="row">
-			<span class="lbl">Icon col</span>
+			<span class="lbl">Color</span>
 			<input
 				type="color"
 				value={normalizeHex(ann.color)}
@@ -291,8 +289,65 @@
 			<span class="hex">{ann.color}</span>
 		</label>
 
+		<div class="row">
+			<span class="lbl">Halo</span>
+			<input
+				type="color"
+				value={normalizeHex(ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
+				oninput={onIconHaloColor}
+				aria-label="Icon halo color"
+				title="Halo (icon outline) color. Default white; only visible when width > 0."
+			/>
+			<input
+				class="halo-width"
+				type="range"
+				min="0"
+				max="4"
+				step="0.1"
+				value={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+				oninput={onIconHaloWidth}
+				aria-label="Icon halo width"
+				title="Halo width in px. 0 turns the halo off (default)."
+			/>
+			<span class="num">{(ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
+		</div>
+
 		<label class="row">
-			<span class="lbl">Label col</span>
+			<span class="lbl">Size</span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				value={ann.iconSize ?? 1}
+				oninput={onIconSize}
+			/>
+			<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
+		</label>
+
+		<label class="row">
+			<span class="lbl">Rotation</span>
+			<input
+				type="range"
+				min="0"
+				max="359"
+				step="1"
+				value={ann.rotation ?? 0}
+				oninput={onRotation}
+			/>
+			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
+		</label>
+
+		<!-- Label section: text + appearance + placement -->
+		<h3 class="section">Label</h3>
+
+		<label class="row">
+			<span class="lbl">Text</span>
+			<input type="text" value={ann.label} oninput={onLabel} placeholder="(no label)" />
+		</label>
+
+		<label class="row">
+			<span class="lbl">Color</span>
 			<input
 				type="color"
 				value={normalizeHex(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
@@ -304,7 +359,7 @@
 		</label>
 
 		<div class="row">
-			<span class="lbl">Label halo</span>
+			<span class="lbl">Halo</span>
 			<input
 				type="color"
 				value={normalizeHex(
@@ -328,57 +383,8 @@
 			<span class="num">{(ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
 		</div>
 
-		<div class="row">
-			<span class="lbl">Icon halo</span>
-			<input
-				type="color"
-				value={normalizeHex(ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
-				oninput={onIconHaloColor}
-				aria-label="Icon halo color"
-				title="Halo (icon outline) color. Default white; only visible when width > 0."
-			/>
-			<input
-				class="halo-width"
-				type="range"
-				min="0"
-				max="4"
-				step="0.1"
-				value={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
-				oninput={onIconHaloWidth}
-				aria-label="Icon halo width"
-				title="Halo width in px. 0 turns the halo off (default)."
-			/>
-			<span class="num">{(ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
-		</div>
-
 		<label class="row">
-			<span class="lbl">Rotation</span>
-			<input
-				type="range"
-				min="0"
-				max="359"
-				step="1"
-				value={ann.rotation ?? 0}
-				oninput={onRotation}
-			/>
-			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
-		</label>
-
-		<label class="row">
-			<span class="lbl">Icon size</span>
-			<input
-				type="range"
-				min="0.4"
-				max="2.5"
-				step="0.05"
-				value={ann.iconSize ?? 1}
-				oninput={onIconSize}
-			/>
-			<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
-		</label>
-
-		<label class="row">
-			<span class="lbl">Label size</span>
+			<span class="lbl">Size</span>
 			<input
 				type="range"
 				min="0.4"
@@ -391,7 +397,7 @@
 		</label>
 
 		<div class="row">
-			<span class="lbl">Label pos</span>
+			<span class="lbl">Side</span>
 			<div class="pos-grid">
 				{#each POSITION_GRID as p (p.value)}
 					<button
@@ -408,7 +414,7 @@
 		</div>
 
 		<label class="row">
-			<span class="lbl">Label gap</span>
+			<span class="lbl">Gap</span>
 			<input
 				type="range"
 				min="0"
@@ -419,6 +425,9 @@
 			/>
 			<span class="num">{(ann.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
 		</label>
+
+		<!-- Visibility section: time window + fade tails -->
+		<h3 class="section">Visibility</h3>
 
 		<div class="row visibility">
 			<span class="lbl">Visible</span>
@@ -496,8 +505,11 @@
 			</div>
 		</div>
 
+		<!-- Position section: lat/lng + helper -->
+		<h3 class="section">Position</h3>
+
 		<div class="row position">
-			<span class="lbl">Position</span>
+			<span class="lbl">Coords</span>
 			<span class="coord">
 				{ann.lat.toFixed(4)}, {ann.lng.toFixed(4)}
 			</span>
@@ -542,6 +554,22 @@
 		justify-content: space-between;
 		gap: 0.5rem;
 		margin-bottom: 0.15rem;
+	}
+	.section {
+		margin: 0.4rem 0 0.1rem;
+		padding: 0.2rem 0 0.15rem;
+		font-size: 10px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: #888;
+		border-top: 1px solid #2a2f37;
+	}
+	/* The first section heading sits right after the title-row, so the top
+	   border would double up with the title-row's bottom-margin gap. Drop it. */
+	.section:first-of-type {
+		border-top: none;
+		margin-top: 0.1rem;
 	}
 	.title {
 		font-size: 12px;
