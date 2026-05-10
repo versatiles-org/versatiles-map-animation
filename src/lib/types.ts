@@ -1,5 +1,18 @@
 export const SCHEMA_VERSION = 1;
 
+/**
+ * Map composition format. Both the editor preview and the viewer iframe
+ * letterbox the map to this aspect ratio so what you compose is what gets
+ * rendered, regardless of window/iframe size.
+ *
+ * `MAP_REFERENCE_WIDTH` is the canonical pixel width that camera zoom values
+ * are stored against — when the map is rendered at a different display width,
+ * MapStage adjusts zoom by `log2(actualWidth / MAP_REFERENCE_WIDTH)` so the
+ * same geographic content fills the frame at any size.
+ */
+export const MAP_ASPECT_RATIO = 16 / 9;
+export const MAP_REFERENCE_WIDTH = 1280;
+
 export const PATH_STYLES = ['arc', 'linear'] as const;
 export type PathStyle = (typeof PATH_STYLES)[number];
 export const DEFAULT_PATH: PathStyle = 'arc';

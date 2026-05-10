@@ -20,6 +20,8 @@
 		"lint": "eslint .",
 		"preview": "vite preview",
 		"test:coverage": "vitest run --coverage",
+		"test:e2e": "playwright test",
+		"test:e2e:install": "playwright install --with-deps chromium",
 		"test": "vitest run",
 		"upgrade": "npm-check-updates -u && npm install"
 	},

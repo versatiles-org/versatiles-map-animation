@@ -25,20 +25,33 @@
 	// Render mode (`?render=1`): the page is being driven by an offline
 	// rendering pipeline (see render/render.mjs). Hide the play overlay and
 	// expose a tiny hook so the renderer can drive the playhead frame-by-frame.
-	const renderMode =
-		typeof window !== 'undefined' &&
-		new URLSearchParams(window.location.search).get('render') === '1';
+	// Test mode (`?test=1`): exposes `window.__viewer_store` for Playwright.
+	// Test/render share the "no play overlay" semantics.
+	// `?t=N` seeks to a fixed frame on mount (combine with `?test=1` for
+	// deterministic visual-equivalence checks across viewport sizes).
+	const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+	const renderMode = params?.get('render') === '1';
+	const testMode = params?.get('test') === '1';
+	const seekParam = params?.get('t');
+	const initialSeek = seekParam !== null && seekParam !== undefined ? Number(seekParam) : null;
 
 	onMount(() => {
-		if (!renderMode) return;
-		(window as unknown as { __renderer: unknown }).__renderer = {
-			seekTo(t: number) {
-				store.seekTo(t);
-			},
-			get duration() {
-				return store.totalDuration;
-			}
-		};
+		if (initialSeek !== null && Number.isFinite(initialSeek)) {
+			store.seekTo(initialSeek);
+		}
+		if (renderMode) {
+			(window as unknown as { __renderer: unknown }).__renderer = {
+				seekTo(t: number) {
+					store.seekTo(t);
+				},
+				get duration() {
+					return store.totalDuration;
+				}
+			};
+		}
+		if (testMode) {
+			(window as unknown as { __viewer_store: unknown }).__viewer_store = store;
+		}
 	});
 </script>
 

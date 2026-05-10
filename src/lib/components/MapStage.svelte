@@ -15,6 +15,7 @@
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
+		MAP_REFERENCE_WIDTH,
 		type Annotation,
 		type CameraState,
 		type LabelPosition
@@ -41,6 +42,11 @@
 	const renderMode =
 		typeof window !== 'undefined' &&
 		new URLSearchParams(window.location.search).get('render') === '1';
+	// Test mode: expose `window.__viewer_map` for Playwright to inspect the
+	// projected viewport corners — used by the visual-equivalence test.
+	const testMode =
+		typeof window !== 'undefined' &&
+		new URLSearchParams(window.location.search).get('test') === '1';
 	const ANNOTATION_OPACITY_FLOOR = 0.1;
 
 	let container: HTMLDivElement;
@@ -83,7 +89,19 @@
 	// and annotations render at their natural sprite size. Embeds smaller than
 	// this get smaller annotations; 4K renders get larger ones. Clamped so
 	// extreme viewports don't produce unreadable or absurd sizes.
-	const REFERENCE_WIDTH = 1280;
+	/**
+	 * Zoom offset between the canonical reference viewport and the map's
+	 * current display width. All `CameraState.zoom` values flowing in or out of
+	 * MapStage are reference-relative; the map's actual displayed zoom adds
+	 * this offset, so a smaller display naturally zooms out and a larger one
+	 * zooms in to keep the same geographic content framed at any size.
+	 */
+	function zoomOffset(): number {
+		if (!map) return 0;
+		const w = map.getContainer().clientWidth;
+		if (w <= 0) return 0;
+		return Math.log2(w / MAP_REFERENCE_WIDTH);
+	}
 	const BASE_TEXT_PX = 13;
 
 	// Reactive flag set to true once the annotation source + layer exist on the
@@ -100,7 +118,7 @@
 	function updateContainerScale(): void {
 		if (!map) return;
 		const w = map.getContainer().clientWidth;
-		if (w > 0) containerScale = Math.max(0.5, Math.min(3, w / REFERENCE_WIDTH));
+		if (w > 0) containerScale = Math.max(0.5, Math.min(3, w / MAP_REFERENCE_WIDTH));
 	}
 
 	function onDragMove(e: maplibregl.MapMouseEvent): void {
@@ -219,7 +237,8 @@
 		return {
 			lng: c.lng,
 			lat: c.lat,
-			zoom: map.getZoom(),
+			// Strip the display-size offset so what gets stored is reference-relative.
+			zoom: map.getZoom() - zoomOffset(),
 			pitch: map.getPitch(),
 			bearing: map.getBearing(),
 			roll: map.getRoll()
@@ -236,7 +255,9 @@
 		// crossings (caused by terrain LOD swaps changing the elevation lookup).
 		map.easeTo({
 			center: [cam.lng, cam.lat],
-			zoom: cam.zoom,
+			// Add display-size offset so the map zooms in/out to fit the same
+			// geographic content at any viewport size.
+			zoom: cam.zoom + zoomOffset(),
 			pitch: cam.pitch,
 			bearing: cam.bearing,
 			roll: cam.roll,
@@ -255,11 +276,15 @@
 		const initialSky = untrack(() => store.sky);
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
 		const style = await buildMapStyle(initialId, initialLabels, initialTerrain, initialSky);
+		// Compute the zoom offset from the container directly — `zoomOffset()`
+		// can't run yet because `map` doesn't exist.
+		const initialOffset =
+			container.clientWidth > 0 ? Math.log2(container.clientWidth / MAP_REFERENCE_WIDTH) : 0;
 		map = new maplibregl.Map({
 			container,
 			style,
 			center: [initialCam.lng, initialCam.lat],
-			zoom: initialCam.zoom,
+			zoom: initialCam.zoom + initialOffset,
 			pitch: initialCam.pitch,
 			bearing: initialCam.bearing,
 			roll: initialCam.roll,
@@ -277,11 +302,20 @@
 			maxTileCacheZoomLevels: 20,
 			refreshExpiredTiles: false
 		});
+		if (testMode) {
+			(window as unknown as { __viewer_map: maplibregl.Map }).__viewer_map = map;
+		}
 		map.on('move', () => {
 			if (!map) return;
 			store.liveCamera = readCamera();
 		});
-		map.on('resize', updateContainerScale);
+		map.on('resize', () => {
+			updateContainerScale();
+			// Re-apply the current sampled camera so its display zoom picks up
+			// the new offset; otherwise a window resize would shift the framing.
+			const cam = store.sampledCamera;
+			if (cam) applyCamera(cam);
+		});
 		updateContainerScale();
 		// Click on an annotation marker → select it. Click on empty map → clear
 		// any annotation selection. The marker click handler stops propagation,
@@ -459,22 +493,38 @@
 	const onSatellite = $derived(store.style === 'satellite');
 </script>
 
-<div class="map-stage" data-testid="map-stage">
-	<div bind:this={container} class="map-canvas"></div>
-	<a
-		class="watermark"
-		class:on-satellite={onSatellite}
-		href="https://versatiles.org/sources"
-		target="_blank"
-		rel="noopener noreferrer">VersaTiles</a
-	>
+<div class="map-stage-frame" data-testid="map-stage-frame">
+	<div class="map-stage" data-testid="map-stage">
+		<div bind:this={container} class="map-canvas"></div>
+		<a
+			class="watermark"
+			class:on-satellite={onSatellite}
+			href="https://versatiles.org/sources"
+			target="_blank"
+			rel="noopener noreferrer">VersaTiles</a
+		>
+	</div>
 </div>
 
 <style>
-	.map-stage {
-		position: relative;
+	.map-stage-frame {
+		/* Letterbox / pillarbox container: black bars fill any space the
+		   16:9 map can't claim, so what the editor previews is exactly what the
+		   embed iframe and the rendered video show. */
 		width: 100%;
 		height: 100%;
+		background: #000;
+		display: grid;
+		place-items: center;
+		container-type: size;
+		border-radius: inherit;
+		overflow: hidden;
+	}
+	.map-stage {
+		position: relative;
+		/* Largest 16:9 box that fits inside the frame, centred. */
+		aspect-ratio: 16 / 9;
+		width: min(100cqw, calc(100cqh * 16 / 9));
 		background: #111;
 		/* Make `.map-stage` a query container so the watermark can size itself
 		   relative to the actual map width via `cqw` units. */
@@ -484,7 +534,6 @@
 		   AnnotationPanel — which is a sibling of `.map-stage` and needs to
 		   extend below the map on short viewports. */
 		overflow: hidden;
-		border-radius: inherit;
 	}
 	.map-canvas {
 		width: 100%;
