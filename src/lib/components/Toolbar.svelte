@@ -2,12 +2,7 @@
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import {
-		DEFAULT_ANNOTATION_COLOR,
-		DEFAULT_ANNOTATION_ICON,
-		DEFAULT_TERRAIN,
-		SCHEMA_VERSION
-	} from '../types';
+	import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
 	import { encodeAnimation } from '../url_state';
 
 	let { store }: { store: AnimationStore } = $props();
