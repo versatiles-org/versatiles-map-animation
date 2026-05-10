@@ -11,7 +11,7 @@
  * visibleFrom, visibleUntil.
  */
 
-import { type Codec, enumOf, string as stringCodec, uint, vuint } from '../codec';
+import { type Codec, enumOf, stringCodec, uint, vuint } from '../codec';
 import {
 	ANNOTATION_ICONS,
 	DEFAULT_ANNOTATION_COLOR,
@@ -225,46 +225,36 @@ function positionField(bit: number, key: 'mx' | 'my'): AnnField {
 function makeAnnotationsCodec(maskBits: number, fields: AnnField[]): Codec<WireAnnotation[]> {
 	return {
 		encode(arr, w) {
-			const ins = w.inspector;
-			if (ins) ins.enter('[length]', w.totalBits());
-			vuint.encode(arr.length, w);
-			if (ins) ins.exit('[length]', w.totalBits());
+			w.frame('[length]', () => vuint.encode(arr.length, w));
 
 			let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
 			for (let idx = 0; idx < arr.length; idx++) {
 				const item = arr[idx];
-				if (ins) ins.enter(`[${idx}]`, w.totalBits());
+				w.frame(`[${idx}]`, () => {
+					let mask = 0;
+					for (const f of fields) if (f.shouldEmit(item, prev)) mask |= 1 << f.bit;
 
-				let mask = 0;
-				for (const f of fields) if (f.shouldEmit(item, prev)) mask |= 1 << f.bit;
-
-				if (ins) ins.enter('[mask]', w.totalBits());
-				w.writeBits(mask, maskBits);
-				if (ins) ins.exit('[mask]', w.totalBits());
-
-				for (const f of fields) {
-					if (mask & (1 << f.bit)) {
-						if (ins) ins.enter(f.label, w.totalBits());
-						f.encode(item, prev, w);
-						if (ins) ins.exit(f.label, w.totalBits());
+					w.frame('[mask]', () => w.writeBits(mask, maskBits));
+					for (const f of fields) {
+						if (mask & (1 << f.bit)) {
+							w.frame(f.label, () => f.encode(item, prev, w));
+						}
 					}
-				}
 
-				if (ins) ins.exit(`[${idx}]`, w.totalBits());
-
-				const next: WireAnnotation = { ...prev };
-				const nextBag = next as unknown as Record<string, unknown>;
-				const itemBag = item as unknown as Record<string, unknown>;
-				for (const f of fields) {
-					if (f.carryForward === 'none') {
-						// Halo-style: never inherit; reset to undefined regardless of mask.
-						nextBag[f.label] = undefined;
-					} else if (mask & (1 << f.bit)) {
-						if (f.apply) f.apply(next, item);
-						else nextBag[f.label] = itemBag[f.label];
+					const next: WireAnnotation = { ...prev };
+					const nextBag = next as unknown as Record<string, unknown>;
+					const itemBag = item as unknown as Record<string, unknown>;
+					for (const f of fields) {
+						if (f.carryForward === 'none') {
+							// Halo-style: never inherit; reset to undefined regardless of mask.
+							nextBag[f.label] = undefined;
+						} else if (mask & (1 << f.bit)) {
+							if (f.apply) f.apply(next, item);
+							else nextBag[f.label] = itemBag[f.label];
+						}
 					}
-				}
-				prev = next;
+					prev = next;
+				});
 			}
 		},
 		decode(r) {

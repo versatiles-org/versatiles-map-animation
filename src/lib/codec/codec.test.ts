@@ -6,23 +6,23 @@ import {
 	base64UrlToBytes,
 	bool,
 	bytesToBase64Url,
-	deltaArray,
 	enumOf,
 	fixed,
 	optional,
 	pack,
-	packBase64Url,
 	sint,
-	string,
+	stringCodec,
 	struct,
 	type Codec,
 	ufixed,
 	uint,
 	unpack,
-	unpackBase64Url,
 	vsint,
 	vuint
 } from '.';
+
+const packBase64 = <T>(c: Codec<T>, v: T) => bytesToBase64Url(pack(c, v));
+const unpackBase64 = <T>(c: Codec<T>, s: string) => unpack(c, base64UrlToBytes(s));
 
 describe('BitWriter / BitReader', () => {
 	it('round-trips non-byte-aligned widths', () => {
@@ -253,69 +253,18 @@ describe('struct', () => {
 	});
 });
 
-describe('deltaArray', () => {
-	const Frame = deltaArray(
-		{
-			t: vuint,
-			x: uint(8),
-			y: uint(8),
-			tag: bool
-		},
-		{ t: 0, x: 0, y: 0, tag: false }
-	);
-
-	it('round-trips when every element changes everything', () => {
-		const arr = [
-			{ t: 1, x: 10, y: 20, tag: true },
-			{ t: 2, x: 30, y: 40, tag: false }
-		];
-		expect(unpack(Frame, pack(Frame, arr))).toEqual(arr);
-	});
-
-	it('omits unchanged fields on the wire', () => {
-		// Compare a 10-frame "all identical" series vs a 10-frame "all-different
-		// every step" series. The identical run encodes only one field-bearing
-		// frame (the rest are mask-only); the different run carries every field.
-		const seed = { t: 5, x: 10, y: 20, tag: true };
-		const same = Array.from({ length: 10 }, () => ({ ...seed }));
-		const diff = Array.from({ length: 10 }, (_, i) => ({
-			t: i + 1,
-			x: (i * 7) & 0xff,
-			y: (i * 13) & 0xff,
-			tag: i % 2 === 0
-		}));
-		expect(pack(Frame, same).length).toBeLessThan(pack(Frame, diff).length);
-		expect(unpack(Frame, pack(Frame, same))).toEqual(same);
-		expect(unpack(Frame, pack(Frame, diff))).toEqual(diff);
-	});
-
-	it('first element is compared against defaults', () => {
-		const arr = [
-			{ t: 0, x: 0, y: 0, tag: false }, // matches defaults entirely → mask=0, no fields
-			{ t: 0, x: 0, y: 0, tag: false }
-		];
-		// Length (vuint=5 bits) + 2× mask(4 bits) = 13 bits → 2 bytes.
-		expect(pack(Frame, arr).length).toBe(2);
-		expect(unpack(Frame, pack(Frame, arr))).toEqual(arr);
-	});
-
-	it('round-trips an empty array', () => {
-		expect(unpack(Frame, pack(Frame, []))).toEqual([]);
-	});
-});
-
-describe('string', () => {
+describe('stringCodec', () => {
 	it('round-trips ascii', () => {
-		expect(unpack(string, pack(string, 'hello world'))).toBe('hello world');
+		expect(unpack(stringCodec, pack(stringCodec, 'hello world'))).toBe('hello world');
 	});
 	it('round-trips unicode (multi-byte UTF-8)', () => {
-		expect(unpack(string, pack(string, 'Köln 🦊 北京'))).toBe('Köln 🦊 北京');
+		expect(unpack(stringCodec, pack(stringCodec, 'Köln 🦊 北京'))).toBe('Köln 🦊 北京');
 	});
 	it('round-trips the empty string', () => {
-		expect(unpack(string, pack(string, ''))).toBe('');
+		expect(unpack(stringCodec, pack(stringCodec, ''))).toBe('');
 	});
 	it('survives byte-misalignment when nested in a struct', () => {
-		const c = struct({ a: bool, s: string, b: uint(3) });
+		const c = struct({ a: bool, s: stringCodec, b: uint(3) });
 		const value = { a: true, s: 'mid', b: 5 };
 		expect(unpack(c, pack(c, value))).toEqual(value);
 	});
@@ -324,21 +273,17 @@ describe('string', () => {
 describe('base64-url helpers', () => {
 	it('round-trip arbitrary bytes', () => {
 		const bytes = new Uint8Array([0, 1, 2, 0xff, 0x80]);
-		expect(Array.from(base64UrlToBytes(bytes64(bytes)))).toEqual(Array.from(bytes));
+		expect(Array.from(base64UrlToBytes(bytesToBase64Url(bytes)))).toEqual(Array.from(bytes));
 	});
 	it('produces URL-safe characters only', () => {
-		const s = packBase64Url(uint(32), 0xfff_ffff);
+		const s = packBase64(uint(32), 0xfff_ffff);
 		expect(s).toMatch(/^[A-Za-z0-9_-]+$/);
 	});
-	it('packBase64Url round-trips', () => {
+	it('round-trips a struct via base64', () => {
 		const c: Codec<{ a: number; b: boolean }> = struct({ a: uint(16), b: bool });
-		const s = packBase64Url(c, { a: 12345, b: true });
-		expect(unpackBase64Url(c, s)).toEqual({ a: 12345, b: true });
+		const s = packBase64(c, { a: 12345, b: true });
+		expect(unpackBase64(c, s)).toEqual({ a: 12345, b: true });
 	});
-
-	function bytes64(b: Uint8Array): string {
-		return bytesToBase64Url(b);
-	}
 });
 
 describe('end-to-end animation-shaped schema', () => {
@@ -346,8 +291,8 @@ describe('end-to-end animation-shaped schema', () => {
 		version: uint(4),
 		style: enumOf(['colorful', 'satellite', 'satellite-overlay']),
 		terrain: bool,
-		keyframes: deltaArray(
-			{
+		keyframes: array(
+			struct({
 				t: vuint,
 				lng: fixed(29, 1e6),
 				lat: fixed(28, 1e6),
@@ -356,8 +301,7 @@ describe('end-to-end animation-shaped schema', () => {
 				bearing: fixed(16, 100),
 				roll: fixed(16, 100),
 				path: enumOf(['arc', 'linear'])
-			},
-			{ t: 0, lng: 0, lat: 0, zoom: 0, pitch: 0, bearing: 0, roll: 0, path: 'arc' }
+			})
 		)
 	});
 
@@ -409,8 +353,8 @@ describe('end-to-end animation-shaped schema', () => {
 				}
 			]
 		};
-		const s = packBase64Url(Animation, value);
-		const back = unpackBase64Url(Animation, s);
+		const s = packBase64(Animation, value);
+		const back = unpackBase64(Animation, s);
 		expect(back.version).toBe(1);
 		expect(back.style).toBe('satellite');
 		expect(back.terrain).toBe(true);
@@ -470,9 +414,10 @@ describe('end-to-end animation-shaped schema', () => {
 			]
 		};
 		const compactJson = JSON.stringify(value);
-		const binary = packBase64Url(Animation, value);
-		// Aim: at least 3× smaller than minified JSON. Don't make this brittle —
-		// just sanity-check that we're not regressing.
-		expect(binary.length * 3).toBeLessThan(compactJson.length);
+		const binary = packBase64(Animation, value);
+		// Even with `array(struct(...))` (no carry-forward delta encoding —
+		// the project's real codec is hand-rolled in url_state/), the bit-packed
+		// form should still beat minified JSON by a large margin.
+		expect(binary.length * 2).toBeLessThan(compactJson.length);
 	});
 });

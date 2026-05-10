@@ -32,7 +32,7 @@ export function inspect<T>(codec: Codec<T>, value: T): InspectionNode {
 			stack[stack.length - 1].children.push(node);
 			stack.push(node);
 		},
-		exit(_label, bit) {
+		exit(bit) {
 			const node = stack.pop();
 			if (node) node.bits = bit - node._start;
 		}

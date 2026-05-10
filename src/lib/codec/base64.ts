@@ -1,9 +1,7 @@
 /**
- * Base64-URL helpers (URL-safe, no padding) and codec wrappers that encode
- * straight to / from a base64-url string.
+ * Base64-URL encoding helpers (URL-safe alphabet, no padding).
+ * Used by the URL hash to ferry the bit-packed binary payload.
  */
-
-import { pack, unpack, type Codec } from './core';
 
 export function bytesToBase64Url(bytes: Uint8Array): string {
 	let binary = '';
@@ -18,12 +16,4 @@ export function base64UrlToBytes(s: string): Uint8Array {
 	const bytes = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 	return bytes;
-}
-
-export function packBase64Url<T>(codec: Codec<T>, value: T): string {
-	return bytesToBase64Url(pack(codec, value));
-}
-
-export function unpackBase64Url<T>(codec: Codec<T>, s: string): T {
-	return unpack(codec, base64UrlToBytes(s));
 }

@@ -2,9 +2,9 @@
  * Bit-stream substrate + the `Codec<T>` interface that every codec implements.
  *
  * Codecs are values that know how to read and write a TypeScript type from a
- * bit stream. They compose: `struct({...})`, `array(...)`, `optional(...)`,
- * `deltaArray(...)`. The codec's static type matches the value it encodes,
- * so the schema *is* the type.
+ * bit stream. They compose: `struct({...})`, `array(...)`, `optional(...)`.
+ * The codec's static type matches the value it encodes, so the schema *is*
+ * the type.
  *
  *   const Frame = struct({
  *     t: vuint,
@@ -24,14 +24,13 @@
  */
 
 /**
- * Optional hook that combinators call around each sub-codec's encode, so that
- * `inspect()` can build a tree of "where the bits went". Set to `undefined`
- * (the default) for production use — the per-call overhead is then a single
- * `?.` check.
+ * Optional tracing hook called by `BitWriter.frame()` so that `inspect()` can
+ * build a tree of "where the bits went". Set to `undefined` (the default) for
+ * production use — the per-call overhead is then a single null-check.
  */
 export interface Inspector {
 	enter(label: string, bit: number): void;
-	exit(label: string, bit: number): void;
+	exit(bit: number): void;
 }
 
 export class BitWriter {
@@ -46,6 +45,22 @@ export class BitWriter {
 	/** Number of bits written so far (not counting the trailing pad in finish()). */
 	totalBits(): number {
 		return this.total;
+	}
+
+	/**
+	 * Run `fn` with this writer wrapped in an inspector frame named `label`.
+	 * Codecs use this to attribute their bit cost to a tree node when an
+	 * inspector is attached; with no inspector it's just `fn()`.
+	 */
+	frame<T>(label: string, fn: () => T): T {
+		const ins = this.inspector;
+		if (!ins) return fn();
+		ins.enter(label, this.total);
+		try {
+			return fn();
+		} finally {
+			ins.exit(this.total);
+		}
 	}
 
 	/** Write the low `n` bits of `value` to the stream, MSB-first. */

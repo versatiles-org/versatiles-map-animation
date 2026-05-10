@@ -125,75 +125,65 @@ function decodeMercatorAxisDelta(prev: number, zoom: number, r: BitReader): numb
  */
 export const keyframesCodec: Codec<WireKeyframe[]> = {
 	encode(arr, w) {
-		const ins = w.inspector;
-		if (ins) ins.enter('[length]', w.totalBits());
-		vuint.encode(arr.length, w);
-		if (ins) ins.exit('[length]', w.totalBits());
+		w.frame('[length]', () => vuint.encode(arr.length, w));
 
 		let prev: WireKeyframe = { ...KEYFRAME_DEFAULTS };
 		let mxHasPrior = false;
 		let myHasPrior = false;
 		for (let idx = 0; idx < arr.length; idx++) {
 			const item = arr[idx];
-			if (ins) ins.enter(`[${idx}]`, w.totalBits());
+			w.frame(`[${idx}]`, () => {
+				// Mask: zoom and non-position fields use direct equality; position
+				// uses precision-aware comparison at the (post-merge) zoom.
+				let mask = 0;
+				if (item.t !== prev.t) mask |= 1 << 0;
+				if (item.zoom !== prev.zoom) mask |= 1 << 1;
+				const effZoom = mask & 0b00000010 ? item.zoom : prev.zoom;
+				if (quantize(item.mx, effZoom) !== quantize(prev.mx, effZoom)) mask |= 1 << 2;
+				if (quantize(item.my, effZoom) !== quantize(prev.my, effZoom)) mask |= 1 << 3;
+				if (item.pitch !== prev.pitch) mask |= 1 << 4;
+				if (item.bearing !== prev.bearing) mask |= 1 << 5;
+				if (item.roll !== prev.roll) mask |= 1 << 6;
+				if (item.path !== prev.path) mask |= 1 << 7;
 
-			// Mask: zoom and non-position fields use direct equality; position
-			// uses precision-aware comparison at the (post-merge) zoom.
-			let mask = 0;
-			if (item.t !== prev.t) mask |= 1 << 0;
-			if (item.zoom !== prev.zoom) mask |= 1 << 1;
-			const effZoom = mask & 0b00000010 ? item.zoom : prev.zoom;
-			if (quantize(item.mx, effZoom) !== quantize(prev.mx, effZoom)) mask |= 1 << 2;
-			if (quantize(item.my, effZoom) !== quantize(prev.my, effZoom)) mask |= 1 << 3;
-			if (item.pitch !== prev.pitch) mask |= 1 << 4;
-			if (item.bearing !== prev.bearing) mask |= 1 << 5;
-			if (item.roll !== prev.roll) mask |= 1 << 6;
-			if (item.path !== prev.path) mask |= 1 << 7;
+				w.frame('[mask]', () => w.writeBits(mask, 8));
 
-			if (ins) ins.enter('[mask]', w.totalBits());
-			w.writeBits(mask, 8);
-			if (ins) ins.exit('[mask]', w.totalBits());
+				const writeField = <T>(name: keyof WireKeyframe, c: Codec<T>, value: T) =>
+					w.frame(name, () => c.encode(value, w));
 
-			const writeField = <T>(name: keyof WireKeyframe, c: Codec<T>, value: T) => {
-				if (ins) ins.enter(name, w.totalBits());
-				c.encode(value, w);
-				if (ins) ins.exit(name, w.totalBits());
-			};
+				if (mask & (1 << 0)) writeField('t', tCodec, item.t);
+				if (mask & (1 << 1)) writeField('zoom', zoomCodec, item.zoom);
+				if (mask & (1 << 2)) {
+					w.frame('mx', () => {
+						if (mxHasPrior) encodeMercatorAxisDelta(item.mx, prev.mx, effZoom, w);
+						else encodeMercatorAxisAbsolute(item.mx, effZoom, w);
+					});
+					mxHasPrior = true;
+				}
+				if (mask & (1 << 3)) {
+					w.frame('my', () => {
+						if (myHasPrior) encodeMercatorAxisDelta(item.my, prev.my, effZoom, w);
+						else encodeMercatorAxisAbsolute(item.my, effZoom, w);
+					});
+					myHasPrior = true;
+				}
+				if (mask & (1 << 4)) writeField('pitch', pitchCodec, item.pitch);
+				if (mask & (1 << 5)) writeField('bearing', bearingCodec, item.bearing);
+				if (mask & (1 << 6)) writeField('roll', rollCodec, item.roll);
+				if (mask & (1 << 7)) writeField('path', pathCodec, item.path);
 
-			if (mask & (1 << 0)) writeField('t', tCodec, item.t);
-			if (mask & (1 << 1)) writeField('zoom', zoomCodec, item.zoom);
-			if (mask & (1 << 2)) {
-				if (ins) ins.enter('mx', w.totalBits());
-				if (mxHasPrior) encodeMercatorAxisDelta(item.mx, prev.mx, effZoom, w);
-				else encodeMercatorAxisAbsolute(item.mx, effZoom, w);
-				if (ins) ins.exit('mx', w.totalBits());
-				mxHasPrior = true;
-			}
-			if (mask & (1 << 3)) {
-				if (ins) ins.enter('my', w.totalBits());
-				if (myHasPrior) encodeMercatorAxisDelta(item.my, prev.my, effZoom, w);
-				else encodeMercatorAxisAbsolute(item.my, effZoom, w);
-				if (ins) ins.exit('my', w.totalBits());
-				myHasPrior = true;
-			}
-			if (mask & (1 << 4)) writeField('pitch', pitchCodec, item.pitch);
-			if (mask & (1 << 5)) writeField('bearing', bearingCodec, item.bearing);
-			if (mask & (1 << 6)) writeField('roll', rollCodec, item.roll);
-			if (mask & (1 << 7)) writeField('path', pathCodec, item.path);
-
-			if (ins) ins.exit(`[${idx}]`, w.totalBits());
-
-			// Update `prev` to mirror exactly what the decoder will see.
-			const next: WireKeyframe = { ...prev };
-			if (mask & (1 << 0)) next.t = item.t; // tCodec is ms-quantized; close enough
-			if (mask & (1 << 1)) next.zoom = item.zoom;
-			if (mask & (1 << 2)) next.mx = dequantize(quantize(item.mx, effZoom), effZoom);
-			if (mask & (1 << 3)) next.my = dequantize(quantize(item.my, effZoom), effZoom);
-			if (mask & (1 << 4)) next.pitch = item.pitch;
-			if (mask & (1 << 5)) next.bearing = item.bearing;
-			if (mask & (1 << 6)) next.roll = item.roll;
-			if (mask & (1 << 7)) next.path = item.path;
-			prev = next;
+				// Update `prev` to mirror exactly what the decoder will see.
+				const next: WireKeyframe = { ...prev };
+				if (mask & (1 << 0)) next.t = item.t; // tCodec is ms-quantized; close enough
+				if (mask & (1 << 1)) next.zoom = item.zoom;
+				if (mask & (1 << 2)) next.mx = dequantize(quantize(item.mx, effZoom), effZoom);
+				if (mask & (1 << 3)) next.my = dequantize(quantize(item.my, effZoom), effZoom);
+				if (mask & (1 << 4)) next.pitch = item.pitch;
+				if (mask & (1 << 5)) next.bearing = item.bearing;
+				if (mask & (1 << 6)) next.roll = item.roll;
+				if (mask & (1 << 7)) next.path = item.path;
+				prev = next;
+			});
 		}
 	},
 	decode(r) {

@@ -5,9 +5,10 @@
  *
  * Topology:
  *   core        — BitReader / BitWriter / Codec / pack / unpack
- *   base64      — base64-url helpers + base64 wrappers around pack/unpack
- *   primitives  — bool / uint / sint / vuint / vsint / fixed / ufixed / string / enumOf
- *   combinators — optional / array / struct / deltaArray
+ *   base64      — base64-url byte ↔ string helpers
+ *   primitives  — bool / uint / sint / ufixed / fixed / vuint / vsint /
+ *                 stringCodec / enumOf
+ *   combinators — optional / array / struct
  *   inspect     — bit-cost tree + formatter for debugging URL size
  */
 

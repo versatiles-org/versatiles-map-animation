@@ -1,5 +1,9 @@
 /**
  * Primitive codecs — single-value reads/writes that don't take other codecs.
+ *
+ * Order: cheap fixed-width primitives first (bool, uint, sint), then their
+ * fixed-point wrappers, then variable-width (vuint, vsint), then larger
+ * containers (stringCodec, enumOf).
  */
 
 import type { Codec } from './core';
@@ -46,6 +50,24 @@ export function sint(bits: number): Codec<number> {
 			// Sign-extend if the top bit is set.
 			return u & signBit ? u | ~widthMask : u;
 		}
+	};
+}
+
+/** Unsigned fixed-point: `Math.round(v * scale)` stored as `uint(bits)`. */
+export function ufixed(bits: number, scale: number): Codec<number> {
+	const inner = uint(bits);
+	return {
+		encode: (v, w) => inner.encode(Math.round(v * scale), w),
+		decode: (r) => inner.decode(r) / scale
+	};
+}
+
+/** Signed fixed-point: `Math.round(v * scale)` stored as `sint(bits)`. */
+export function fixed(bits: number, scale: number): Codec<number> {
+	const inner = sint(bits);
+	return {
+		encode: (v, w) => inner.encode(Math.round(v * scale), w),
+		decode: (r) => inner.decode(r) / scale
 	};
 }
 
@@ -97,30 +119,12 @@ export const vsint: Codec<number> = {
 	}
 };
 
-/** Unsigned fixed-point: `Math.round(v * scale)` stored as `uint(bits)`. */
-export function ufixed(bits: number, scale: number): Codec<number> {
-	const inner = uint(bits);
-	return {
-		encode: (v, w) => inner.encode(Math.round(v * scale), w),
-		decode: (r) => inner.decode(r) / scale
-	};
-}
-
-/** Signed fixed-point: `Math.round(v * scale)` stored as `sint(bits)`. */
-export function fixed(bits: number, scale: number): Codec<number> {
-	const inner = sint(bits);
-	return {
-		encode: (v, w) => inner.encode(Math.round(v * scale), w),
-		decode: (r) => inner.decode(r) / scale
-	};
-}
-
 /**
  * A length-prefixed UTF-8 string. Cheap for short strings (5 bits length +
  * 8 bits per byte); use sparingly — strings are the worst offender for URL
  * size in our schema.
  */
-export const string: Codec<string> = {
+export const stringCodec: Codec<string> = {
 	encode: (s, w) => {
 		const bytes = new TextEncoder().encode(s);
 		vuint.encode(bytes.length, w);
