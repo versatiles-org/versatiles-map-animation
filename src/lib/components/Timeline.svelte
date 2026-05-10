@@ -43,28 +43,43 @@
 		return start + (x / rect.width) * span;
 	}
 
+	/**
+	 * Pointer-drag boilerplate: captures the pointer on `el`, registers
+	 * `pointermove` + `pointerup` + `pointercancel` on window, and on release
+	 * (or cancel) releases capture, removes all three listeners, and runs the
+	 * optional `onUp`. Every drag handler in this file is built on top of this.
+	 */
+	function capturePointer(
+		el: HTMLElement,
+		e: PointerEvent,
+		cb: { onMove: (ev: PointerEvent) => void; onUp?: (ev: PointerEvent) => void }
+	): void {
+		el.setPointerCapture(e.pointerId);
+		function up(ev: PointerEvent) {
+			if (el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
+			window.removeEventListener('pointermove', cb.onMove);
+			window.removeEventListener('pointerup', up);
+			window.removeEventListener('pointercancel', up);
+			cb.onUp?.(ev);
+		}
+		window.addEventListener('pointermove', cb.onMove);
+		window.addEventListener('pointerup', up);
+		window.addEventListener('pointercancel', up);
+	}
+
 	function startScrub(e: PointerEvent) {
 		const target = e.target as HTMLElement;
 		if (target.closest('.marker')) return;
 		e.preventDefault();
-		trackEl.setPointerCapture(e.pointerId);
 		store.pause();
 		store.isScrubbing = true;
 		store.seekTo(tFromClientX(e.clientX));
-
-		function onMove(ev: PointerEvent) {
-			store.seekTo(tFromClientX(ev.clientX));
-		}
-		function onUp(ev: PointerEvent) {
-			if (trackEl.hasPointerCapture(ev.pointerId)) trackEl.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('pointercancel', onUp);
-			store.isScrubbing = false;
-		}
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('pointercancel', onUp);
+		capturePointer(trackEl, e, {
+			onMove: (ev) => store.seekTo(tFromClientX(ev.clientX)),
+			onUp: () => {
+				store.isScrubbing = false;
+			}
+		});
 	}
 
 	// ---------------------------------------------------------------------------
@@ -86,58 +101,46 @@
 		e.preventDefault();
 		const idx = store.selectedAnnotationIndex;
 		if (idx === null) return;
-		const handle = e.target as HTMLElement;
-		handle.setPointerCapture(e.pointerId);
 		store.pause();
 		store.isScrubbing = true; // lifts the edit-mode floor — real opacity preview
+		capturePointer(e.target as HTMLElement, e, {
+			onMove: (ev) => {
+				const ann = store.selectedAnnotation;
+				if (!ann) return;
+				const t = Math.max(0, tFromClientX(ev.clientX));
+				const vFrom = ann.visibleFrom;
+				const vUntil = ann.visibleUntil;
+				const fIn = Math.max(0, ann.fadeIn ?? 0);
 
-		function onMove(ev: PointerEvent) {
-			const ann = store.selectedAnnotation;
-			if (!ann || idx === null) return;
-			const t = Math.max(0, tFromClientX(ev.clientX));
-			const vFrom = ann.visibleFrom;
-			const vUntil = ann.visibleUntil;
-			const fIn = Math.max(0, ann.fadeIn ?? 0);
-			const fOut = Math.max(0, ann.fadeOut ?? 0);
-
-			if (kind === 'fadeIn' && vFrom !== undefined) {
-				// Outer-left tip = visibleFrom - fadeIn → fadeIn = vFrom - tip.
-				// Clamp tip ≤ vFrom (no negative fade) and tip ≥ 0 (no negative time).
-				const tip = Math.min(vFrom, Math.max(0, t));
-				store.updateAnnotation(idx, { fadeIn: round2(vFrom - tip) });
-			} else if (kind === 'visibleFrom' && vFrom !== undefined) {
-				// Inner-left translates visibleFrom; fadeIn stays the same so the
-				// outer tip moves with it. Clamp so the tip doesn't go negative
-				// and visibleFrom stays below visibleUntil.
-				const max = vUntil !== undefined ? vUntil - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
-				const min = fIn; // visibleFrom - fadeIn ≥ 0 ⇒ visibleFrom ≥ fadeIn
-				store.updateAnnotation(idx, {
-					visibleFrom: round2(Math.max(min, Math.min(max, t)))
-				});
-			} else if (kind === 'visibleUntil' && vUntil !== undefined) {
-				const min = vFrom !== undefined ? vFrom + ANN_MIN_GAP : 0;
-				store.updateAnnotation(idx, {
-					visibleUntil: round2(Math.max(min, t))
-				});
-			} else if (kind === 'fadeOut' && vUntil !== undefined) {
-				// Outer-right tip = visibleUntil + fadeOut → fadeOut = tip - vUntil.
-				const tip = Math.max(vUntil, t);
-				store.updateAnnotation(idx, { fadeOut: round2(tip - vUntil) });
+				if (kind === 'fadeIn' && vFrom !== undefined) {
+					// Outer-left tip = visibleFrom - fadeIn → fadeIn = vFrom - tip.
+					// Clamp tip ≤ vFrom (no negative fade) and tip ≥ 0 (no negative time).
+					const tip = Math.min(vFrom, Math.max(0, t));
+					store.updateAnnotation(idx, { fadeIn: round2(vFrom - tip) });
+				} else if (kind === 'visibleFrom' && vFrom !== undefined) {
+					// Inner-left translates visibleFrom; fadeIn stays the same so the
+					// outer tip moves with it. Clamp so the tip doesn't go negative
+					// and visibleFrom stays below visibleUntil.
+					const max = vUntil !== undefined ? vUntil - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
+					const min = fIn; // visibleFrom - fadeIn ≥ 0 ⇒ visibleFrom ≥ fadeIn
+					store.updateAnnotation(idx, {
+						visibleFrom: round2(Math.max(min, Math.min(max, t)))
+					});
+				} else if (kind === 'visibleUntil' && vUntil !== undefined) {
+					const min = vFrom !== undefined ? vFrom + ANN_MIN_GAP : 0;
+					store.updateAnnotation(idx, {
+						visibleUntil: round2(Math.max(min, t))
+					});
+				} else if (kind === 'fadeOut' && vUntil !== undefined) {
+					// Outer-right tip = visibleUntil + fadeOut → fadeOut = tip - vUntil.
+					const tip = Math.max(vUntil, t);
+					store.updateAnnotation(idx, { fadeOut: round2(tip - vUntil) });
+				}
+			},
+			onUp: () => {
+				store.isScrubbing = false;
 			}
-			// `fOut` participates only in the outer-right branch's bookkeeping;
-			// other branches don't read it. Reference it to keep TS quiet.
-			void fOut;
-		}
-		function onUp(ev: PointerEvent) {
-			handle.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('pointercancel', onUp);
-			store.isScrubbing = false;
-		}
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('pointercancel', onUp);
+		});
 	}
 
 	function startAnnBarDrag(e: PointerEvent): void {
@@ -154,59 +157,44 @@
 		const startVUntil = ann.visibleUntil;
 		const fIn = Math.max(0, ann.fadeIn ?? 0);
 		const startT = tFromClientX(e.clientX);
-		const handle = e.target as HTMLElement;
-		handle.setPointerCapture(e.pointerId);
 		store.pause();
 		store.isScrubbing = true;
-
-		function onMove(ev: PointerEvent) {
-			if (idx === null) return;
-			let dt = tFromClientX(ev.clientX) - startT;
-			// Don't push the fade-in tip past 0 (and therefore never below 0).
-			const minDt = fIn - startVFrom;
-			if (dt < minDt) dt = minDt;
-			store.updateAnnotation(idx, {
-				visibleFrom: round2(startVFrom + dt),
-				visibleUntil: round2(startVUntil + dt)
-			});
-		}
-		function onUp(ev: PointerEvent) {
-			handle.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('pointercancel', onUp);
-			store.isScrubbing = false;
-		}
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('pointercancel', onUp);
+		capturePointer(e.target as HTMLElement, e, {
+			onMove: (ev) => {
+				let dt = tFromClientX(ev.clientX) - startT;
+				// Don't push the fade-in tip past 0 (and therefore never below 0).
+				const minDt = fIn - startVFrom;
+				if (dt < minDt) dt = minDt;
+				store.updateAnnotation(idx, {
+					visibleFrom: round2(startVFrom + dt),
+					visibleUntil: round2(startVUntil + dt)
+				});
+			},
+			onUp: () => {
+				store.isScrubbing = false;
+			}
+		});
 	}
 
 	function startDragMarker(e: PointerEvent, index: number) {
 		e.stopPropagation();
 		e.preventDefault();
-		const handle = e.target as HTMLElement;
-		handle.setPointerCapture(e.pointerId);
 		store.selectAt(index);
 		store.pause();
 		// Dragging a keyframe re-seeks the playhead each frame, so it's a scrub
 		// in disguise — flag it so the editor's edit-mode chrome bows out and
 		// the user sees the real animation pose at the dragged time.
 		store.isScrubbing = true;
-
-		function onMove(ev: PointerEvent) {
-			store.setKeyframeTime(index, tFromClientX(ev.clientX));
-			const kf = store.keyframes[index];
-			if (kf) store.currentTime = kf.t;
-		}
-		function onUp(ev: PointerEvent) {
-			handle.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			store.isScrubbing = false;
-		}
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
+		capturePointer(e.target as HTMLElement, e, {
+			onMove: (ev) => {
+				store.setKeyframeTime(index, tFromClientX(ev.clientX));
+				const kf = store.keyframes[index];
+				if (kf) store.currentTime = kf.t;
+			},
+			onUp: () => {
+				store.isScrubbing = false;
+			}
+		});
 	}
 
 	function zoomAt(factor: number, anchorClientX: number) {
@@ -243,7 +231,6 @@
 	function startPanbarDrag(e: PointerEvent, mode: 'pan' | 'left' | 'right') {
 		e.preventDefault();
 		e.stopPropagation();
-		panbarEl.setPointerCapture(e.pointerId);
 		const startStart = start;
 		const startEnd = end;
 		const rect = panbarEl.getBoundingClientRect();
@@ -252,34 +239,26 @@
 		// happens when the user drags past the current end).
 		const initialMax = panbarMax;
 		const startX = e.clientX;
-
-		function onMove(ev: PointerEvent) {
-			const dT = ((ev.clientX - startX) / rect.width) * initialMax;
-			if (mode === 'pan') {
-				viewSpan = startEnd - startStart;
-				viewStart = startStart + dT;
-			} else if (mode === 'left') {
-				const newStart = Math.min(startEnd - MIN_SPAN, Math.max(0, startStart + dT));
-				viewSpan = startEnd - newStart;
-				viewStart = newStart;
-			} else {
-				const newEnd = Math.max(
-					startStart + MIN_SPAN,
-					Math.min(MAX_SPAN + startStart, startEnd + dT)
-				);
-				viewSpan = newEnd - startStart;
-				viewStart = startStart;
+		capturePointer(panbarEl, e, {
+			onMove: (ev) => {
+				const dT = ((ev.clientX - startX) / rect.width) * initialMax;
+				if (mode === 'pan') {
+					viewSpan = startEnd - startStart;
+					viewStart = startStart + dT;
+				} else if (mode === 'left') {
+					const newStart = Math.min(startEnd - MIN_SPAN, Math.max(0, startStart + dT));
+					viewSpan = startEnd - newStart;
+					viewStart = newStart;
+				} else {
+					const newEnd = Math.max(
+						startStart + MIN_SPAN,
+						Math.min(MAX_SPAN + startStart, startEnd + dT)
+					);
+					viewSpan = newEnd - startStart;
+					viewStart = startStart;
+				}
 			}
-		}
-		function onUp(ev: PointerEvent) {
-			if (panbarEl.hasPointerCapture(ev.pointerId)) panbarEl.releasePointerCapture(ev.pointerId);
-			window.removeEventListener('pointermove', onMove);
-			window.removeEventListener('pointerup', onUp);
-			window.removeEventListener('pointercancel', onUp);
-		}
-		window.addEventListener('pointermove', onMove);
-		window.addEventListener('pointerup', onUp);
-		window.addEventListener('pointercancel', onUp);
+		});
 	}
 
 	function onPanbarPointerDown(e: PointerEvent) {

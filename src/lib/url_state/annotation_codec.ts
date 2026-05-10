@@ -392,9 +392,17 @@ function formatHexColor(rgb: number): string {
 // labelPosition validity) stay as inline special cases below.
 // ---------------------------------------------------------------------------
 
-interface FieldSpec {
+export interface FieldSpec {
+	/** Field key (Annotation key === WireAnnotation key for everything in here). */
+	key: string;
 	toWire(ann: Annotation, wire: WireAnnotation): void;
 	fromWire(wire: WireAnnotation, out: Annotation): void;
+	/**
+	 * Read this field from a raw JSON record (during file-import validation).
+	 * Throws on type mismatch (with index for error context); silently skips
+	 * when the field is absent or undefined.
+	 */
+	fromJson(raw: Record<string, unknown>, out: Annotation, idx: number): void;
 }
 
 /** Carry-forward numeric field with a default. */
@@ -403,6 +411,7 @@ function numField<K extends keyof Annotation & keyof WireAnnotation>(
 	defaultVal: number
 ): FieldSpec {
 	return {
+		key,
 		toWire(ann, wire) {
 			(wire as unknown as Record<string, unknown>)[key] = Math.max(
 				0,
@@ -412,22 +421,31 @@ function numField<K extends keyof Annotation & keyof WireAnnotation>(
 		fromWire(wire, out) {
 			const v = (wire as unknown as Record<string, unknown>)[key] as number;
 			if (v !== defaultVal) (out as unknown as Record<string, unknown>)[key] = v;
+		},
+		fromJson(raw, out, idx) {
+			const v = raw[key];
+			if (v === undefined) return;
+			if (typeof v !== 'number' || !Number.isFinite(v)) {
+				throw new Error(`Annotation ${idx}: invalid "${key}".`);
+			}
+			(out as unknown as Record<string, unknown>)[key] = Math.max(0, v);
 		}
 	};
 }
 
 /** Hex-colour field with a named string default and matching int default. */
-function colorField(
-	key: 'labelColor',
-	defaultStr: string,
-	defaultInt: number
-): FieldSpec {
+function colorField(key: 'labelColor', defaultStr: string, defaultInt: number): FieldSpec {
 	return {
+		key,
 		toWire(ann, wire) {
 			wire[key] = parseHexColor(ann[key] ?? defaultStr);
 		},
 		fromWire(wire, out) {
 			if (wire[key] !== defaultInt) out[key] = formatHexColor(wire[key]);
+		},
+		fromJson(raw, out) {
+			const v = raw[key];
+			if (typeof v === 'string') out[key] = v;
 		}
 	};
 }
@@ -435,11 +453,20 @@ function colorField(
 /** Present-only halo width — undefined ↔ undefined; clamp ≥ 0. */
 function presentNumField(key: 'labelHaloWidth' | 'iconHaloWidth'): FieldSpec {
 	return {
+		key,
 		toWire(ann, wire) {
 			wire[key] = ann[key] != null ? Math.max(0, ann[key]!) : undefined;
 		},
 		fromWire(wire, out) {
 			if (wire[key] !== undefined) out[key] = wire[key];
+		},
+		fromJson(raw, out, idx) {
+			const v = raw[key];
+			if (v === undefined) return;
+			if (typeof v !== 'number' || !Number.isFinite(v)) {
+				throw new Error(`Annotation ${idx}: invalid "${key}".`);
+			}
+			out[key] = Math.max(0, v);
 		}
 	};
 }
@@ -447,16 +474,21 @@ function presentNumField(key: 'labelHaloWidth' | 'iconHaloWidth'): FieldSpec {
 /** Present-only halo colour — undefined ↔ undefined. */
 function presentColorField(key: 'labelHaloColor' | 'iconHaloColor'): FieldSpec {
 	return {
+		key,
 		toWire(ann, wire) {
 			wire[key] = ann[key] != null ? parseHexColor(ann[key]!) : undefined;
 		},
 		fromWire(wire, out) {
 			if (wire[key] !== undefined) out[key] = formatHexColor(wire[key]!);
+		},
+		fromJson(raw, out) {
+			const v = raw[key];
+			if (typeof v === 'string') out[key] = v;
 		}
 	};
 }
 
-const FIELD_SPECS: FieldSpec[] = [
+export const FIELD_SPECS: FieldSpec[] = [
 	numField('visibleFrom', 0),
 	numField('iconSize', 1),
 	numField('labelSize', 1),

@@ -23,23 +23,45 @@
 	let videoInput = $state<HTMLInputElement | undefined>(undefined);
 	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
 	let importError = $state<string | null>(null);
-	let status = $state<{ tone: 'ok' | 'err'; text: string } | null>(null);
-	let statusTimer: ReturnType<typeof setTimeout> | undefined;
 	let embedOpen = $state(false);
-	let embedCopied = $state(false);
-	let embedCopyTimer: ReturnType<typeof setTimeout> | undefined;
 	let videoOpen = $state(false);
 	let videoWidth = $state<VideoWidth>(1920);
 	let videoFps = $state<VideoFps>(30);
-	let videoCopied = $state(false);
-	let videoCopyTimer: ReturnType<typeof setTimeout> | undefined;
+
+	/**
+	 * Reactive transient value that auto-clears after `timeoutMs`. Used for the
+	 * status flash chip and the "✓ Copied" button states — set on action, then
+	 * the value reverts to null on its own. Calling `.set` again before the
+	 * timer fires resets the countdown.
+	 */
+	function flashState<T>(timeoutMs: number) {
+		let value = $state<T | null>(null);
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		return {
+			get value() {
+				return value;
+			},
+			set(v: T) {
+				value = v;
+				if (timer) clearTimeout(timer);
+				timer = setTimeout(() => {
+					value = null;
+				}, timeoutMs);
+			},
+			clear() {
+				if (timer) clearTimeout(timer);
+				timer = undefined;
+				value = null;
+			}
+		};
+	}
+
+	const status = flashState<{ tone: 'ok' | 'err'; text: string }>(1800);
+	const embedCopied = flashState<true>(1800);
+	const videoCopied = flashState<true>(1800);
 
 	function flash(tone: 'ok' | 'err', text: string) {
-		status = { tone, text };
-		if (statusTimer) clearTimeout(statusTimer);
-		statusTimer = setTimeout(() => {
-			status = null;
-		}, 1800);
+		status.set({ tone, text });
 	}
 
 	function closeMenu() {
@@ -124,7 +146,7 @@
 		closeMenu();
 		if (store.keyframes.length === 0) return;
 		embedOpen = !embedOpen;
-		embedCopied = false;
+		embedCopied.clear();
 		if (embedOpen) {
 			queueMicrotask(() => embedInput?.select());
 		}
@@ -134,16 +156,11 @@
 		if (!embedInput) return;
 		try {
 			await navigator.clipboard.writeText(embedInput.value);
-			embedCopied = true;
 		} catch {
 			embedInput.select();
 			document.execCommand?.('copy');
-			embedCopied = true;
 		}
-		if (embedCopyTimer) clearTimeout(embedCopyTimer);
-		embedCopyTimer = setTimeout(() => {
-			embedCopied = false;
-		}, 1800);
+		embedCopied.set(true);
 	}
 
 	function buildVideoCommand(): string {
@@ -158,7 +175,7 @@
 		closeMenu();
 		if (store.keyframes.length === 0) return;
 		videoOpen = !videoOpen;
-		videoCopied = false;
+		videoCopied.clear();
 		if (videoOpen) {
 			queueMicrotask(() => videoInput?.select());
 		}
@@ -168,16 +185,11 @@
 		if (!videoInput) return;
 		try {
 			await navigator.clipboard.writeText(videoInput.value);
-			videoCopied = true;
 		} catch {
 			videoInput.select();
 			document.execCommand?.('copy');
-			videoCopied = true;
 		}
-		if (videoCopyTimer) clearTimeout(videoCopyTimer);
-		videoCopyTimer = setTimeout(() => {
-			videoCopied = false;
-		}, 1800);
+		videoCopied.set(true);
 	}
 
 	function onLoadExample() {
@@ -364,9 +376,13 @@
 
 	<div class="spacer"></div>
 
-	{#if status}
-		<span class="status" class:ok={status.tone === 'ok'} class:err={status.tone === 'err'}>
-			{status.text}
+	{#if status.value}
+		<span
+			class="status"
+			class:ok={status.value.tone === 'ok'}
+			class:err={status.value.tone === 'err'}
+		>
+			{status.value.text}
 		</span>
 	{/if}
 
@@ -422,8 +438,13 @@
 				value={embedSnippet}
 				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
 			/>
-			<button type="button" onclick={onCopyEmbed} class:copied={embedCopied} title="Copy snippet">
-				{embedCopied ? '✓ Copied' : '⧉ Copy'}
+			<button
+				type="button"
+				onclick={onCopyEmbed}
+				class:copied={embedCopied.value}
+				title="Copy snippet"
+			>
+				{embedCopied.value ? '✓ Copied' : '⧉ Copy'}
 			</button>
 			<button type="button" onclick={onToggleEmbed} aria-label="Close" title="Close">✕</button>
 		</div>
@@ -464,8 +485,13 @@
 				value={videoCommand}
 				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
 			/>
-			<button type="button" onclick={onCopyVideo} class:copied={videoCopied} title="Copy command">
-				{videoCopied ? '✓ Copied' : '⧉ Copy'}
+			<button
+				type="button"
+				onclick={onCopyVideo}
+				class:copied={videoCopied.value}
+				title="Copy command"
+			>
+				{videoCopied.value ? '✓ Copied' : '⧉ Copy'}
 			</button>
 			<button type="button" onclick={onToggleVideo} aria-label="Close" title="Close">✕</button>
 		</div>

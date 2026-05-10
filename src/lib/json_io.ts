@@ -1,3 +1,4 @@
+import { FIELD_SPECS } from './url_state/annotation_codec';
 import {
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
@@ -16,6 +17,25 @@ import {
 	type Keyframe,
 	type MapStyleId
 } from './types';
+
+/** Read a required finite number from `o[key]`, throwing with a context label. */
+function requiredNum(o: Record<string, unknown>, key: string, ctx: string): number {
+	const v = o[key];
+	if (typeof v !== 'number' || !Number.isFinite(v)) {
+		throw new Error(`${ctx}: missing or invalid "${key}".`);
+	}
+	return v;
+}
+
+/** Read an optional finite number from `o[key]`. Throws on type mismatch; undefined when absent. */
+function optionalNum(o: Record<string, unknown>, key: string, ctx: string): number | undefined {
+	const v = o[key];
+	if (v === undefined) return undefined;
+	if (typeof v !== 'number' || !Number.isFinite(v)) {
+		throw new Error(`${ctx}: invalid "${key}".`);
+	}
+	return v;
+}
 
 export function downloadAnimation(anim: Animation, filename = 'map-animation.json'): void {
 	const json = JSON.stringify(anim, null, 2);
@@ -65,21 +85,15 @@ export function validateAnimation(input: unknown): Animation {
 			throw new Error(`Keyframe ${i}: not an object.`);
 		}
 		const o = raw as Record<string, unknown>;
-		const num = (key: string): number => {
-			const v = o[key];
-			if (typeof v !== 'number' || !Number.isFinite(v)) {
-				throw new Error(`Keyframe ${i}: missing or invalid "${key}".`);
-			}
-			return v;
-		};
+		const ctx = `Keyframe ${i}`;
 		const kf: Keyframe = {
-			t: num('t'),
-			lng: num('lng'),
-			lat: num('lat'),
-			zoom: num('zoom'),
-			pitch: num('pitch'),
-			bearing: num('bearing'),
-			roll: num('roll')
+			t: requiredNum(o, 't', ctx),
+			lng: requiredNum(o, 'lng', ctx),
+			lat: requiredNum(o, 'lat', ctx),
+			zoom: requiredNum(o, 'zoom', ctx),
+			pitch: requiredNum(o, 'pitch', ctx),
+			bearing: requiredNum(o, 'bearing', ctx),
+			roll: requiredNum(o, 'roll', ctx)
 		};
 		if (isPathStyle(o.path)) kf.path = o.path;
 		return kf;
@@ -108,51 +122,23 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 		throw new Error(`Annotation ${i}: not an object.`);
 	}
 	const o = raw as Record<string, unknown>;
-	const num = (key: string): number => {
-		const v = o[key];
-		if (typeof v !== 'number' || !Number.isFinite(v)) {
-			throw new Error(`Annotation ${i}: missing or invalid "${key}".`);
-		}
-		return v;
-	};
-	const optionalNum = (key: string): number | undefined => {
-		const v = o[key];
-		if (v === undefined) return undefined;
-		if (typeof v !== 'number' || !Number.isFinite(v)) {
-			throw new Error(`Annotation ${i}: invalid "${key}".`);
-		}
-		return v;
-	};
+	const ctx = `Annotation ${i}`;
 	const out: Annotation = {
-		lng: num('lng'),
-		lat: num('lat'),
+		lng: requiredNum(o, 'lng', ctx),
+		lat: requiredNum(o, 'lat', ctx),
 		icon: isAnnotationIcon(o.icon) ? o.icon : DEFAULT_ANNOTATION_ICON,
 		color: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
 		label: typeof o.label === 'string' ? o.label : ''
 	};
-	if (typeof o.labelColor === 'string') out.labelColor = o.labelColor;
-	if (typeof o.labelHaloColor === 'string') out.labelHaloColor = o.labelHaloColor;
-	const lhw = optionalNum('labelHaloWidth');
-	if (lhw !== undefined) out.labelHaloWidth = Math.max(0, lhw);
-	if (typeof o.iconHaloColor === 'string') out.iconHaloColor = o.iconHaloColor;
-	const ihw = optionalNum('iconHaloWidth');
-	if (ihw !== undefined) out.iconHaloWidth = Math.max(0, ihw);
-	const rotation = optionalNum('rotation');
+	// rotation, visibleUntil, labelPosition aren't in FIELD_SPECS (their wire
+	// shape needs special-case handling in the codec), so validate them inline.
+	const rotation = optionalNum(o, 'rotation', ctx);
 	if (rotation !== undefined) out.rotation = rotation;
-	const visibleFrom = optionalNum('visibleFrom');
-	if (visibleFrom !== undefined) out.visibleFrom = visibleFrom;
-	const visibleUntil = optionalNum('visibleUntil');
+	const visibleUntil = optionalNum(o, 'visibleUntil', ctx);
 	if (visibleUntil !== undefined) out.visibleUntil = visibleUntil;
-	const iconSize = optionalNum('iconSize');
-	if (iconSize !== undefined) out.iconSize = iconSize;
-	const labelSize = optionalNum('labelSize');
-	if (labelSize !== undefined) out.labelSize = labelSize;
 	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
-	const labelDistance = optionalNum('labelDistance');
-	if (labelDistance !== undefined) out.labelDistance = labelDistance;
-	const fadeIn = optionalNum('fadeIn');
-	if (fadeIn !== undefined) out.fadeIn = fadeIn;
-	const fadeOut = optionalNum('fadeOut');
-	if (fadeOut !== undefined) out.fadeOut = fadeOut;
+	// Everything else flows through the same field table that drives the
+	// wire codec and normalize/denormalize, so adding a future field is one row.
+	for (const f of FIELD_SPECS) f.fromJson(o, out, i);
 	return out;
 }
