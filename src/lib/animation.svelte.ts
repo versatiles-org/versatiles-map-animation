@@ -5,6 +5,7 @@ import {
 	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_INITIAL_VIEW,
 	DEFAULT_LABELS,
+	DEFAULT_SKY,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
@@ -71,6 +72,7 @@ export class AnimationStore {
 	style = $state<MapStyleId>(DEFAULT_STYLE);
 	labels = $state(DEFAULT_LABELS);
 	terrain = $state(DEFAULT_TERRAIN);
+	sky = $state(DEFAULT_SKY);
 	annotationScale = $state(DEFAULT_ANNOTATION_SCALE);
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
@@ -255,6 +257,7 @@ export class AnimationStore {
 		this.style = anim.style ?? DEFAULT_STYLE;
 		this.labels = anim.labels ?? DEFAULT_LABELS;
 		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
+		this.sky = anim.sky ?? DEFAULT_SKY;
 		this.annotationScale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
@@ -268,6 +271,7 @@ export class AnimationStore {
 			style: this.style,
 			labels: this.labels,
 			terrain: this.terrain,
+			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),
 			annotations: this.annotations.map((a) => ({ ...a })),
 			annotationScale: this.annotationScale

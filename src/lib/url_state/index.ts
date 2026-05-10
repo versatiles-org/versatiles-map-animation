@@ -85,6 +85,7 @@ export function encodeAnimation(anim: Animation): string {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
@@ -99,6 +100,7 @@ export function encodeAnimation(anim: Animation): string {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
@@ -113,6 +115,7 @@ export function encodeAnimation(anim: Animation): string {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
@@ -127,6 +130,7 @@ export function encodeAnimation(anim: Animation): string {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation)
 			},
@@ -140,6 +144,7 @@ export function encodeAnimation(anim: Animation): string {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe)
 			},
 			w
@@ -183,6 +188,7 @@ function decodeOrThrow(encoded: string): Animation {
 			style: wire.style,
 			labels: wire.labels,
 			terrain: wire.terrain,
+			sky: wire.sky,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
 			annotationScale: wire.annotationScale
@@ -196,6 +202,7 @@ function decodeOrThrow(encoded: string): Animation {
 			style: wire.style,
 			labels: wire.labels,
 			terrain: wire.terrain,
+			sky: wire.sky,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
 			annotationScale: wire.annotationScale
@@ -209,6 +216,7 @@ function decodeOrThrow(encoded: string): Animation {
 			style: wire.style,
 			labels: wire.labels,
 			terrain: wire.terrain,
+			sky: wire.sky,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
 			annotationScale: wire.annotationScale
@@ -222,6 +230,7 @@ function decodeOrThrow(encoded: string): Animation {
 			style: wire.style,
 			labels: wire.labels,
 			terrain: wire.terrain,
+			sky: wire.sky,
 			keyframes: wire.keyframes.map(denormalizeKeyframe),
 			annotations: wire.annotations.map(denormalizeAnnotation),
 			annotationScale: DEFAULT_ANNOTATION_SCALE
@@ -234,6 +243,7 @@ function decodeOrThrow(encoded: string): Animation {
 		style: wire.style,
 		labels: wire.labels,
 		terrain: wire.terrain,
+		sky: wire.sky,
 		keyframes: wire.keyframes.map(denormalizeKeyframe),
 		annotations: [],
 		annotationScale: DEFAULT_ANNOTATION_SCALE
@@ -300,6 +310,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				style: anim.style,
 				labels: anim.labels,
 				terrain: anim.terrain,
+				sky: anim.sky,
 				keyframes: anim.keyframes.map(normalizeKeyframe),
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
@@ -310,6 +321,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 					style: anim.style,
 					labels: anim.labels,
 					terrain: anim.terrain,
+					sky: anim.sky,
 					keyframes: anim.keyframes.map(normalizeKeyframe),
 					annotations: anim.annotations.map(normalizeAnnotation),
 					annotationScale: scale
@@ -320,6 +332,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 						style: anim.style,
 						labels: anim.labels,
 						terrain: anim.terrain,
+						sky: anim.sky,
 						keyframes: anim.keyframes.map(normalizeKeyframe),
 						annotations: anim.annotations.map(normalizeAnnotation),
 						annotationScale: scale
@@ -330,6 +343,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 							style: anim.style,
 							labels: anim.labels,
 							terrain: anim.terrain,
+							sky: anim.sky,
 							keyframes: anim.keyframes.map(normalizeKeyframe),
 							annotations: anim.annotations.map(normalizeAnnotation)
 						})
@@ -338,6 +352,7 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 							style: anim.style,
 							labels: anim.labels,
 							terrain: anim.terrain,
+							sky: anim.sky,
 							keyframes: anim.keyframes.map(normalizeKeyframe)
 						});
 	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so

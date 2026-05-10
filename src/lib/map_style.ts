@@ -26,30 +26,62 @@ function withMarkersSprite(style: StyleSpecification): StyleSpecification {
 	return style;
 }
 
+/**
+ * MapLibre `sky` block — atmospheric scattering visible behind the horizon
+ * when the camera is pitched. The upstream style builders don't include one,
+ * so we attach it here when the user opts in.
+ *
+ * `atmosphere-blend` is interpolated from full at flat to off past zoom 12,
+ * so the sky doesn't bleed into close-up tiles. Cast through `unknown` because
+ * @maplibre's expression type is too narrow for `interpolate` literals when
+ * spelled out as an inline array.
+ */
+function makeSkySpec(): StyleSpecification['sky'] {
+	return {
+		'sky-color': '#88c6ff',
+		'horizon-color': '#dbe4f0',
+		'fog-color': '#dbe4f0',
+		'sky-horizon-blend': 0.5,
+		'horizon-fog-blend': 0.5,
+		'fog-ground-blend': 0.5,
+		'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0] as unknown as number
+	};
+}
+
+function withSky(style: StyleSpecification, sky: boolean): StyleSpecification {
+	if (sky) style.sky = makeSkySpec();
+	return style;
+}
+
 export async function buildMapStyle(
 	id: MapStyleId,
 	labels: boolean,
-	terrain: boolean
+	terrain: boolean,
+	sky: boolean
 ): Promise<StyleSpecification> {
 	switch (id) {
 		case 'colorful':
 			// `hideLabels: true` strips every symbol layer (place names, POIs,
 			// shields). For colorful that's the only "show labels" knob the
 			// upstream builder offers.
-			return withMarkersSprite(
-				await colorful({
-					baseUrl: TILES_BASE_URL,
-					hideLabels: !labels,
-					terrain,
-					hillshade: terrain
-				})
+			return withSky(
+				withMarkersSprite(
+					await colorful({
+						baseUrl: TILES_BASE_URL,
+						hideLabels: !labels,
+						terrain,
+						hillshade: terrain
+					})
+				),
+				sky
 			);
 		case 'satellite':
 			// Satellite imagery is always rendered. The `overlay` flag adds the
 			// colorful basemap (roads, labels, etc.) on top — that's the
 			// satellite equivalent of "show labels".
-			return withMarkersSprite(
-				await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain })
+			return withSky(
+				withMarkersSprite(await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain })),
+				sky
 			);
 	}
 }

@@ -3,6 +3,7 @@ import {
 	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_ANNOTATION_SCALE,
 	DEFAULT_LABELS,
+	DEFAULT_SKY,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isAnnotationIcon,
@@ -55,6 +56,7 @@ export function validateAnimation(input: unknown): Animation {
 	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : DEFAULT_STYLE;
 	const labels = typeof obj.labels === 'boolean' ? obj.labels : DEFAULT_LABELS;
 	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
+	const sky = typeof obj.sky === 'boolean' ? obj.sky : DEFAULT_SKY;
 	if (!Array.isArray(obj.keyframes)) {
 		throw new Error('Invalid file: "keyframes" missing or not an array.');
 	}
@@ -94,6 +96,7 @@ export function validateAnimation(input: unknown): Animation {
 		style,
 		labels,
 		terrain,
+		sky,
 		keyframes,
 		annotations,
 		annotationScale

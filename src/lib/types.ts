@@ -116,6 +116,7 @@ export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 export const DEFAULT_STYLE: MapStyleId = 'colorful';
 export const DEFAULT_LABELS = true;
 export const DEFAULT_TERRAIN = false;
+export const DEFAULT_SKY = false;
 
 export function isMapStyleId(value: unknown): value is MapStyleId {
 	return typeof value === 'string' && (MAP_STYLE_IDS as readonly string[]).includes(value);
@@ -255,6 +256,8 @@ export interface Animation {
 	 */
 	labels: boolean;
 	terrain: boolean;
+	/** Renders the maplibre atmospheric sky behind the horizon (visible at pitch). */
+	sky: boolean;
 	keyframes: Keyframe[];
 	annotations: Annotation[];
 	/** Multiplier for icon + label size. Defaults to 1. */
@@ -276,6 +279,7 @@ export function createEmptyAnimation(): Animation {
 		style: DEFAULT_STYLE,
 		labels: DEFAULT_LABELS,
 		terrain: DEFAULT_TERRAIN,
+		sky: DEFAULT_SKY,
 		keyframes: [],
 		annotations: [],
 		annotationScale: DEFAULT_ANNOTATION_SCALE

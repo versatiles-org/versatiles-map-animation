@@ -44,6 +44,7 @@
 		void store.style;
 		void store.labels;
 		void store.terrain;
+		void store.sky;
 		if (urlTimer) clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
 			const anim = store.toAnimation();

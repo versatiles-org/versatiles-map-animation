@@ -27,6 +27,13 @@
 		<input type="checkbox" bind:checked={store.terrain} />
 		<span>Terrain</span>
 	</label>
+	<label
+		class="row checkbox"
+		title="Render an atmospheric sky behind the horizon. Only visible when the camera is pitched."
+	>
+		<input type="checkbox" bind:checked={store.sky} />
+		<span>Sky</span>
+	</label>
 </div>
 
 <style>

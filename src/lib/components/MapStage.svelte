@@ -252,8 +252,9 @@
 		const initialId = untrack(() => store.style);
 		const initialLabels = untrack(() => store.labels);
 		const initialTerrain = untrack(() => store.terrain);
+		const initialSky = untrack(() => store.sky);
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
-		const style = await buildMapStyle(initialId, initialLabels, initialTerrain);
+		const style = await buildMapStyle(initialId, initialLabels, initialTerrain, initialSky);
 		map = new maplibregl.Map({
 			container,
 			style,
@@ -374,9 +375,10 @@
 		const id = store.style;
 		const labels = store.labels;
 		const terrain = store.terrain;
+		const sky = store.sky;
 		if (!map || !initialStyleApplied) return;
 		let cancelled = false;
-		buildMapStyle(id, labels, terrain).then((newStyle) => {
+		buildMapStyle(id, labels, terrain, sky).then((newStyle) => {
 			if (cancelled || !map) return;
 			// setStyle({ diff: false }) wipes our custom source/layer along with
 			// the rest. Re-install once the new style has finished loading.

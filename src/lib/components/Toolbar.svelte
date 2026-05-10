@@ -187,6 +187,7 @@
 			style: 'colorful',
 			labels: true,
 			terrain: DEFAULT_TERRAIN,
+			sky: false,
 			keyframes: [
 				{ t: 0, lng: 0, lat: 30, zoom: 1.5, pitch: 0, bearing: 0, roll: 0 },
 				{ t: 3, lng: 13.405, lat: 52.52, zoom: 9, pitch: 60, bearing: 30, roll: 0 },

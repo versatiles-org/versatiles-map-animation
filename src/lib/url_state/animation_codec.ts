@@ -33,6 +33,7 @@ export const AnimationCodecV1 = struct({
 	style: styleCodec,
 	labels: bool,
 	terrain: bool,
+	sky: bool,
 	keyframes: keyframesCodec
 });
 
@@ -41,6 +42,7 @@ export const AnimationCodecV2 = struct({
 	style: styleCodec,
 	labels: bool,
 	terrain: bool,
+	sky: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodec
 });
@@ -58,6 +60,7 @@ export const AnimationCodecV3 = struct({
 	style: styleCodec,
 	labels: bool,
 	terrain: bool,
+	sky: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodec,
 	annotationScale: annotationScaleCodec
@@ -71,6 +74,7 @@ export const AnimationCodecV4 = struct({
 	style: styleCodec,
 	labels: bool,
 	terrain: bool,
+	sky: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodecV4,
 	annotationScale: annotationScaleCodec
@@ -83,6 +87,7 @@ export const AnimationCodecV5 = struct({
 	style: styleCodec,
 	labels: bool,
 	terrain: bool,
+	sky: bool,
 	keyframes: keyframesCodec,
 	annotations: annotationsCodecV5,
 	annotationScale: annotationScaleCodec
