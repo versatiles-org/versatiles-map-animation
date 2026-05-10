@@ -18,6 +18,12 @@ jobs:
   check:
     name: Lint, type-check, test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Codecov uses GitHub's OIDC token to authenticate without a secret on
+      # public repos. Tightly scoped to this job so the rest of the workflow
+      # keeps the default minimal permissions.
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -37,8 +43,16 @@ jobs:
       - name: svelte-check
         run: npm run check:svelte
 
-      - name: Vitest
-        run: npm run test
+      - name: Vitest with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/lcov.info
+          use_oidc: true
+          fail_ci_if_error: false
 
   build:
     name: Build
