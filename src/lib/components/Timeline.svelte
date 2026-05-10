@@ -378,6 +378,9 @@
 						aria-hidden="true"
 					></div>
 				{/if}
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<!-- tabindex is only set when role is 'slider' (i.e. when the bar is
+				     interactive); the static check can't see that correlation. -->
 				<div
 					class="ann-bar"
 					class:draggable={barDraggable}
