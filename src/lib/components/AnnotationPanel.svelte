@@ -94,17 +94,23 @@
 	// Group all 187 fonts by family so the `<select>` can render them under
 	// `<optgroup>`s — the flat list is overwhelming, but most users want
 	// "pick a family, pick a weight" and `<optgroup>` matches that mental
-	// model. Computed once at module load by walking the (already family-
-	// adjacent) ANNOTATION_LABEL_FONTS in order.
+	// model. The upstream font list interleaves families lexicographically
+	// (e.g. `fira_sans_bold` < `fira_sans_condensed_*` < `fira_sans_extrabold`),
+	// so we collect by family into a plain object and preserve first-encounter
+	// family order — which keeps the grouping stable without depending on
+	// adjacent ordering in the source.
 	const FONT_GROUPS: { family: string; fonts: AnnotationLabelFont[] }[] = (() => {
-		const groups: { family: string; fonts: AnnotationLabelFont[] }[] = [];
+		const order: string[] = [];
+		const byFamily: Record<string, AnnotationLabelFont[]> = {};
 		for (const f of ANNOTATION_LABEL_FONTS) {
 			const fam = fontFamilyOf(f);
-			const last = groups[groups.length - 1];
-			if (last && last.family === fam) last.fonts.push(f);
-			else groups.push({ family: fam, fonts: [f] });
+			if (!(fam in byFamily)) {
+				byFamily[fam] = [];
+				order.push(fam);
+			}
+			byFamily[fam].push(f);
 		}
-		return groups;
+		return order.map((family) => ({ family, fonts: byFamily[family] }));
 	})();
 	function familyLabel(family: string): string {
 		return family
