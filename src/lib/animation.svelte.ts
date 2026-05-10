@@ -14,6 +14,23 @@ import type { Animation, Annotation, CameraState, Keyframe, MapStyleId, PathStyl
 
 const MIN_TIME_GAP = 0.01;
 
+/** Return a new array with `arr[idx]` replaced by `value`. */
+function replaceAt<T>(arr: T[], idx: number, value: T): T[] {
+	return [...arr.slice(0, idx), value, ...arr.slice(idx + 1)];
+}
+
+/**
+ * Renumber a selection index after deleting array element `deletedIdx`:
+ * the deleted item itself ⇒ no selection; later items shift down by one;
+ * earlier items are unaffected. Returns the new index (or null).
+ */
+function adjustIndexAfterDelete(sel: number | null, deletedIdx: number): number | null {
+	if (sel === null) return null;
+	if (sel === deletedIdx) return null;
+	if (sel > deletedIdx) return sel - 1;
+	return sel;
+}
+
 /**
  * Continuous opacity at time `t`. Inside the visibility window the opacity is
  * 1; outside it's 0; within `fadeIn` seconds before `visibleFrom` it ramps 0→1,
@@ -119,22 +136,13 @@ export class AnimationStore {
 		if (this.selectedIndex === null) return;
 		const kf = this.keyframes[this.selectedIndex];
 		if (!kf) return;
-		const updated: Keyframe = { ...kf, ...cam };
-		this.keyframes = [
-			...this.keyframes.slice(0, this.selectedIndex),
-			updated,
-			...this.keyframes.slice(this.selectedIndex + 1)
-		];
+		this.keyframes = replaceAt(this.keyframes, this.selectedIndex, { ...kf, ...cam });
 	}
 
 	deleteAt(index: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
 		this.keyframes = this.keyframes.filter((_, i) => i !== index);
-		if (this.selectedIndex === index) {
-			this.selectedIndex = null;
-		} else if (this.selectedIndex !== null && this.selectedIndex > index) {
-			this.selectedIndex -= 1;
-		}
+		this.selectedIndex = adjustIndexAfterDelete(this.selectedIndex, index);
 	}
 
 	/** Set the trajectory style used to reach this keyframe from the previous one. */
@@ -145,11 +153,7 @@ export class AnimationStore {
 		const updated: Keyframe = { ...kf };
 		if (path === 'arc') delete updated.path;
 		else updated.path = path;
-		this.keyframes = [
-			...this.keyframes.slice(0, index),
-			updated,
-			...this.keyframes.slice(index + 1)
-		];
+		this.keyframes = replaceAt(this.keyframes, index, updated);
 	}
 
 	/** Move a keyframe in time, clamped to a 0.01s buffer from neighbors. */
@@ -161,12 +165,7 @@ export class AnimationStore {
 				? this.keyframes[index + 1].t - MIN_TIME_GAP
 				: Number.POSITIVE_INFINITY;
 		const clamped = Math.max(minT, Math.min(maxT, t));
-		const updated = { ...this.keyframes[index], t: clamped };
-		this.keyframes = [
-			...this.keyframes.slice(0, index),
-			updated,
-			...this.keyframes.slice(index + 1)
-		];
+		this.keyframes = replaceAt(this.keyframes, index, { ...this.keyframes[index], t: clamped });
 	}
 
 	selectAt(index: number): void {
@@ -198,21 +197,13 @@ export class AnimationStore {
 		for (const key of ['rotation', 'visibleFrom', 'visibleUntil'] as const) {
 			if (patch[key] === undefined && key in patch) delete updated[key];
 		}
-		this.annotations = [
-			...this.annotations.slice(0, index),
-			updated,
-			...this.annotations.slice(index + 1)
-		];
+		this.annotations = replaceAt(this.annotations, index, updated);
 	}
 
 	deleteAnnotation(index: number): void {
 		if (index < 0 || index >= this.annotations.length) return;
 		this.annotations = this.annotations.filter((_, i) => i !== index);
-		if (this.selectedAnnotationIndex === index) {
-			this.selectedAnnotationIndex = null;
-		} else if (this.selectedAnnotationIndex !== null && this.selectedAnnotationIndex > index) {
-			this.selectedAnnotationIndex -= 1;
-		}
+		this.selectedAnnotationIndex = adjustIndexAfterDelete(this.selectedAnnotationIndex, index);
 	}
 
 	selectAnnotation(index: number): void {
