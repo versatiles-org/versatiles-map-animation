@@ -127,351 +127,226 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	iconHaloWidth: undefined
 };
 
-export const annotationsCodec: Codec<WireAnnotation[]> = {
-	encode(arr, w) {
-		const ins = w.inspector;
-		if (ins) ins.enter('[length]', w.totalBits());
-		vuint.encode(arr.length, w);
-		if (ins) ins.exit('[length]', w.totalBits());
+// ---------------------------------------------------------------------------
+// Codec factory + field descriptors
+//
+// All three annotation codecs (V2 8-bit mask, V4 16-bit, V5 24-bit) share the
+// same shape: variable-length array of mask + emitted fields, with carry-
+// forward across iterations. The differences are:
+//   - mask width
+//   - which fields are included
+//   - one special "present-only" semantic for halo fields (don't carry forward;
+//     mask bit means "value is present" instead of "differs from prev")
+//
+// Each field is described by a small object — adding a future field is a
+// one-line addition to the relevant array.
+// ---------------------------------------------------------------------------
 
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let idx = 0; idx < arr.length; idx++) {
-			const item = arr[idx];
-			if (ins) ins.enter(`[${idx}]`, w.totalBits());
-
-			const mxInt = Math.round(Math.max(0, Math.min(1, item.mx)) * ANNOTATION_POS_MAX);
-			const myInt = Math.round(Math.max(0, Math.min(1, item.my)) * ANNOTATION_POS_MAX);
-			const prevMxInt = Math.round(prev.mx * ANNOTATION_POS_MAX);
-			const prevMyInt = Math.round(prev.my * ANNOTATION_POS_MAX);
-
-			let mask = 0;
-			if (mxInt !== prevMxInt) mask |= 1 << 0;
-			if (myInt !== prevMyInt) mask |= 1 << 1;
-			if (item.icon !== prev.icon) mask |= 1 << 2;
-			if (item.color !== prev.color) mask |= 1 << 3;
-			if (item.label !== prev.label) mask |= 1 << 4;
-			if (item.rotation !== prev.rotation) mask |= 1 << 5;
-			if (item.visibleFrom !== prev.visibleFrom) mask |= 1 << 6;
-			if (item.visibleUntil !== prev.visibleUntil) mask |= 1 << 7;
-
-			if (ins) ins.enter('[mask]', w.totalBits());
-			w.writeBits(mask, 8);
-			if (ins) ins.exit('[mask]', w.totalBits());
-
-			const writeField = <T>(name: keyof WireAnnotation, c: Codec<T>, value: T) => {
-				if (ins) ins.enter(name, w.totalBits());
-				c.encode(value, w);
-				if (ins) ins.exit(name, w.totalBits());
-			};
-
-			if (mask & (1 << 0)) writeField('mx', uint(ANNOTATION_POS_BITS), mxInt);
-			if (mask & (1 << 1)) writeField('my', uint(ANNOTATION_POS_BITS), myInt);
-			if (mask & (1 << 2)) writeField('icon', annotationIconCodec, item.icon);
-			if (mask & (1 << 3)) writeField('color', annotationColorCodec, item.color);
-			if (mask & (1 << 4)) writeField('label', stringCodec, item.label);
-			if (mask & (1 << 5)) writeField('rotation', annotationRotationCodec, item.rotation);
-			if (mask & (1 << 6)) writeField('visibleFrom', annotationVisibilityCodec, item.visibleFrom);
-			if (mask & (1 << 7)) writeField('visibleUntil', annotationVisibilityCodec, item.visibleUntil);
-
-			if (ins) ins.exit(`[${idx}]`, w.totalBits());
-
-			const next: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) next.mx = mxInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) next.my = myInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) next.icon = item.icon;
-			if (mask & (1 << 3)) next.color = item.color;
-			if (mask & (1 << 4)) next.label = item.label;
-			if (mask & (1 << 5)) next.rotation = item.rotation;
-			if (mask & (1 << 6)) next.visibleFrom = item.visibleFrom;
-			if (mask & (1 << 7)) next.visibleUntil = item.visibleUntil;
-			prev = next;
-		}
-	},
-	decode(r) {
-		const len = vuint.decode(r);
-		const out: WireAnnotation[] = [];
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let i = 0; i < len; i++) {
-			const mask = r.readBits(8);
-			const item: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) item.mx = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) item.my = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) item.icon = annotationIconCodec.decode(r);
-			if (mask & (1 << 3)) item.color = annotationColorCodec.decode(r);
-			if (mask & (1 << 4)) item.label = stringCodec.decode(r);
-			if (mask & (1 << 5)) item.rotation = annotationRotationCodec.decode(r);
-			if (mask & (1 << 6)) item.visibleFrom = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 7)) item.visibleUntil = annotationVisibilityCodec.decode(r);
-			out.push(item);
-			prev = item;
-		}
-		return out;
-	}
-};
+interface AnnField {
+	bit: number;
+	/** Inspector label. For most fields, also the WireAnnotation key name. */
+	label: string;
+	/** 'self' = on-emit, copy item[key] into next; 'none' = always reset to undefined. */
+	carryForward: 'self' | 'none';
+	shouldEmit(item: WireAnnotation, prev: WireAnnotation): boolean;
+	encode(item: WireAnnotation, prev: WireAnnotation, w: import('../codec').BitWriter): void;
+	decode(item: WireAnnotation, prev: WireAnnotation, r: import('../codec').BitReader): void;
+	/** Override the default `next[label] = item[label]` when carryForward === 'self'. */
+	apply?(next: WireAnnotation, item: WireAnnotation): void;
+}
 
 /**
- * V4 codec: 16-bit mask + extra fields beyond V2 — bit 8 iconSize, bit 9
- * labelSize, bit 10 labelPosition, bit 11 labelDistance, bit 12 fadeIn,
- * bit 13 fadeOut, bit 14 labelColor. Used only when at least one annotation
- * has a non-default value for any of these; V2/V3 stay byte-stable for share
- * links that don't.
+ * Carry-forward field: emit when value differs from prev; on the wire, just
+ * the value through `codec`. Most fields use this shape.
  */
-export const annotationsCodecV4: Codec<WireAnnotation[]> = {
-	encode(arr, w) {
-		const ins = w.inspector;
-		if (ins) ins.enter('[length]', w.totalBits());
-		vuint.encode(arr.length, w);
-		if (ins) ins.exit('[length]', w.totalBits());
-
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let idx = 0; idx < arr.length; idx++) {
-			const item = arr[idx];
-			if (ins) ins.enter(`[${idx}]`, w.totalBits());
-
-			const mxInt = Math.round(Math.max(0, Math.min(1, item.mx)) * ANNOTATION_POS_MAX);
-			const myInt = Math.round(Math.max(0, Math.min(1, item.my)) * ANNOTATION_POS_MAX);
-			const prevMxInt = Math.round(prev.mx * ANNOTATION_POS_MAX);
-			const prevMyInt = Math.round(prev.my * ANNOTATION_POS_MAX);
-
-			let mask = 0;
-			if (mxInt !== prevMxInt) mask |= 1 << 0;
-			if (myInt !== prevMyInt) mask |= 1 << 1;
-			if (item.icon !== prev.icon) mask |= 1 << 2;
-			if (item.color !== prev.color) mask |= 1 << 3;
-			if (item.label !== prev.label) mask |= 1 << 4;
-			if (item.rotation !== prev.rotation) mask |= 1 << 5;
-			if (item.visibleFrom !== prev.visibleFrom) mask |= 1 << 6;
-			if (item.visibleUntil !== prev.visibleUntil) mask |= 1 << 7;
-			if (item.iconSize !== prev.iconSize) mask |= 1 << 8;
-			if (item.labelSize !== prev.labelSize) mask |= 1 << 9;
-			if (item.labelPosition !== prev.labelPosition) mask |= 1 << 10;
-			if (item.labelDistance !== prev.labelDistance) mask |= 1 << 11;
-			if (item.fadeIn !== prev.fadeIn) mask |= 1 << 12;
-			if (item.fadeOut !== prev.fadeOut) mask |= 1 << 13;
-			if (item.labelColor !== prev.labelColor) mask |= 1 << 14;
-
-			if (ins) ins.enter('[mask]', w.totalBits());
-			w.writeBits(mask, 16);
-			if (ins) ins.exit('[mask]', w.totalBits());
-
-			const writeField = <T>(name: keyof WireAnnotation, c: Codec<T>, value: T) => {
-				if (ins) ins.enter(name, w.totalBits());
-				c.encode(value, w);
-				if (ins) ins.exit(name, w.totalBits());
-			};
-
-			if (mask & (1 << 0)) writeField('mx', uint(ANNOTATION_POS_BITS), mxInt);
-			if (mask & (1 << 1)) writeField('my', uint(ANNOTATION_POS_BITS), myInt);
-			if (mask & (1 << 2)) writeField('icon', annotationIconCodec, item.icon);
-			if (mask & (1 << 3)) writeField('color', annotationColorCodec, item.color);
-			if (mask & (1 << 4)) writeField('label', stringCodec, item.label);
-			if (mask & (1 << 5)) writeField('rotation', annotationRotationCodec, item.rotation);
-			if (mask & (1 << 6)) writeField('visibleFrom', annotationVisibilityCodec, item.visibleFrom);
-			if (mask & (1 << 7)) writeField('visibleUntil', annotationVisibilityCodec, item.visibleUntil);
-			if (mask & (1 << 8)) writeField('iconSize', annotationSizeCodec, item.iconSize);
-			if (mask & (1 << 9)) writeField('labelSize', annotationSizeCodec, item.labelSize);
-			if (mask & (1 << 10)) writeField('labelPosition', labelPositionCodec, item.labelPosition);
-			if (mask & (1 << 11)) writeField('labelDistance', labelDistanceCodec, item.labelDistance);
-			if (mask & (1 << 12)) writeField('fadeIn', annotationVisibilityCodec, item.fadeIn);
-			if (mask & (1 << 13)) writeField('fadeOut', annotationVisibilityCodec, item.fadeOut);
-			if (mask & (1 << 14)) writeField('labelColor', annotationColorCodec, item.labelColor);
-
-			if (ins) ins.exit(`[${idx}]`, w.totalBits());
-
-			const next: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) next.mx = mxInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) next.my = myInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) next.icon = item.icon;
-			if (mask & (1 << 3)) next.color = item.color;
-			if (mask & (1 << 4)) next.label = item.label;
-			if (mask & (1 << 5)) next.rotation = item.rotation;
-			if (mask & (1 << 6)) next.visibleFrom = item.visibleFrom;
-			if (mask & (1 << 7)) next.visibleUntil = item.visibleUntil;
-			if (mask & (1 << 8)) next.iconSize = item.iconSize;
-			if (mask & (1 << 9)) next.labelSize = item.labelSize;
-			if (mask & (1 << 10)) next.labelPosition = item.labelPosition;
-			if (mask & (1 << 11)) next.labelDistance = item.labelDistance;
-			if (mask & (1 << 12)) next.fadeIn = item.fadeIn;
-			if (mask & (1 << 13)) next.fadeOut = item.fadeOut;
-			if (mask & (1 << 14)) next.labelColor = item.labelColor;
-			prev = next;
+function simpleField<K extends keyof WireAnnotation>(
+	bit: number,
+	key: K,
+	codec: Codec<WireAnnotation[K]>
+): AnnField {
+	return {
+		bit,
+		label: key as string,
+		carryForward: 'self',
+		shouldEmit: (item, prev) => item[key] !== prev[key],
+		encode: (item, _prev, w) => codec.encode(item[key], w),
+		decode: (item, _prev, r) => {
+			item[key] = codec.decode(r);
 		}
-	},
-	decode(r) {
-		const len = vuint.decode(r);
-		const out: WireAnnotation[] = [];
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let i = 0; i < len; i++) {
-			const mask = r.readBits(16);
-			const item: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) item.mx = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) item.my = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) item.icon = annotationIconCodec.decode(r);
-			if (mask & (1 << 3)) item.color = annotationColorCodec.decode(r);
-			if (mask & (1 << 4)) item.label = stringCodec.decode(r);
-			if (mask & (1 << 5)) item.rotation = annotationRotationCodec.decode(r);
-			if (mask & (1 << 6)) item.visibleFrom = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 7)) item.visibleUntil = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 8)) item.iconSize = annotationSizeCodec.decode(r);
-			if (mask & (1 << 9)) item.labelSize = annotationSizeCodec.decode(r);
-			if (mask & (1 << 10)) item.labelPosition = labelPositionCodec.decode(r);
-			if (mask & (1 << 11)) item.labelDistance = labelDistanceCodec.decode(r);
-			if (mask & (1 << 12)) item.fadeIn = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 13)) item.fadeOut = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 14)) item.labelColor = annotationColorCodec.decode(r);
-			out.push(item);
-			prev = item;
-		}
-		return out;
-	}
-};
+	};
+}
 
 /**
- * V5 codec: 24-bit mask + four extra fields beyond V4 — bit 15 labelHaloColor,
- * bit 16 labelHaloWidth, bit 17 iconHaloColor, bit 18 iconHaloWidth. Used
- * only when at least one annotation customises a halo; V4 stays byte-stable
- * for share links that don't use these features.
- *
- * Halo colour fields use `number | undefined` (undefined = "use default").
- * The mask bit serves as the presence indicator: when 0, the field stays
- * undefined and MapStage falls back to the auto-flip (labels) / off (icons)
- * default.
+ * Present-only field (halo). The mask bit means "value is present" rather
+ * than "differs from prev"; the field doesn't carry forward, so each
+ * annotation's halo override is independent.
  */
-export const annotationsCodecV5: Codec<WireAnnotation[]> = {
-	encode(arr, w) {
-		const ins = w.inspector;
-		if (ins) ins.enter('[length]', w.totalBits());
-		vuint.encode(arr.length, w);
-		if (ins) ins.exit('[length]', w.totalBits());
-
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let idx = 0; idx < arr.length; idx++) {
-			const item = arr[idx];
-			if (ins) ins.enter(`[${idx}]`, w.totalBits());
-
-			const mxInt = Math.round(Math.max(0, Math.min(1, item.mx)) * ANNOTATION_POS_MAX);
-			const myInt = Math.round(Math.max(0, Math.min(1, item.my)) * ANNOTATION_POS_MAX);
-			const prevMxInt = Math.round(prev.mx * ANNOTATION_POS_MAX);
-			const prevMyInt = Math.round(prev.my * ANNOTATION_POS_MAX);
-
-			let mask = 0;
-			if (mxInt !== prevMxInt) mask |= 1 << 0;
-			if (myInt !== prevMyInt) mask |= 1 << 1;
-			if (item.icon !== prev.icon) mask |= 1 << 2;
-			if (item.color !== prev.color) mask |= 1 << 3;
-			if (item.label !== prev.label) mask |= 1 << 4;
-			if (item.rotation !== prev.rotation) mask |= 1 << 5;
-			if (item.visibleFrom !== prev.visibleFrom) mask |= 1 << 6;
-			if (item.visibleUntil !== prev.visibleUntil) mask |= 1 << 7;
-			if (item.iconSize !== prev.iconSize) mask |= 1 << 8;
-			if (item.labelSize !== prev.labelSize) mask |= 1 << 9;
-			if (item.labelPosition !== prev.labelPosition) mask |= 1 << 10;
-			if (item.labelDistance !== prev.labelDistance) mask |= 1 << 11;
-			if (item.fadeIn !== prev.fadeIn) mask |= 1 << 12;
-			if (item.fadeOut !== prev.fadeOut) mask |= 1 << 13;
-			if (item.labelColor !== prev.labelColor) mask |= 1 << 14;
-			// Halo fields don't carry forward — each annotation's halo override
-			// is independent. The mask bit means "present" (vs undefined =
-			// use default). Without this carve-out, going from a halo-set
-			// annotation back to a default one would set the mask but try to
-			// encode `undefined`.
-			if (item.labelHaloColor !== undefined) mask |= 1 << 15;
-			if (item.labelHaloWidth !== undefined) mask |= 1 << 16;
-			if (item.iconHaloColor !== undefined) mask |= 1 << 17;
-			if (item.iconHaloWidth !== undefined) mask |= 1 << 18;
-
-			if (ins) ins.enter('[mask]', w.totalBits());
-			w.writeBits(mask, 24);
-			if (ins) ins.exit('[mask]', w.totalBits());
-
-			const writeField = <T>(name: keyof WireAnnotation, c: Codec<T>, value: T) => {
-				if (ins) ins.enter(name, w.totalBits());
-				c.encode(value, w);
-				if (ins) ins.exit(name, w.totalBits());
-			};
-
-			if (mask & (1 << 0)) writeField('mx', uint(ANNOTATION_POS_BITS), mxInt);
-			if (mask & (1 << 1)) writeField('my', uint(ANNOTATION_POS_BITS), myInt);
-			if (mask & (1 << 2)) writeField('icon', annotationIconCodec, item.icon);
-			if (mask & (1 << 3)) writeField('color', annotationColorCodec, item.color);
-			if (mask & (1 << 4)) writeField('label', stringCodec, item.label);
-			if (mask & (1 << 5)) writeField('rotation', annotationRotationCodec, item.rotation);
-			if (mask & (1 << 6)) writeField('visibleFrom', annotationVisibilityCodec, item.visibleFrom);
-			if (mask & (1 << 7)) writeField('visibleUntil', annotationVisibilityCodec, item.visibleUntil);
-			if (mask & (1 << 8)) writeField('iconSize', annotationSizeCodec, item.iconSize);
-			if (mask & (1 << 9)) writeField('labelSize', annotationSizeCodec, item.labelSize);
-			if (mask & (1 << 10)) writeField('labelPosition', labelPositionCodec, item.labelPosition);
-			if (mask & (1 << 11)) writeField('labelDistance', labelDistanceCodec, item.labelDistance);
-			if (mask & (1 << 12)) writeField('fadeIn', annotationVisibilityCodec, item.fadeIn);
-			if (mask & (1 << 13)) writeField('fadeOut', annotationVisibilityCodec, item.fadeOut);
-			if (mask & (1 << 14)) writeField('labelColor', annotationColorCodec, item.labelColor);
-			if (mask & (1 << 15))
-				writeField('labelHaloColor', annotationColorCodec, item.labelHaloColor!);
-			if (mask & (1 << 16)) writeField('labelHaloWidth', haloWidthCodec, item.labelHaloWidth!);
-			if (mask & (1 << 17)) writeField('iconHaloColor', annotationColorCodec, item.iconHaloColor!);
-			if (mask & (1 << 18)) writeField('iconHaloWidth', haloWidthCodec, item.iconHaloWidth!);
-
-			if (ins) ins.exit(`[${idx}]`, w.totalBits());
-
-			const next: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) next.mx = mxInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) next.my = myInt / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) next.icon = item.icon;
-			if (mask & (1 << 3)) next.color = item.color;
-			if (mask & (1 << 4)) next.label = item.label;
-			if (mask & (1 << 5)) next.rotation = item.rotation;
-			if (mask & (1 << 6)) next.visibleFrom = item.visibleFrom;
-			if (mask & (1 << 7)) next.visibleUntil = item.visibleUntil;
-			if (mask & (1 << 8)) next.iconSize = item.iconSize;
-			if (mask & (1 << 9)) next.labelSize = item.labelSize;
-			if (mask & (1 << 10)) next.labelPosition = item.labelPosition;
-			if (mask & (1 << 11)) next.labelDistance = item.labelDistance;
-			if (mask & (1 << 12)) next.fadeIn = item.fadeIn;
-			if (mask & (1 << 13)) next.fadeOut = item.fadeOut;
-			if (mask & (1 << 14)) next.labelColor = item.labelColor;
-			// Halo fields are per-annotation only — `prev`'s halo state is
-			// always `undefined`, so the next iteration's "present" check
-			// matches the encoder.
-			next.labelHaloColor = undefined;
-			next.labelHaloWidth = undefined;
-			next.iconHaloColor = undefined;
-			next.iconHaloWidth = undefined;
-			prev = next;
+function presentField<K extends keyof WireAnnotation>(
+	bit: number,
+	key: K,
+	codec: Codec<NonNullable<WireAnnotation[K]>>
+): AnnField {
+	return {
+		bit,
+		label: key as string,
+		carryForward: 'none',
+		shouldEmit: (item) => item[key] !== undefined,
+		encode: (item, _prev, w) =>
+			codec.encode(item[key] as NonNullable<WireAnnotation[K]>, w),
+		decode: (item, _prev, r) => {
+			item[key] = codec.decode(r) as WireAnnotation[K];
 		}
-	},
-	decode(r) {
-		const len = vuint.decode(r);
-		const out: WireAnnotation[] = [];
-		let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
-		for (let i = 0; i < len; i++) {
-			const mask = r.readBits(24);
-			const item: WireAnnotation = { ...prev };
-			if (mask & (1 << 0)) item.mx = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 1)) item.my = uint(ANNOTATION_POS_BITS).decode(r) / ANNOTATION_POS_MAX;
-			if (mask & (1 << 2)) item.icon = annotationIconCodec.decode(r);
-			if (mask & (1 << 3)) item.color = annotationColorCodec.decode(r);
-			if (mask & (1 << 4)) item.label = stringCodec.decode(r);
-			if (mask & (1 << 5)) item.rotation = annotationRotationCodec.decode(r);
-			if (mask & (1 << 6)) item.visibleFrom = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 7)) item.visibleUntil = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 8)) item.iconSize = annotationSizeCodec.decode(r);
-			if (mask & (1 << 9)) item.labelSize = annotationSizeCodec.decode(r);
-			if (mask & (1 << 10)) item.labelPosition = labelPositionCodec.decode(r);
-			if (mask & (1 << 11)) item.labelDistance = labelDistanceCodec.decode(r);
-			if (mask & (1 << 12)) item.fadeIn = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 13)) item.fadeOut = annotationVisibilityCodec.decode(r);
-			if (mask & (1 << 14)) item.labelColor = annotationColorCodec.decode(r);
-			// Halo fields: per-annotation only — explicit-undefined when bit unset.
-			item.labelHaloColor = mask & (1 << 15) ? annotationColorCodec.decode(r) : undefined;
-			item.labelHaloWidth = mask & (1 << 16) ? haloWidthCodec.decode(r) : undefined;
-			item.iconHaloColor = mask & (1 << 17) ? annotationColorCodec.decode(r) : undefined;
-			item.iconHaloWidth = mask & (1 << 18) ? haloWidthCodec.decode(r) : undefined;
-			out.push(item);
-			prev = item;
+	};
+}
+
+/**
+ * Position field (mx / my). Comparison and wire format are based on the
+ * quantized integer at fixed precision; the `apply` hook stores the
+ * dequantized value so prev mirrors what the decoder will see (matches the
+ * pre-factory hand-coded behaviour byte-for-byte).
+ */
+function positionField(bit: number, key: 'mx' | 'my'): AnnField {
+	const quantize = (v: number) =>
+		Math.round(Math.max(0, Math.min(1, v)) * ANNOTATION_POS_MAX);
+	const inner = uint(ANNOTATION_POS_BITS);
+	return {
+		bit,
+		label: key,
+		carryForward: 'self',
+		shouldEmit: (item, prev) => quantize(item[key]) !== quantize(prev[key]),
+		encode: (item, _prev, w) => inner.encode(quantize(item[key]), w),
+		decode: (item, _prev, r) => {
+			item[key] = inner.decode(r) / ANNOTATION_POS_MAX;
+		},
+		apply: (next, item) => {
+			next[key] = quantize(item[key]) / ANNOTATION_POS_MAX;
 		}
-		return out;
-	}
-};
+	};
+}
+
+function makeAnnotationsCodec(maskBits: number, fields: AnnField[]): Codec<WireAnnotation[]> {
+	return {
+		encode(arr, w) {
+			const ins = w.inspector;
+			if (ins) ins.enter('[length]', w.totalBits());
+			vuint.encode(arr.length, w);
+			if (ins) ins.exit('[length]', w.totalBits());
+
+			let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
+			for (let idx = 0; idx < arr.length; idx++) {
+				const item = arr[idx];
+				if (ins) ins.enter(`[${idx}]`, w.totalBits());
+
+				let mask = 0;
+				for (const f of fields) if (f.shouldEmit(item, prev)) mask |= 1 << f.bit;
+
+				if (ins) ins.enter('[mask]', w.totalBits());
+				w.writeBits(mask, maskBits);
+				if (ins) ins.exit('[mask]', w.totalBits());
+
+				for (const f of fields) {
+					if (mask & (1 << f.bit)) {
+						if (ins) ins.enter(f.label, w.totalBits());
+						f.encode(item, prev, w);
+						if (ins) ins.exit(f.label, w.totalBits());
+					}
+				}
+
+				if (ins) ins.exit(`[${idx}]`, w.totalBits());
+
+				const next: WireAnnotation = { ...prev };
+				const nextBag = next as unknown as Record<string, unknown>;
+				const itemBag = item as unknown as Record<string, unknown>;
+				for (const f of fields) {
+					if (f.carryForward === 'none') {
+						// Halo-style: never inherit; reset to undefined regardless of mask.
+						nextBag[f.label] = undefined;
+					} else if (mask & (1 << f.bit)) {
+						if (f.apply) f.apply(next, item);
+						else nextBag[f.label] = itemBag[f.label];
+					}
+				}
+				prev = next;
+			}
+		},
+		decode(r) {
+			const len = vuint.decode(r);
+			const out: WireAnnotation[] = [];
+			let prev: WireAnnotation = { ...ANNOTATION_DEFAULTS };
+			for (let i = 0; i < len; i++) {
+				const mask = r.readBits(maskBits);
+				const item: WireAnnotation = { ...prev };
+				const itemBag = item as unknown as Record<string, unknown>;
+				// Present-only fields don't inherit — clear before reading so an
+				// unset mask bit decodes as `undefined`.
+				for (const f of fields) {
+					if (f.carryForward === 'none') itemBag[f.label] = undefined;
+				}
+				for (const f of fields) {
+					if (mask & (1 << f.bit)) f.decode(item, prev, r);
+				}
+				out.push(item);
+				prev = item;
+			}
+			return out;
+		}
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Field tables — extending the codec means adding one entry to one array.
+// ---------------------------------------------------------------------------
+
+const V2_FIELDS: AnnField[] = [
+	positionField(0, 'mx'),
+	positionField(1, 'my'),
+	simpleField(2, 'icon', annotationIconCodec),
+	simpleField(3, 'color', annotationColorCodec),
+	simpleField(4, 'label', stringCodec),
+	simpleField(5, 'rotation', annotationRotationCodec),
+	simpleField(6, 'visibleFrom', annotationVisibilityCodec),
+	simpleField(7, 'visibleUntil', annotationVisibilityCodec)
+];
+
+const V4_EXTRA: AnnField[] = [
+	simpleField(8, 'iconSize', annotationSizeCodec),
+	simpleField(9, 'labelSize', annotationSizeCodec),
+	simpleField(10, 'labelPosition', labelPositionCodec),
+	simpleField(11, 'labelDistance', labelDistanceCodec),
+	simpleField(12, 'fadeIn', annotationVisibilityCodec),
+	simpleField(13, 'fadeOut', annotationVisibilityCodec),
+	simpleField(14, 'labelColor', annotationColorCodec)
+];
+
+const V5_EXTRA: AnnField[] = [
+	presentField(15, 'labelHaloColor', annotationColorCodec),
+	presentField(16, 'labelHaloWidth', haloWidthCodec),
+	presentField(17, 'iconHaloColor', annotationColorCodec),
+	presentField(18, 'iconHaloWidth', haloWidthCodec)
+];
+
+/**
+ * V2/V3: keyframes + annotations at default scale + default per-annotation
+ * sizes — bits 0..7. Older binary versions stay byte-stable for share links.
+ */
+export const annotationsCodec = makeAnnotationsCodec(8, V2_FIELDS);
+
+/**
+ * V4: extends each annotation with iconSize / labelSize / labelPosition /
+ * labelDistance / fadeIn / fadeOut / labelColor — bits 8..14.
+ */
+export const annotationsCodecV4 = makeAnnotationsCodec(16, [...V2_FIELDS, ...V4_EXTRA]);
+
+/**
+ * V5: per-annotation halo overrides for both label and icon — bits 15..18.
+ * Halo fields are present-only (no carry-forward), so each annotation's
+ * halo state is independent.
+ */
+export const annotationsCodecV5 = makeAnnotationsCodec(24, [
+	...V2_FIELDS,
+	...V4_EXTRA,
+	...V5_EXTRA
+]);
 
 // ---------------------------------------------------------------------------
 // Hex colour helpers — wire stores RGB as a 24-bit int; in-memory keeps the
@@ -508,37 +383,118 @@ function formatHexColor(rgb: number): string {
 // Wire ↔ application conversions
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Field-spec table for normalize / denormalize
+//
+// Most per-annotation fields share the same shape: clamp ≥ 0 on the way in,
+// omit when value matches default on the way out. The few that don't (mx/my
+// from lat/lng, icon validity, rotation mod-360, visibleUntil sentinel,
+// labelPosition validity) stay as inline special cases below.
+// ---------------------------------------------------------------------------
+
+interface FieldSpec {
+	toWire(ann: Annotation, wire: WireAnnotation): void;
+	fromWire(wire: WireAnnotation, out: Annotation): void;
+}
+
+/** Carry-forward numeric field with a default. */
+function numField<K extends keyof Annotation & keyof WireAnnotation>(
+	key: K,
+	defaultVal: number
+): FieldSpec {
+	return {
+		toWire(ann, wire) {
+			(wire as unknown as Record<string, unknown>)[key] = Math.max(
+				0,
+				(ann[key] as number | undefined) ?? defaultVal
+			);
+		},
+		fromWire(wire, out) {
+			const v = (wire as unknown as Record<string, unknown>)[key] as number;
+			if (v !== defaultVal) (out as unknown as Record<string, unknown>)[key] = v;
+		}
+	};
+}
+
+/** Hex-colour field with a named string default and matching int default. */
+function colorField(
+	key: 'labelColor',
+	defaultStr: string,
+	defaultInt: number
+): FieldSpec {
+	return {
+		toWire(ann, wire) {
+			wire[key] = parseHexColor(ann[key] ?? defaultStr);
+		},
+		fromWire(wire, out) {
+			if (wire[key] !== defaultInt) out[key] = formatHexColor(wire[key]);
+		}
+	};
+}
+
+/** Present-only halo width — undefined ↔ undefined; clamp ≥ 0. */
+function presentNumField(key: 'labelHaloWidth' | 'iconHaloWidth'): FieldSpec {
+	return {
+		toWire(ann, wire) {
+			wire[key] = ann[key] != null ? Math.max(0, ann[key]!) : undefined;
+		},
+		fromWire(wire, out) {
+			if (wire[key] !== undefined) out[key] = wire[key];
+		}
+	};
+}
+
+/** Present-only halo colour — undefined ↔ undefined. */
+function presentColorField(key: 'labelHaloColor' | 'iconHaloColor'): FieldSpec {
+	return {
+		toWire(ann, wire) {
+			wire[key] = ann[key] != null ? parseHexColor(ann[key]!) : undefined;
+		},
+		fromWire(wire, out) {
+			if (wire[key] !== undefined) out[key] = formatHexColor(wire[key]!);
+		}
+	};
+}
+
+const FIELD_SPECS: FieldSpec[] = [
+	numField('visibleFrom', 0),
+	numField('iconSize', 1),
+	numField('labelSize', 1),
+	numField('labelDistance', DEFAULT_LABEL_DISTANCE),
+	numField('fadeIn', 0),
+	numField('fadeOut', 0),
+	colorField('labelColor', DEFAULT_ANNOTATION_LABEL_COLOR, 0x111111),
+	presentColorField('labelHaloColor'),
+	presentNumField('labelHaloWidth'),
+	presentColorField('iconHaloColor'),
+	presentNumField('iconHaloWidth')
+];
+
+// ---------------------------------------------------------------------------
+// Wire ↔ application conversions
+// ---------------------------------------------------------------------------
+
 export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 	const { mx, my } = lngLatToMercator(ann.lng, ann.lat);
-	const icon: AnnotationIcon = isAnnotationIcon(ann.icon) ? ann.icon : DEFAULT_ANNOTATION_ICON;
-	const rotation = ((((ann.rotation ?? 0) % 360) + 360) % 360) % 360;
-	const visibleFrom = Math.max(0, ann.visibleFrom ?? 0);
-	const visibleUntilRaw = ann.visibleUntil;
-	const visibleUntil =
-		visibleUntilRaw == null || !Number.isFinite(visibleUntilRaw)
-			? ANNOTATION_VISIBLE_FOREVER
-			: Math.max(visibleFrom, visibleUntilRaw);
-	return {
+	const wire: WireAnnotation = {
+		...ANNOTATION_DEFAULTS,
 		mx,
 		my,
-		icon,
+		icon: isAnnotationIcon(ann.icon) ? ann.icon : DEFAULT_ANNOTATION_ICON,
 		color: parseHexColor(ann.color ?? DEFAULT_ANNOTATION_COLOR),
 		label: ann.label ?? '',
-		rotation,
-		visibleFrom,
-		visibleUntil,
-		iconSize: ann.iconSize ?? 1,
-		labelSize: ann.labelSize ?? 1,
-		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION,
-		labelDistance: Math.max(0, ann.labelDistance ?? DEFAULT_LABEL_DISTANCE),
-		fadeIn: Math.max(0, ann.fadeIn ?? 0),
-		fadeOut: Math.max(0, ann.fadeOut ?? 0),
-		labelColor: parseHexColor(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR),
-		labelHaloColor: ann.labelHaloColor != null ? parseHexColor(ann.labelHaloColor) : undefined,
-		labelHaloWidth: ann.labelHaloWidth != null ? Math.max(0, ann.labelHaloWidth) : undefined,
-		iconHaloColor: ann.iconHaloColor != null ? parseHexColor(ann.iconHaloColor) : undefined,
-		iconHaloWidth: ann.iconHaloWidth != null ? Math.max(0, ann.iconHaloWidth) : undefined
+		rotation: ((((ann.rotation ?? 0) % 360) + 360) % 360) % 360,
+		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION
 	};
+	for (const f of FIELD_SPECS) f.toWire(ann, wire);
+	// visibleUntil depends on visibleFrom (which was filled by the table) and
+	// uses a sentinel for "always visible", so handle it after the loop.
+	const visibleUntilRaw = ann.visibleUntil;
+	wire.visibleUntil =
+		visibleUntilRaw == null || !Number.isFinite(visibleUntilRaw)
+			? ANNOTATION_VISIBLE_FOREVER
+			: Math.max(wire.visibleFrom, visibleUntilRaw);
+	return wire;
 }
 
 export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
@@ -551,18 +507,9 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 		label: wire.label
 	};
 	if (wire.rotation !== 0) out.rotation = wire.rotation;
-	if (wire.visibleFrom !== 0) out.visibleFrom = wire.visibleFrom;
-	if (wire.visibleUntil < ANNOTATION_VISIBLE_FOREVER) out.visibleUntil = wire.visibleUntil;
-	if (wire.iconSize !== 1) out.iconSize = wire.iconSize;
-	if (wire.labelSize !== 1) out.labelSize = wire.labelSize;
 	if (wire.labelPosition !== DEFAULT_LABEL_POSITION) out.labelPosition = wire.labelPosition;
-	if (wire.labelDistance !== DEFAULT_LABEL_DISTANCE) out.labelDistance = wire.labelDistance;
-	if (wire.fadeIn !== 0) out.fadeIn = wire.fadeIn;
-	if (wire.fadeOut !== 0) out.fadeOut = wire.fadeOut;
-	if (wire.labelColor !== 0x111111) out.labelColor = formatHexColor(wire.labelColor);
-	if (wire.labelHaloColor !== undefined) out.labelHaloColor = formatHexColor(wire.labelHaloColor);
-	if (wire.labelHaloWidth !== undefined) out.labelHaloWidth = wire.labelHaloWidth;
-	if (wire.iconHaloColor !== undefined) out.iconHaloColor = formatHexColor(wire.iconHaloColor);
-	if (wire.iconHaloWidth !== undefined) out.iconHaloWidth = wire.iconHaloWidth;
+	// `<` not `!==` because the sentinel marks the upper bound.
+	if (wire.visibleUntil < ANNOTATION_VISIBLE_FOREVER) out.visibleUntil = wire.visibleUntil;
+	for (const f of FIELD_SPECS) f.fromWire(wire, out);
 	return out;
 }

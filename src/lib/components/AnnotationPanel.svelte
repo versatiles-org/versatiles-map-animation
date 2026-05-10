@@ -55,27 +55,22 @@
 		return DEFAULT_ANNOTATION_COLOR;
 	}
 
-	function onLabel(e: Event) {
-		patch({ label: (e.currentTarget as HTMLInputElement).value });
+	// Generic field binders — text/color inputs go through `onText`, numeric
+	// range inputs through `onNum`. Saves a one-line handler per field; the
+	// handler's identity changes per render but Svelte 5's event handling makes
+	// that cheap. Only inputs that need extra logic (clamping, side effects)
+	// keep a named handler below.
+	function onText<K extends keyof Annotation>(key: K) {
+		return (e: Event) =>
+			patch({ [key]: (e.currentTarget as HTMLInputElement).value } as Partial<Annotation>);
 	}
-	function onColor(e: Event) {
-		patch({ color: (e.currentTarget as HTMLInputElement).value });
+	function onNum<K extends keyof Annotation>(key: K) {
+		return (e: Event) =>
+			patch({
+				[key]: Number((e.currentTarget as HTMLInputElement).value)
+			} as Partial<Annotation>);
 	}
-	function onLabelColor(e: Event) {
-		patch({ labelColor: (e.currentTarget as HTMLInputElement).value });
-	}
-	function onLabelHaloColor(e: Event) {
-		patch({ labelHaloColor: (e.currentTarget as HTMLInputElement).value });
-	}
-	function onLabelHaloWidth(e: Event) {
-		patch({ labelHaloWidth: Number((e.currentTarget as HTMLInputElement).value) });
-	}
-	function onIconHaloColor(e: Event) {
-		patch({ iconHaloColor: (e.currentTarget as HTMLInputElement).value });
-	}
-	function onIconHaloWidth(e: Event) {
-		patch({ iconHaloWidth: Number((e.currentTarget as HTMLInputElement).value) });
-	}
+
 	function onIcon(icon: AnnotationIcon) {
 		patch({ icon });
 		iconMenuOpen = false;
@@ -90,21 +85,6 @@
 		document.addEventListener('click', handleDocClick);
 		return () => document.removeEventListener('click', handleDocClick);
 	});
-	function onRotation(e: Event) {
-		patch({ rotation: Number((e.currentTarget as HTMLInputElement).value) });
-	}
-	function onIconSize(e: Event) {
-		patch({ iconSize: Number((e.currentTarget as HTMLInputElement).value) });
-	}
-	function onLabelSize(e: Event) {
-		patch({ labelSize: Number((e.currentTarget as HTMLInputElement).value) });
-	}
-	function onLabelPosition(p: LabelPosition) {
-		patch({ labelPosition: p });
-	}
-	function onLabelDistance(e: Event) {
-		patch({ labelDistance: Number((e.currentTarget as HTMLInputElement).value) });
-	}
 
 	// 3×3 grid of label-position options. The dot in the center represents
 	// the icon; each surrounding slot is one cardinal/diagonal placement.
@@ -174,12 +154,6 @@
 		const clamped = round2(Math.max(min, raw));
 		patch({ visibleUntil: clamped });
 		syncInput(input, clamped);
-	}
-	function onClearFrom() {
-		patch({ visibleFrom: undefined, fadeIn: 0 });
-	}
-	function onClearUntil() {
-		patch({ visibleUntil: undefined, fadeOut: 0 });
 	}
 	function onFadeIn(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
@@ -283,7 +257,7 @@
 			<input
 				type="color"
 				value={normalizeHex(ann.color)}
-				oninput={onColor}
+				oninput={onText('color')}
 				aria-label="Icon color"
 			/>
 			<span class="hex">{ann.color}</span>
@@ -294,7 +268,7 @@
 			<input
 				type="color"
 				value={normalizeHex(ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
-				oninput={onIconHaloColor}
+				oninput={onText('iconHaloColor')}
 				aria-label="Icon halo color"
 				title="Halo (icon outline) color. Default white; only visible when width > 0."
 			/>
@@ -305,7 +279,7 @@
 				max="4"
 				step="0.1"
 				value={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
-				oninput={onIconHaloWidth}
+				oninput={onNum('iconHaloWidth')}
 				aria-label="Icon halo width"
 				title="Halo width in px. 0 turns the halo off (default)."
 			/>
@@ -320,7 +294,7 @@
 				max="2.5"
 				step="0.05"
 				value={ann.iconSize ?? 1}
-				oninput={onIconSize}
+				oninput={onNum('iconSize')}
 			/>
 			<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
 		</label>
@@ -333,7 +307,7 @@
 				max="359"
 				step="1"
 				value={ann.rotation ?? 0}
-				oninput={onRotation}
+				oninput={onNum('rotation')}
 			/>
 			<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
 		</label>
@@ -343,7 +317,7 @@
 
 		<label class="row">
 			<span class="lbl">Text</span>
-			<input type="text" value={ann.label} oninput={onLabel} placeholder="(no label)" />
+			<input type="text" value={ann.label} oninput={onText('label')} placeholder="(no label)" />
 		</label>
 
 		<label class="row">
@@ -351,7 +325,7 @@
 			<input
 				type="color"
 				value={normalizeHex(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
-				oninput={onLabelColor}
+				oninput={onText('labelColor')}
 				aria-label="Label color"
 				title="Label text color. The halo defaults to a contrasting brightness; override below."
 			/>
@@ -365,7 +339,7 @@
 				value={normalizeHex(
 					ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
 				)}
-				oninput={onLabelHaloColor}
+				oninput={onText('labelHaloColor')}
 				aria-label="Label halo color"
 				title="Halo (text outline) color. Defaults to a contrasting brightness; pick to override."
 			/>
@@ -376,7 +350,7 @@
 				max="4"
 				step="0.1"
 				value={ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
-				oninput={onLabelHaloWidth}
+				oninput={onNum('labelHaloWidth')}
 				aria-label="Label halo width"
 				title="Halo width in px. 0 turns the halo off."
 			/>
@@ -391,7 +365,7 @@
 				max="2.5"
 				step="0.05"
 				value={ann.labelSize ?? 1}
-				oninput={onLabelSize}
+				oninput={onNum('labelSize')}
 			/>
 			<span class="num">{(ann.labelSize ?? 1).toFixed(2)}×</span>
 		</label>
@@ -403,7 +377,7 @@
 					<button
 						type="button"
 						class:active={(ann.labelPosition ?? DEFAULT_LABEL_POSITION) === p.value}
-						onclick={() => onLabelPosition(p.value)}
+						onclick={() => patch({ labelPosition: p.value })}
 						title={p.value}
 						aria-label={`Place label ${p.value}`}
 					>
@@ -421,7 +395,7 @@
 				max="5"
 				step="0.1"
 				value={ann.labelDistance ?? DEFAULT_LABEL_DISTANCE}
-				oninput={onLabelDistance}
+				oninput={onNum('labelDistance')}
 			/>
 			<span class="num">{(ann.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
 		</label>
@@ -444,7 +418,7 @@
 				<button
 					type="button"
 					class="mini"
-					onclick={onClearFrom}
+					onclick={() => patch({ visibleFrom: undefined, fadeIn: 0 })}
 					disabled={ann.visibleFrom === undefined}
 					title="Show from the start of the animation"
 				>
@@ -462,7 +436,7 @@
 				<button
 					type="button"
 					class="mini"
-					onclick={onClearUntil}
+					onclick={() => patch({ visibleUntil: undefined, fadeOut: 0 })}
 					disabled={ann.visibleUntil === undefined}
 					title="Show until the end of the animation"
 				>

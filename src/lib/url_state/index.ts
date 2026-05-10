@@ -9,12 +9,14 @@
  *   inspectAnimation(anim)       → InspectionNode     (debug bit-cost tree)
  *
  * The on-the-wire format is a single tag byte followed by a struct chosen by
- * the smallest sufficient version (V1 keyframes-only, V2 adds annotations, V3
- * adds annotationScale). See ./animation_codec for the struct definitions.
+ * the smallest sufficient version. The full version table lives in `VERSIONS`
+ * below — each entry knows its tag, its codec, whether the current animation
+ * needs it, how to build a wire payload, and how to read one back. That single
+ * table drives encode, decode, and inspect.
  */
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
-import type { InspectionNode } from '../codec';
+import type { Codec, InspectionNode } from '../codec';
 import {
 	DEFAULT_ANNOTATION_LABEL_COLOR,
 	DEFAULT_ANNOTATION_SCALE,
@@ -41,115 +43,171 @@ import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
 const HASH_KEY = 'kf';
 const STORAGE_KEY = 'versatiles-map-animation';
 
+// ---------------------------------------------------------------------------
+// Version table
+// ---------------------------------------------------------------------------
+
+interface VersionEntry {
+	tag: number;
+	codec: Codec<unknown>;
+	/** True when this version is required to round-trip `anim` losslessly. */
+	needs(anim: Animation, scale: number): boolean;
+	/** Build the wire-shape payload that this version's codec accepts. */
+	build(anim: Animation, scale: number): unknown;
+	/** Reverse: turn a decoded wire payload into an Animation. */
+	toAnimation(wire: unknown): Animation;
+}
+
+function hasAnnotations(anim: Animation): boolean {
+	return Boolean(anim.annotations && anim.annotations.length > 0);
+}
+
+function needsHalo(a: Animation['annotations'][number]): boolean {
+	return (
+		a.labelHaloColor !== undefined ||
+		a.labelHaloWidth !== undefined ||
+		a.iconHaloColor !== undefined ||
+		a.iconHaloWidth !== undefined
+	);
+}
+
+function needsV4Extras(a: Animation['annotations'][number]): boolean {
+	return (
+		(a.iconSize ?? 1) !== 1 ||
+		(a.labelSize ?? 1) !== 1 ||
+		(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
+		(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
+		(a.fadeIn ?? 0) !== 0 ||
+		(a.fadeOut ?? 0) !== 0 ||
+		(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
+	);
+}
+
+function commonWire(anim: Animation) {
+	return {
+		version: anim.version,
+		style: anim.style,
+		labels: anim.labels,
+		terrain: anim.terrain,
+		sky: anim.sky,
+		keyframes: anim.keyframes.map(normalizeKeyframe)
+	};
+}
+
+type WireWithAnnotations = ReturnType<typeof commonWire> & {
+	annotations: ReturnType<typeof normalizeAnnotation>[];
+	annotationScale?: number;
+};
+
+function fromWire(wire: WireWithAnnotations, scale: number): Animation {
+	return {
+		version: SCHEMA_VERSION,
+		style: wire.style,
+		labels: wire.labels,
+		terrain: wire.terrain,
+		sky: wire.sky,
+		keyframes: wire.keyframes.map(denormalizeKeyframe),
+		annotations: wire.annotations.map(denormalizeAnnotation),
+		annotationScale: scale
+	};
+}
+
+/**
+ * Versions are listed highest-first. `encodeAnimation` walks the table and
+ * picks the first entry whose `needs(...)` returns true; the last entry (V1)
+ * has `needs: () => true`, acting as the fallback. Adding a new format
+ * version means adding one row here — encode, decode, and inspect all see it
+ * automatically.
+ */
+const VERSIONS: VersionEntry[] = [
+	{
+		tag: FORMAT_TAG_BINARY_V5,
+		codec: AnimationCodecV5 as Codec<unknown>,
+		needs: (anim) => hasAnnotations(anim) && anim.annotations.some(needsHalo),
+		build: (anim, scale) => ({
+			...commonWire(anim),
+			annotations: anim.annotations.map(normalizeAnnotation),
+			annotationScale: scale
+		}),
+		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+	},
+	{
+		tag: FORMAT_TAG_BINARY_V4,
+		codec: AnimationCodecV4 as Codec<unknown>,
+		needs: (anim) => hasAnnotations(anim) && anim.annotations.some(needsV4Extras),
+		build: (anim, scale) => ({
+			...commonWire(anim),
+			annotations: anim.annotations.map(normalizeAnnotation),
+			annotationScale: scale
+		}),
+		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+	},
+	{
+		tag: FORMAT_TAG_BINARY_V3,
+		codec: AnimationCodecV3 as Codec<unknown>,
+		needs: (anim, scale) => hasAnnotations(anim) && scale !== DEFAULT_ANNOTATION_SCALE,
+		build: (anim, scale) => ({
+			...commonWire(anim),
+			annotations: anim.annotations.map(normalizeAnnotation),
+			annotationScale: scale
+		}),
+		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, (wire as WireWithAnnotations).annotationScale!)
+	},
+	{
+		tag: FORMAT_TAG_BINARY_V2,
+		codec: AnimationCodecV2 as Codec<unknown>,
+		needs: (anim) => hasAnnotations(anim),
+		build: (anim) => ({
+			...commonWire(anim),
+			annotations: anim.annotations.map(normalizeAnnotation)
+		}),
+		toAnimation: (wire) => fromWire(wire as WireWithAnnotations, DEFAULT_ANNOTATION_SCALE)
+	},
+	{
+		tag: FORMAT_TAG_BINARY_V1,
+		codec: AnimationCodecV1 as Codec<unknown>,
+		needs: () => true,
+		build: (anim) => commonWire(anim),
+		toAnimation: (wire) => {
+			const w = wire as ReturnType<typeof commonWire>;
+			return {
+				version: SCHEMA_VERSION,
+				style: w.style,
+				labels: w.labels,
+				terrain: w.terrain,
+				sky: w.sky,
+				keyframes: w.keyframes.map(denormalizeKeyframe),
+				annotations: [],
+				annotationScale: DEFAULT_ANNOTATION_SCALE
+			};
+		}
+	}
+];
+
+function pickVersion(anim: Animation): VersionEntry {
+	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
+	// First entry whose `needs` matches; the last entry is the always-true fallback.
+	for (const entry of VERSIONS) if (entry.needs(anim, scale)) return entry;
+	return VERSIONS[VERSIONS.length - 1];
+}
+
+// ---------------------------------------------------------------------------
+// Encode / decode / inspect
+// ---------------------------------------------------------------------------
+
 /**
  * Encode an animation to a base64-url string suitable for URL hashes.
  * Uses the bit-packed binary codec; the first byte is a format tag so the
- * decoder can pick the right struct. Picks the smallest sufficient version:
- *   V1: keyframes only
- *   V2: keyframes + annotations at default scale + default per-annotation sizes
- *   V3: V2 + annotationScale ≠ 1
- *   V4: V3 + per-annotation iconSize / labelSize
- * Older binary versions stay byte-stable so existing share links don't change.
+ * decoder can pick the right struct. Picks the smallest sufficient version
+ * from the table at the top of this file. Older binary versions stay
+ * byte-stable so existing share links don't change.
  */
 export function encodeAnimation(anim: Animation): string {
 	const w = new BitWriter();
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
-	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
-	const needsV5 =
-		hasAnnotations &&
-		anim.annotations.some(
-			(a) =>
-				a.labelHaloColor !== undefined ||
-				a.labelHaloWidth !== undefined ||
-				a.iconHaloColor !== undefined ||
-				a.iconHaloWidth !== undefined
-		);
-	const needsV4 =
-		hasAnnotations &&
-		anim.annotations.some(
-			(a) =>
-				(a.iconSize ?? 1) !== 1 ||
-				(a.labelSize ?? 1) !== 1 ||
-				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
-				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
-				(a.fadeIn ?? 0) !== 0 ||
-				(a.fadeOut ?? 0) !== 0 ||
-				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
-		);
-	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	if (needsV5) {
-		w.writeBits(FORMAT_TAG_BINARY_V5, 8);
-		AnimationCodecV5.encode(
-			{
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation),
-				annotationScale: scale
-			},
-			w
-		);
-	} else if (needsV4) {
-		w.writeBits(FORMAT_TAG_BINARY_V4, 8);
-		AnimationCodecV4.encode(
-			{
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation),
-				annotationScale: scale
-			},
-			w
-		);
-	} else if (needsV3) {
-		w.writeBits(FORMAT_TAG_BINARY_V3, 8);
-		AnimationCodecV3.encode(
-			{
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation),
-				annotationScale: scale
-			},
-			w
-		);
-	} else if (hasAnnotations) {
-		w.writeBits(FORMAT_TAG_BINARY_V2, 8);
-		AnimationCodecV2.encode(
-			{
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation)
-			},
-			w
-		);
-	} else {
-		w.writeBits(FORMAT_TAG_BINARY_V1, 8);
-		AnimationCodecV1.encode(
-			{
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe)
-			},
-			w
-		);
-	}
+	const entry = pickVersion(anim);
+	w.writeBits(entry.tag, 8);
+	entry.codec.encode(entry.build(anim, scale), w);
 	return bytesToBase64Url(w.finish());
 }
 
@@ -169,85 +227,13 @@ function decodeOrThrow(encoded: string): Animation {
 	const bytes = base64UrlToBytes(encoded);
 	if (bytes.length === 0) throw new Error('Empty payload');
 	const tag = bytes[0];
-	if (
-		tag !== FORMAT_TAG_BINARY_V1 &&
-		tag !== FORMAT_TAG_BINARY_V2 &&
-		tag !== FORMAT_TAG_BINARY_V3 &&
-		tag !== FORMAT_TAG_BINARY_V4 &&
-		tag !== FORMAT_TAG_BINARY_V5
-	) {
-		throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
-	}
+	const entry = VERSIONS.find((v) => v.tag === tag);
+	if (!entry) throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
 	const r = new BitReader(bytes);
 	r.readBits(8); // consume tag
-	if (tag === FORMAT_TAG_BINARY_V5) {
-		const wire = AnimationCodecV5.decode(r);
-		assertVersion(wire.version);
-		return {
-			version: SCHEMA_VERSION,
-			style: wire.style,
-			labels: wire.labels,
-			terrain: wire.terrain,
-			sky: wire.sky,
-			keyframes: wire.keyframes.map(denormalizeKeyframe),
-			annotations: wire.annotations.map(denormalizeAnnotation),
-			annotationScale: wire.annotationScale
-		};
-	}
-	if (tag === FORMAT_TAG_BINARY_V4) {
-		const wire = AnimationCodecV4.decode(r);
-		assertVersion(wire.version);
-		return {
-			version: SCHEMA_VERSION,
-			style: wire.style,
-			labels: wire.labels,
-			terrain: wire.terrain,
-			sky: wire.sky,
-			keyframes: wire.keyframes.map(denormalizeKeyframe),
-			annotations: wire.annotations.map(denormalizeAnnotation),
-			annotationScale: wire.annotationScale
-		};
-	}
-	if (tag === FORMAT_TAG_BINARY_V3) {
-		const wire = AnimationCodecV3.decode(r);
-		assertVersion(wire.version);
-		return {
-			version: SCHEMA_VERSION,
-			style: wire.style,
-			labels: wire.labels,
-			terrain: wire.terrain,
-			sky: wire.sky,
-			keyframes: wire.keyframes.map(denormalizeKeyframe),
-			annotations: wire.annotations.map(denormalizeAnnotation),
-			annotationScale: wire.annotationScale
-		};
-	}
-	if (tag === FORMAT_TAG_BINARY_V2) {
-		const wire = AnimationCodecV2.decode(r);
-		assertVersion(wire.version);
-		return {
-			version: SCHEMA_VERSION,
-			style: wire.style,
-			labels: wire.labels,
-			terrain: wire.terrain,
-			sky: wire.sky,
-			keyframes: wire.keyframes.map(denormalizeKeyframe),
-			annotations: wire.annotations.map(denormalizeAnnotation),
-			annotationScale: DEFAULT_ANNOTATION_SCALE
-		};
-	}
-	const wire = AnimationCodecV1.decode(r);
+	const wire = entry.codec.decode(r) as { version: number };
 	assertVersion(wire.version);
-	return {
-		version: SCHEMA_VERSION,
-		style: wire.style,
-		labels: wire.labels,
-		terrain: wire.terrain,
-		sky: wire.sky,
-		keyframes: wire.keyframes.map(denormalizeKeyframe),
-		annotations: [],
-		annotationScale: DEFAULT_ANNOTATION_SCALE
-	};
+	return entry.toAnimation(wire);
 }
 
 function assertVersion(v: number): void {
@@ -281,80 +267,8 @@ export function readAnimationFromUrl(): Animation | null {
  */
 export function inspectAnimation(anim: Animation): InspectionNode {
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
-	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
-	const needsV5 =
-		hasAnnotations &&
-		anim.annotations.some(
-			(a) =>
-				a.labelHaloColor !== undefined ||
-				a.labelHaloWidth !== undefined ||
-				a.iconHaloColor !== undefined ||
-				a.iconHaloWidth !== undefined
-		);
-	const needsV4 =
-		hasAnnotations &&
-		anim.annotations.some(
-			(a) =>
-				(a.iconSize ?? 1) !== 1 ||
-				(a.labelSize ?? 1) !== 1 ||
-				(a.labelPosition ?? DEFAULT_LABEL_POSITION) !== DEFAULT_LABEL_POSITION ||
-				(a.labelDistance ?? DEFAULT_LABEL_DISTANCE) !== DEFAULT_LABEL_DISTANCE ||
-				(a.fadeIn ?? 0) !== 0 ||
-				(a.fadeOut ?? 0) !== 0 ||
-				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
-		);
-	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	const inner = needsV5
-		? inspect(AnimationCodecV5, {
-				version: anim.version,
-				style: anim.style,
-				labels: anim.labels,
-				terrain: anim.terrain,
-				sky: anim.sky,
-				keyframes: anim.keyframes.map(normalizeKeyframe),
-				annotations: anim.annotations.map(normalizeAnnotation),
-				annotationScale: scale
-			})
-		: needsV4
-			? inspect(AnimationCodecV4, {
-					version: anim.version,
-					style: anim.style,
-					labels: anim.labels,
-					terrain: anim.terrain,
-					sky: anim.sky,
-					keyframes: anim.keyframes.map(normalizeKeyframe),
-					annotations: anim.annotations.map(normalizeAnnotation),
-					annotationScale: scale
-				})
-			: needsV3
-				? inspect(AnimationCodecV3, {
-						version: anim.version,
-						style: anim.style,
-						labels: anim.labels,
-						terrain: anim.terrain,
-						sky: anim.sky,
-						keyframes: anim.keyframes.map(normalizeKeyframe),
-						annotations: anim.annotations.map(normalizeAnnotation),
-						annotationScale: scale
-					})
-				: hasAnnotations
-					? inspect(AnimationCodecV2, {
-							version: anim.version,
-							style: anim.style,
-							labels: anim.labels,
-							terrain: anim.terrain,
-							sky: anim.sky,
-							keyframes: anim.keyframes.map(normalizeKeyframe),
-							annotations: anim.annotations.map(normalizeAnnotation)
-						})
-					: inspect(AnimationCodecV1, {
-							version: anim.version,
-							style: anim.style,
-							labels: anim.labels,
-							terrain: anim.terrain,
-							sky: anim.sky,
-							keyframes: anim.keyframes.map(normalizeKeyframe)
-						});
+	const entry = pickVersion(anim);
+	const inner = inspect(entry.codec, entry.build(anim, scale));
 	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so
 	// the tree's bit total matches the actual on-the-wire payload.
 	return {
