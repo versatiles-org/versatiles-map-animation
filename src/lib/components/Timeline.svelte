@@ -508,10 +508,14 @@
 		cursor: crosshair;
 		overflow: hidden;
 		touch-action: none;
-	}
-	.track:focus {
-		outline: 1px solid #4a9eff;
-		outline-offset: -1px;
+
+		&:focus {
+			outline: 1px solid #4a9eff;
+			outline-offset: -1px;
+		}
+		&:active {
+			cursor: ew-resize;
+		}
 	}
 	.tick {
 		position: absolute;
@@ -543,6 +547,10 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+
+		&.selected .diamond {
+			background: #ffd24a;
+		}
 	}
 	.diamond {
 		display: block;
@@ -552,9 +560,6 @@
 		transform: rotate(45deg);
 		border: 1px solid #fff;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-	}
-	.marker.selected .diamond {
-		background: #ffd24a;
 	}
 	.playhead {
 		position: absolute;
@@ -584,9 +589,6 @@
 		border: 1px solid #fff;
 		border-radius: 50%;
 		pointer-events: none;
-	}
-	.track:active {
-		cursor: ew-resize;
 	}
 	.content-end {
 		position: absolute;
@@ -625,13 +627,15 @@
 		border-radius: 1px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
 		touch-action: none;
-	}
-	.ann-bar.draggable {
-		pointer-events: auto;
-		cursor: grab;
-	}
-	.ann-bar.draggable:active {
-		cursor: grabbing;
+
+		&.draggable {
+			pointer-events: auto;
+			cursor: grab;
+
+			&:active {
+				cursor: grabbing;
+			}
+		}
 	}
 	.ann-fade-in,
 	.ann-fade-out {
@@ -662,26 +666,27 @@
 		touch-action: none;
 		pointer-events: auto;
 		transform: translate(-50%, -50%);
-	}
-	.ann-handle.inner {
-		width: 4px;
-		height: 16px;
-		border-radius: 1px;
-		z-index: 2;
-	}
-	.ann-handle.outer {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		z-index: 3;
-		/* Sit at the bottom of the lane, where the fade triangle's "0 height"
-		   tip actually is — the centered position floated above empty space
-		   and looked disconnected from the triangle it controls. */
-		top: 100%;
-	}
-	.ann-handle:hover {
-		background: #4a9eff;
-		border-color: #fff;
+
+		&.inner {
+			width: 4px;
+			height: 16px;
+			border-radius: 1px;
+			z-index: 2;
+		}
+		&.outer {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			z-index: 3;
+			/* Sit at the bottom of the lane, where the fade triangle's "0 height"
+			   tip actually is — the centered position floated above empty space
+			   and looked disconnected from the triangle it controls. */
+			top: 100%;
+		}
+		&:hover {
+			background: #4a9eff;
+			border-color: #fff;
+		}
 	}
 
 	.panbar {
@@ -708,18 +713,20 @@
 		border-top: 1px solid rgba(255, 255, 255, 0.25);
 		border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 		cursor: grab;
-	}
-	.thumb-body:active {
-		cursor: grabbing;
-		background: rgba(74, 158, 255, 0.75);
+
+		&:active {
+			cursor: grabbing;
+			background: rgba(74, 158, 255, 0.75);
+		}
 	}
 	.thumb-handle {
 		flex: 0 0 6px;
 		background: #4a9eff;
 		cursor: ew-resize;
-	}
-	.thumb-handle:hover {
-		background: #6fb1ff;
+
+		&:hover {
+			background: #6fb1ff;
+		}
 	}
 	.thumb-handle-left {
 		border-radius: 4px 0 0 4px;
@@ -749,14 +756,15 @@
 		font-size: 11px;
 		font-family: inherit;
 		cursor: pointer;
-	}
-	.fit:hover:not(:disabled) {
-		background: rgba(255, 255, 255, 0.12);
-		border-color: #4a9eff;
-	}
-	.fit:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
+
+		&:hover:not(:disabled) {
+			background: rgba(255, 255, 255, 0.12);
+			border-color: #4a9eff;
+		}
+		&:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
 	}
 	.dim {
 		color: #555;

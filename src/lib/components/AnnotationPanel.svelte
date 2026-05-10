@@ -538,12 +538,13 @@
 		letter-spacing: 0.07em;
 		color: #888;
 		border-top: 1px solid #2a2f37;
-	}
-	/* The first section heading sits right after the title-row, so the top
-	   border would double up with the title-row's bottom-margin gap. Drop it. */
-	.section:first-of-type {
-		border-top: none;
-		margin-top: 0.1rem;
+
+		/* The first section heading sits right after the title-row, so the top
+		   border would double up with the title-row's bottom-margin gap. Drop it. */
+		&:first-of-type {
+			border-top: none;
+			margin-top: 0.1rem;
+		}
 	}
 	.title {
 		font-size: 12px;
@@ -560,27 +561,29 @@
 		padding: 0 0.2rem;
 		font-size: 14px;
 		line-height: 1;
-	}
-	.close:hover {
-		color: #fff;
+
+		&:hover {
+			color: #fff;
+		}
 	}
 
 	.row {
 		display: flex;
 		align-items: center;
 		gap: 0.45rem;
-	}
-	.row.visibility,
-	.row.position {
-		align-items: flex-start;
-	}
-	.row .lbl {
-		flex: 0 0 auto;
-		width: 60px;
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #888;
+
+		&.visibility,
+		&.position {
+			align-items: flex-start;
+		}
+		.lbl {
+			flex: 0 0 auto;
+			width: 60px;
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: #888;
+		}
 	}
 
 	input[type='text'],
@@ -593,11 +596,11 @@
 		border-radius: 4px;
 		color: #ddd;
 		font: inherit;
-	}
-	input[type='text']:focus,
-	input[type='number']:focus {
-		outline: none;
-		border-color: #4a9eff;
+
+		&:focus {
+			outline: none;
+			border-color: #4a9eff;
+		}
 	}
 	input[type='color'] {
 		width: 36px;
@@ -641,20 +644,21 @@
 		font: inherit;
 		cursor: pointer;
 		text-align: left;
-	}
-	.icon-trigger:hover {
-		border-color: #4a9eff;
-	}
-	.icon-trigger .icon-name {
-		flex: 1 1 auto;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.icon-trigger .caret {
-		color: #888;
-		font-size: 11px;
+
+		&:hover {
+			border-color: #4a9eff;
+		}
+		.icon-name {
+			flex: 1 1 auto;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.caret {
+			color: #888;
+			font-size: 11px;
+		}
 	}
 	.icon-prev {
 		position: relative;
@@ -665,19 +669,20 @@
 		   pixels flip to white while the parent's black chip background stays
 		   intact. Inline styles set `--sprite-bg / --sprite-pos / --sprite-size`. */
 		border-radius: 2px;
-	}
-	.icon-prev::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background-image: var(--sprite-bg);
-		background-position: var(--sprite-pos);
-		background-size: var(--sprite-size);
-		background-repeat: no-repeat;
-		filter: invert(1);
-		/* Mirrors the per-icon rotation offset MapStage applies, so the
-		   preview points the same way the map will at rotation = 0. */
-		transform: rotate(var(--sprite-rotate, 0deg));
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background-image: var(--sprite-bg);
+			background-position: var(--sprite-pos);
+			background-size: var(--sprite-size);
+			background-repeat: no-repeat;
+			filter: invert(1);
+			/* Mirrors the per-icon rotation offset MapStage applies, so the
+			   preview points the same way the map will at rotation = 0. */
+			transform: rotate(var(--sprite-rotate, 0deg));
+		}
 	}
 	.icon-menu {
 		position: absolute;
@@ -694,9 +699,10 @@
 		border-radius: 4px;
 		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 		z-index: 10;
-	}
-	.icon-menu li {
-		margin: 0;
+
+		li {
+			margin: 0;
+		}
 	}
 	.icon-option {
 		width: 100%;
@@ -711,48 +717,51 @@
 		font: inherit;
 		cursor: pointer;
 		text-align: left;
-	}
-	.icon-option:hover {
-		background: rgba(74, 158, 255, 0.12);
-		border-color: rgba(74, 158, 255, 0.4);
-	}
-	.icon-option.selected {
-		background: rgba(74, 158, 255, 0.18);
-		border-color: #4a9eff;
-		color: #fff;
-	}
-	.icon-option .icon-name {
-		flex: 1 1 auto;
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+
+		&:hover {
+			background: rgba(74, 158, 255, 0.12);
+			border-color: rgba(74, 158, 255, 0.4);
+		}
+		&.selected {
+			background: rgba(74, 158, 255, 0.18);
+			border-color: #4a9eff;
+			color: #fff;
+		}
+		.icon-name {
+			flex: 1 1 auto;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
 	}
 	.pos-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 22px);
 		grid-template-rows: repeat(3, 22px);
 		gap: 2px;
-	}
-	.pos-grid button {
-		padding: 0;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid #2a2f37;
-		border-radius: 3px;
-		color: #888;
-		font:
-			14px/1 ui-monospace,
-			monospace;
-		cursor: pointer;
-	}
-	.pos-grid button:hover {
-		border-color: #4a9eff;
-		color: #ddd;
-	}
-	.pos-grid button.active {
-		background: rgba(74, 158, 255, 0.18);
-		border-color: #4a9eff;
-		color: #fff;
+
+		button {
+			padding: 0;
+			background: rgba(255, 255, 255, 0.04);
+			border: 1px solid #2a2f37;
+			border-radius: 3px;
+			color: #888;
+			font:
+				14px/1 ui-monospace,
+				monospace;
+			cursor: pointer;
+
+			&:hover {
+				border-color: #4a9eff;
+				color: #ddd;
+			}
+			&.active {
+				background: rgba(74, 158, 255, 0.18);
+				border-color: #4a9eff;
+				color: #fff;
+			}
+		}
 	}
 	.visibility-grid {
 		flex: 1 1 auto;
@@ -775,14 +784,15 @@
 		font: inherit;
 		font-size: 11px;
 		cursor: pointer;
-	}
-	.mini:hover:not(:disabled) {
-		border-color: #4a9eff;
-		color: #ddd;
-	}
-	.mini:disabled {
-		opacity: 0.35;
-		cursor: not-allowed;
+
+		&:hover:not(:disabled) {
+			border-color: #4a9eff;
+			color: #ddd;
+		}
+		&:disabled {
+			opacity: 0.35;
+			cursor: not-allowed;
+		}
 	}
 
 	footer {
@@ -799,9 +809,10 @@
 		font: inherit;
 		font-size: 12px;
 		cursor: pointer;
-	}
-	.danger:hover {
-		background: rgba(255, 80, 80, 0.22);
-		color: #fff;
+
+		&:hover {
+			background: rgba(255, 80, 80, 0.22);
+			color: #fff;
+		}
 	}
 </style>

@@ -59,6 +59,11 @@
 		gap: 0.4rem;
 		cursor: pointer;
 		user-select: none;
+
+		&.checkbox input {
+			margin: 0;
+			accent-color: #4a9eff;
+		}
 	}
 	.lbl {
 		color: #888;
@@ -72,12 +77,9 @@
 		font-size: 12px;
 		font-family: inherit;
 		cursor: pointer;
-	}
-	select:hover {
-		border-color: #4a9eff;
-	}
-	.row.checkbox input {
-		margin: 0;
-		accent-color: #4a9eff;
+
+		&:hover {
+			border-color: #4a9eff;
+		}
 	}
 </style>

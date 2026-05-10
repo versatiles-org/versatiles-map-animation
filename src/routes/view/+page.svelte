@@ -122,13 +122,14 @@
 			background 120ms ease,
 			transform 120ms ease;
 		padding: 0;
-	}
-	.play-overlay:hover {
-		background: rgba(0, 0, 0, 0.75);
-		transform: translate(-50%, -50%) scale(1.05);
-	}
-	.play-overlay svg {
-		display: block;
+
+		&:hover {
+			background: rgba(0, 0, 0, 0.75);
+			transform: translate(-50%, -50%) scale(1.05);
+		}
+		svg {
+			display: block;
+		}
 	}
 
 	.message {
@@ -143,9 +144,10 @@
 		color: #ddd;
 		font-size: 13px;
 		text-align: center;
-	}
-	.message.error {
-		border-color: rgba(255, 80, 80, 0.5);
-		color: #ffaaaa;
+
+		&.error {
+			border-color: rgba(255, 80, 80, 0.5);
+			color: #ffaaaa;
+		}
 	}
 </style>

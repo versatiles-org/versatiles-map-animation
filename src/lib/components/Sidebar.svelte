@@ -113,18 +113,20 @@
 		/* Push to the bottom of the sidebar's flex column. */
 		margin-top: auto;
 		padding-top: 0.5rem;
-	}
-	.sidebar-footer a {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		color: #888;
-		text-decoration: none;
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-	}
-	.sidebar-footer a:hover {
-		color: #ddd;
+
+		a {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.4rem;
+			color: #888;
+			text-decoration: none;
+			font-size: 11px;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+
+			&:hover {
+				color: #ddd;
+			}
+		}
 	}
 </style>

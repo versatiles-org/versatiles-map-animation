@@ -560,13 +560,14 @@
 		   AnnotationPanel — which is a sibling of `.map-stage` and needs to
 		   extend below the map on short viewports. */
 		overflow: hidden;
+
+		& :global(.maplibregl-canvas) {
+			outline: none;
+		}
 	}
 	.map-canvas {
 		width: 100%;
 		height: 100%;
-	}
-	.map-stage :global(.maplibregl-canvas) {
-		outline: none;
 	}
 	.watermark {
 		position: absolute;
@@ -590,9 +591,10 @@
 		/* Default: colourful style — dark glyphs on a light halo. */
 		color: #000;
 		-webkit-text-stroke-color: #fff;
-	}
-	.watermark.on-satellite {
-		color: #fff;
-		-webkit-text-stroke-color: #000;
+
+		&.on-satellite {
+			color: #fff;
+			-webkit-text-stroke-color: #000;
+		}
 	}
 </style>

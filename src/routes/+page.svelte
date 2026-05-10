@@ -141,17 +141,19 @@
 		border-radius: 4px;
 		color: #ffaaaa;
 		font-size: 13px;
-	}
-	.banner button {
-		background: transparent;
-		border: none;
-		color: #ffaaaa;
-		cursor: pointer;
-		font-size: 14px;
-		padding: 0.1rem 0.4rem;
-	}
-	.banner button:hover {
-		color: #fff;
+
+		button {
+			background: transparent;
+			border: none;
+			color: #ffaaaa;
+			cursor: pointer;
+			font-size: 14px;
+			padding: 0.1rem 0.4rem;
+
+			&:hover {
+				color: #fff;
+			}
+		}
 	}
 
 	/* Top half of the viewport: sidebar on the left, main column (map +
