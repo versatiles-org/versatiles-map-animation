@@ -471,9 +471,15 @@
 	// from the feature property, so the layer expression encodes both halves
 	// and we only re-set it when the global half changes.
 	//
-	// text-offset is in ems so it auto-scales with text-size; icon-offset is
-	// multiplied by icon-size internally by MapLibre, so the tuned pivot
-	// pixels stay correct at any scale.
+	// All four annotation pixel-sizes flow through `globalScale` so the
+	// editor preview and any embed/render at a different width keep the same
+	// visual proportions:
+	//   - icon-size and text-size: scaled here.
+	//   - icon-halo-width and text-halo-width: scaled here, so the outline
+	//     stays visually proportional to the icon/text it surrounds.
+	//   - text-offset: in em, auto-scales with text-size.
+	//   - icon-offset: multiplied by icon-size internally by MapLibre, so the
+	//     tuned pivot pixels stay correct at any scale.
 	$effect(() => {
 		const ready = annotationsReady;
 		const cs = containerScale;
@@ -485,6 +491,16 @@
 			'*',
 			['get', 'labelSize'],
 			BASE_TEXT_PX * globalScale
+		]);
+		map.setPaintProperty(ANNOTATION_LAYER, 'icon-halo-width', [
+			'*',
+			['get', 'iconHaloWidth'],
+			globalScale
+		]);
+		map.setPaintProperty(ANNOTATION_LAYER, 'text-halo-width', [
+			'*',
+			['get', 'labelHaloWidth'],
+			globalScale
 		]);
 	});
 
