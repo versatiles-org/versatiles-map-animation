@@ -18,7 +18,7 @@ const baseAnn = (overrides: Partial<Annotation> = {}): Annotation => ({
 	lng: 0,
 	lat: 0,
 	icon: 'symbol-marker',
-	color: '#cc0000',
+	iconColor: '#cc0000',
 	label: '',
 	...overrides
 });
@@ -53,14 +53,14 @@ describe('annotation codec - normalize fallbacks', () => {
 	});
 
 	it('falls back to default color for malformed hex strings', () => {
-		const out = roundTrip([baseAnn({ color: 'not-a-color' })]);
+		const out = roundTrip([baseAnn({ iconColor: 'not-a-color' })]);
 		// Default color (#cc0000) — re-emitted as canonical lowercase hex.
-		expect(out.annotations[0].color).toBe('#cc0000');
+		expect(out.annotations[0].iconColor).toBe('#cc0000');
 	});
 
 	it('accepts 3-digit hex colors and emits 6-digit canonical form', () => {
-		const out = roundTrip([baseAnn({ color: '#abc' })]);
-		expect(out.annotations[0].color).toBe('#aabbcc');
+		const out = roundTrip([baseAnn({ iconColor: '#abc' })]);
+		expect(out.annotations[0].iconColor).toBe('#aabbcc');
 	});
 
 	it('mod-360 rotation: 720 normalises to 0, -10 to 350', () => {

@@ -72,7 +72,7 @@
 			lng: cam.lng,
 			lat: cam.lat,
 			icon: DEFAULT_ANNOTATION_ICON,
-			color: DEFAULT_ANNOTATION_COLOR,
+			iconColor: DEFAULT_ANNOTATION_COLOR,
 			label: ''
 		});
 	}
@@ -202,59 +202,151 @@
 			labels: false,
 			terrain: true,
 			sky: true,
+			// 10-second flight around Germany's Zugspitze (2962 m) and the
+			// surrounding Wetterstein massif. Starts as a wide aerial north of
+			// Garmisch-Partenkirchen, descends toward the Eibsee at the foot of
+			// the Zugspitze, then pulls into a high-pitch panorama that reveals
+			// the whole massif from west to east.
 			keyframes: [
 				{
 					t: 0,
-					lng: 6.881653939053336,
-					lat: 45.814581983794,
-					zoom: 11.136564461224788,
-					pitch: 39.882352941176464,
-					bearing: 117.421875,
+					lng: 11.05,
+					lat: 47.62,
+					zoom: 10,
+					pitch: 30,
+					bearing: 200,
 					roll: 0
 				},
 				{
-					t: 3.011362925517272,
-					lng: 6.939199689011502,
-					lat: 45.79650412618753,
-					zoom: 11.5464248596472,
-					pitch: 60.705882352941174,
-					bearing: 119.88281250000001,
+					t: 3,
+					lng: 10.99,
+					lat: 47.52,
+					zoom: 11.5,
+					pitch: 55,
+					bearing: 200,
 					roll: 0
 				},
 				{
-					t: 6.009,
-					lng: 6.881507623131057,
-					lat: 45.760951554399725,
-					zoom: 11.41,
-					pitch: 64.58823529411765,
-					bearing: 167.34375,
+					t: 6.5,
+					lng: 10.96,
+					lat: 47.5,
+					zoom: 11.8,
+					pitch: 72,
+					bearing: 220,
 					roll: 0,
 					path: 'linear'
 				},
 				{
-					t: 9.08427815864377,
-					lng: 6.861904619278221,
-					lat: 45.63357817092992,
-					zoom: 10.848637509184293,
-					pitch: 78.20588235294119,
-					bearing: 179.69812535546495,
+					t: 10,
+					lng: 11.05,
+					lat: 47.52,
+					zoom: 11.3,
+					pitch: 78,
+					bearing: 245,
 					roll: 0
 				}
 			],
 			annotations: [
+				// Zugspitze — the headliner: Germany's highest peak. Larger
+				// icon and bolder colour to stand out from the supporting peaks.
 				{
-					lng: 6.862675947884867,
-					lat: 45.83310387328872,
+					lng: 10.985278,
+					lat: 47.421111,
 					icon: 'symbol-arrow1',
-					color: '#b20000',
-					label: 'Mont Blanc',
+					label: 'Zugspitze\n2962 m',
 					labelPosition: 'top',
-					visibleFrom: 3,
-					iconSize: 2.5,
-					labelSize: 1.75,
+					visibleFrom: 0,
 					labelDistance: 2.5,
 					fadeIn: 1,
-					labelColor: '#b20000',
+					
+					iconColor: '#660000',
+					iconHaloColor: '#ffffff',
+					iconHaloWidth: 1,
+					iconSize: 2.5,
+					labelColor: '#660000',
+					labelHaloColor: '#ffffff',
+					labelHaloWidth: 1,
+					labelSize: 1.75,
+				},
+				// Supporting peaks of the Wetterstein massif, fanned out so the
+				// labels don't collide at the panoramic shot. Coordinates from
+				// each peak's Wikipedia summit page.
+				{
+					lng: 10.971944,
+					lat: 47.412917,
+					icon: 'symbol-arrow1',
+					iconColor: '#7a3030',
+					label: 'Schneefernerkopf\n2875 m',
+					labelPosition: 'bottom-left',
+					visibleFrom: 2,
+					iconSize: 1.8,
+					labelSize: 1.3,
+					labelDistance: 2.2,
+					fadeIn: 1,
+					labelColor: '#7a3030',
+					labelHaloWidth: 1
+				},
+				{
+					lng: 11.0375,
+					lat: 47.4525,
+					icon: 'symbol-arrow1',
+					iconColor: '#7a3030',
+					label: 'Alpspitze\n2628 m',
+					labelPosition: 'top-right',
+					visibleFrom: 2,
+					iconSize: 1.8,
+					labelSize: 1.3,
+					labelDistance: 2.2,
+					fadeIn: 1,
+					labelColor: '#7a3030',
+					labelHaloWidth: 1
+				},
+				{
+					lng: 11.082222,
+					lat: 47.413056,
+					icon: 'symbol-arrow1',
+					iconColor: '#7a3030',
+					label: 'Hochwanner\n2744 m',
+					labelPosition: 'bottom-right',
+					visibleFrom: 2,
+					iconSize: 1.8,
+					labelSize: 1.3,
+					labelDistance: 2.2,
+					fadeIn: 1,
+					labelColor: '#7a3030',
+					labelHaloWidth: 1
+				},
+				{
+					lng: 11.013333,
+					lat: 47.430278,
+					icon: 'symbol-arrow1',
+					iconColor: '#7a3030',
+					label: 'Höllentalspitze\n2743 m',
+					labelPosition: 'right',
+					visibleFrom: 2,
+					iconSize: 1.8,
+					labelSize: 1.3,
+					labelDistance: 2.2,
+					fadeIn: 1,
+					labelColor: '#7a3030',
+					labelHaloWidth: 1
+				},
+				// Eibsee — the turquoise alpine lake at the foot of the Zugspitze.
+				// Different icon (marker pin) so it reads as a point of interest
+				// rather than another peak.
+				{
+					lng: 10.9783,
+					lat: 47.4581,
+					icon: 'symbol-marker',
+					iconColor: '#1a6fa8',
+					label: 'Eibsee\n973 m',
+					labelPosition: 'top-left',
+					visibleFrom: 2,
+					iconSize: 1.6,
+					labelSize: 1.2,
+					labelDistance: 1.8,
+					fadeIn: 1,
+					labelColor: '#1a6fa8',
 					labelHaloWidth: 1
 				}
 			],

@@ -131,7 +131,7 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 		lng: requiredNum(o, 'lng', ctx),
 		lat: requiredNum(o, 'lat', ctx),
 		icon: isAnnotationIcon(o.icon) ? o.icon : DEFAULT_ANNOTATION_ICON,
-		color: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
+		iconColor: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
 		label: typeof o.label === 'string' ? o.label : ''
 	};
 	// rotation, visibleUntil, labelPosition aren't in FIELD_SPECS (their wire

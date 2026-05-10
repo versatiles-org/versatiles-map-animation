@@ -131,7 +131,7 @@ describe('inspectAnimation', () => {
 					lng: 0,
 					lat: 0,
 					icon: 'symbol-marker',
-					color: '#cc0000',
+					iconColor: '#cc0000',
 					label: '',
 					labelHaloColor: '#abcdef'
 				}

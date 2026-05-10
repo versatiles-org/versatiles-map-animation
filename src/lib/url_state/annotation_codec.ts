@@ -488,7 +488,7 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 		mx,
 		my,
 		icon: isAnnotationIcon(ann.icon) ? ann.icon : DEFAULT_ANNOTATION_ICON,
-		color: parseHexColor(ann.color ?? DEFAULT_ANNOTATION_COLOR),
+		color: parseHexColor(ann.iconColor ?? DEFAULT_ANNOTATION_COLOR),
 		label: ann.label ?? '',
 		rotation: ((((ann.rotation ?? 0) % 360) + 360) % 360) % 360,
 		labelPosition: isLabelPosition(ann.labelPosition) ? ann.labelPosition : DEFAULT_LABEL_POSITION
@@ -510,7 +510,7 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 		lng,
 		lat,
 		icon: wire.icon,
-		color: formatHexColor(wire.color),
+		iconColor: formatHexColor(wire.color),
 		label: wire.label
 	};
 	if (wire.rotation !== 0) out.rotation = wire.rotation;

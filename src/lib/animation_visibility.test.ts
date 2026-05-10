@@ -6,7 +6,7 @@ const base: Annotation = {
 	lng: 0,
 	lat: 0,
 	icon: 'symbol-marker',
-	color: '#ffffff',
+	iconColor: '#ffffff',
 	label: ''
 };
 

@@ -94,7 +94,7 @@ describe('annotations round-trip', () => {
 					lng: 13.405,
 					lat: 52.52,
 					icon: 'symbol-marker',
-					color: '#ff8800',
+					iconColor: '#ff8800',
 					label: 'Berlin'
 				}
 			]
@@ -105,7 +105,7 @@ describe('annotations round-trip', () => {
 		expect(a.lng).toBeCloseTo(13.405, 4);
 		expect(a.lat).toBeCloseTo(52.52, 4);
 		expect(a.icon).toBe('symbol-marker');
-		expect(a.color).toBe('#ff8800');
+		expect(a.iconColor).toBe('#ff8800');
 		expect(a.label).toBe('Berlin');
 		// Optional fields default to undefined when they match defaults.
 		expect(a.rotation).toBeUndefined();
@@ -121,7 +121,7 @@ describe('annotations round-trip', () => {
 					lng: 7.1,
 					lat: 46.1,
 					icon: 'symbol-arrow',
-					color: '#00ff00',
+					iconColor: '#00ff00',
 					label: 'Bern',
 					rotation: 90,
 					visibleFrom: 1.5,
@@ -139,14 +139,14 @@ describe('annotations round-trip', () => {
 	it('carry-forward shrinks repeated icon/color/label across annotations', () => {
 		const single: Animation = {
 			...example,
-			annotations: [{ lng: 10, lat: 50, icon: 'symbol-marker', color: '#aabbcc', label: 'A' }]
+			annotations: [{ lng: 10, lat: 50, icon: 'symbol-marker', iconColor: '#aabbcc', label: 'A' }]
 		};
 		const many: Animation = {
 			...example,
 			annotations: [
-				{ lng: 10, lat: 50, icon: 'symbol-marker', color: '#aabbcc', label: 'A' },
-				{ lng: 11, lat: 51, icon: 'symbol-marker', color: '#aabbcc', label: 'A' },
-				{ lng: 12, lat: 52, icon: 'symbol-marker', color: '#aabbcc', label: 'A' }
+				{ lng: 10, lat: 50, icon: 'symbol-marker', iconColor: '#aabbcc', label: 'A' },
+				{ lng: 11, lat: 51, icon: 'symbol-marker', iconColor: '#aabbcc', label: 'A' },
+				{ lng: 12, lat: 52, icon: 'symbol-marker', iconColor: '#aabbcc', label: 'A' }
 			]
 		};
 		const singleLen = encodeAnimation(single).length;
@@ -164,16 +164,16 @@ describe('annotations round-trip', () => {
 	it('accepts shorthand #rgb hex colour', () => {
 		const anim: Animation = {
 			...example,
-			annotations: [{ lng: 0, lat: 0, icon: 'symbol-circle', color: '#fa0', label: '' }]
+			annotations: [{ lng: 0, lat: 0, icon: 'symbol-circle', iconColor: '#fa0', label: '' }]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
-		expect(decoded?.annotations[0].color).toBe('#ffaa00');
+		expect(decoded?.annotations[0].iconColor).toBe('#ffaa00');
 	});
 
 	it('round-trips unicode labels', () => {
 		const anim: Animation = {
 			...example,
-			annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'Köln 🦊' }]
+			annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'Köln 🦊' }]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
 		expect(decoded?.annotations[0].label).toBe('Köln 🦊');
@@ -183,7 +183,7 @@ describe('annotations round-trip', () => {
 describe('annotationScale option', () => {
 	const oneAnn: Animation = {
 		...example,
-		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A' }]
+		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'A' }]
 	};
 
 	it('default scale (1) costs no extra bytes via the options mask', () => {
@@ -209,7 +209,7 @@ describe('annotationScale option', () => {
 describe('per-annotation extras', () => {
 	const ann = (extra: Partial<{ iconSize: number; labelSize: number }> = {}): Animation => ({
 		...example,
-		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A', ...extra }]
+		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'A', ...extra }]
 	});
 
 	it('default sizes cost nothing extra', () => {
@@ -228,7 +228,7 @@ describe('per-annotation extras', () => {
 		const anim: Animation = {
 			...example,
 			annotations: [
-				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 }
+				{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#fff', label: 'A', iconSize: 1.5 }
 			],
 			annotationScale: 1.25
 		};
@@ -245,7 +245,7 @@ describe('per-annotation extras', () => {
 					lng: 0,
 					lat: 0,
 					icon: 'symbol-marker',
-					color: '#fff',
+					iconColor: '#fff',
 					label: 'H',
 					labelHaloColor: '#ff0000',
 					labelHaloWidth: 2.5,
@@ -270,11 +270,11 @@ describe('per-annotation extras', () => {
 					lng: 0,
 					lat: 0,
 					icon: 'symbol-marker',
-					color: '#fff',
+					iconColor: '#fff',
 					label: 'A',
 					labelHaloColor: '#f00'
 				},
-				{ lng: 1, lat: 1, icon: 'symbol-marker', color: '#fff', label: 'B' }
+				{ lng: 1, lat: 1, icon: 'symbol-marker', iconColor: '#fff', label: 'B' }
 			]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
@@ -290,7 +290,7 @@ describe('per-annotation extras', () => {
 					lng: 0,
 					lat: 0,
 					icon: 'symbol-marker',
-					color: '#fff',
+					iconColor: '#fff',
 					label: 'A',
 					labelColor: '#ff0080',
 					labelDistance: 2.7,
@@ -313,7 +313,7 @@ describe('per-annotation extras', () => {
 					lng: 0,
 					lat: 0,
 					icon: 'symbol-marker',
-					color: '#fff',
+					iconColor: '#fff',
 					label: 'A',
 					labelPosition: 'bottom'
 				}

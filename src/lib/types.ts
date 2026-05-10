@@ -192,7 +192,7 @@ export interface Annotation {
 	lat: number;
 	icon: AnnotationIcon;
 	/** Icon colour. Any CSS hex; canonical wire form is `#RRGGBB`. */
-	color: string;
+	iconColor: string;
 	/**
 	 * Label text colour. Default `DEFAULT_ANNOTATION_LABEL_COLOR` (near-black);
 	 * the halo auto-flips to the contrasting brightness so the label stays

@@ -148,7 +148,7 @@
 					geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
 					properties: {
 						icon: a.icon,
-						color: a.color,
+						color: a.iconColor,
 						label: a.label,
 						// Per-icon rotation offset puts the user's `rotation = 0`
 						// at "north up" for arrows; other icons have offset 0.

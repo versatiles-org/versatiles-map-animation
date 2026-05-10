@@ -256,11 +256,11 @@
 			<span class="lbl">Color</span>
 			<input
 				type="color"
-				value={normalizeHex(ann.color)}
+				value={normalizeHex(ann.iconColor)}
 				oninput={onText('color')}
 				aria-label="Icon color"
 			/>
-			<span class="hex">{ann.color}</span>
+			<span class="hex">{ann.iconColor}</span>
 		</label>
 
 		<div class="row">

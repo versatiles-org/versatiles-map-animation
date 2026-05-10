@@ -373,7 +373,7 @@
 					<div
 						class="ann-fade-in"
 						style="left: {pct(vFrom - fIn)}%; width: {pct(vFrom) -
-							pct(vFrom - fIn)}%; background: {selAnn.color};"
+							pct(vFrom - fIn)}%; background: {selAnn.iconColor};"
 						title="Fade in {fIn.toFixed(2)}s"
 						aria-hidden="true"
 					></div>
@@ -384,7 +384,7 @@
 				<div
 					class="ann-bar"
 					class:draggable={barDraggable}
-					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {selAnn.color};"
+					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {selAnn.iconColor};"
 					title={barDraggable
 						? `Drag to shift the visibility window (${fmt(vFrom)}s → ${fmt(vUntil)}s)`
 						: vFrom !== undefined || vUntil !== undefined
@@ -400,7 +400,7 @@
 					<div
 						class="ann-fade-out"
 						style="left: {pct(vUntil)}%; width: {pct(vUntil + fOut) -
-							pct(vUntil)}%; background: {selAnn.color};"
+							pct(vUntil)}%; background: {selAnn.iconColor};"
 						title="Fade out {fOut.toFixed(2)}s"
 						aria-hidden="true"
 					></div>

@@ -155,7 +155,7 @@ describe('validateAnnotation (via validateAnimation)', () => {
 			...minimalAnim,
 			annotations: [{ ...minimalAnn, color: 12345 }]
 		});
-		expect(typeof a.annotations[0].color).toBe('string');
+		expect(typeof a.annotations[0].iconColor).toBe('string');
 	});
 
 	it('preserves rotation/visibleFrom/visibleUntil when valid', () => {
