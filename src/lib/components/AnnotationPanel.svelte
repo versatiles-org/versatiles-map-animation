@@ -673,6 +673,9 @@
 		background-size: var(--sprite-size);
 		background-repeat: no-repeat;
 		filter: invert(1);
+		/* Mirrors the per-icon rotation offset MapStage applies, so the
+		   preview points the same way the map will at rotation = 0. */
+		transform: rotate(var(--sprite-rotate, 0deg));
 	}
 	.icon-menu {
 		position: absolute;

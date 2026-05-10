@@ -41,6 +41,29 @@ export function isAnnotationIcon(value: unknown): value is AnnotationIcon {
 }
 
 /**
+ * Per-icon rotation offset (degrees, clockwise) applied on top of the user's
+ * `rotation`. Arrows ship as right-pointing sprites; +90° puts the user's
+ * `rotation = 0` at "arrow points down" (south) — the natural default when
+ * a label sits below the marker pointing toward something at the geo point.
+ * Other icons use 0 since they're rotation-symmetric or don't have a natural
+ * orientation. The same offset is applied to icon previews in the dropdown.
+ */
+export const ANNOTATION_ICON_ROTATION_OFFSETS: Record<AnnotationIcon, number> = {
+	'symbol-marker': 0,
+	'symbol-marker_outline': 0,
+	'symbol-circle': 0,
+	'symbol-circle_outline': 0,
+	'symbol-star': 0,
+	'symbol-star_outline': 0,
+	'symbol-arrow': 90,
+	'symbol-arrow1': 90,
+	'symbol-arrow2': 90,
+	'icon-home': 0,
+	'icon-mountain': 0,
+	'icon-information': 0
+};
+
+/**
  * Per-icon `icon-offset` (px) used with `icon-anchor: 'center'` on the symbol
  * layer. Each value places the icon's intended visual pivot exactly on the
  * geographic point and makes `icon-rotate` rotate around that pivot — marker

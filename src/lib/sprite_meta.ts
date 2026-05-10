@@ -6,7 +6,7 @@
  * version drift in code review than leave the picker silently broken).
  */
 
-import type { AnnotationIcon } from './types';
+import { ANNOTATION_ICON_ROTATION_OFFSETS, type AnnotationIcon } from './types';
 
 export const ANNOTATION_SPRITE_PNG_URL =
 	'https://tiles.versatiles.org/assets/sprites/markers/sprites.png';
@@ -42,11 +42,15 @@ export const ANNOTATION_SPRITE_POS: Record<AnnotationIcon, [number, number]> = {
 export function spritePreviewStyle(icon: AnnotationIcon, displayPx: number): string {
 	const [sx, sy] = ANNOTATION_SPRITE_POS[icon];
 	const scale = displayPx / ANNOTATION_SPRITE_PX;
+	// Apply the same per-icon rotation offset the map uses, so what the user
+	// sees in the dropdown matches what they'll get on the map at rotation 0.
+	const offsetDeg = ANNOTATION_ICON_ROTATION_OFFSETS[icon];
 	return [
 		`width: ${displayPx}px`,
 		`height: ${displayPx}px`,
 		`--sprite-bg: url('${ANNOTATION_SPRITE_PNG_URL}')`,
 		`--sprite-pos: -${sx * scale}px -${sy * scale}px`,
-		`--sprite-size: ${ANNOTATION_SPRITE_ATLAS_W * scale}px ${ANNOTATION_SPRITE_ATLAS_H * scale}px`
+		`--sprite-size: ${ANNOTATION_SPRITE_ATLAS_W * scale}px ${ANNOTATION_SPRITE_ATLAS_H * scale}px`,
+		`--sprite-rotate: ${offsetDeg}deg`
 	].join('; ');
 }

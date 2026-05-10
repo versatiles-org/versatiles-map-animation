@@ -7,6 +7,7 @@
 	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
+		ANNOTATION_ICON_ROTATION_OFFSETS,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_ICON_HALO_COLOR,
 		DEFAULT_ICON_HALO_WIDTH,
@@ -130,7 +131,9 @@
 						icon: a.icon,
 						color: a.color,
 						label: a.label,
-						rotation: a.rotation ?? 0,
+						// Per-icon rotation offset puts the user's `rotation = 0`
+						// at "north up" for arrows; other icons have offset 0.
+						rotation: (a.rotation ?? 0) + ANNOTATION_ICON_ROTATION_OFFSETS[a.icon],
 						offset: ANNOTATION_ICON_OFFSETS[a.icon],
 						iconSize: a.iconSize ?? 1,
 						labelSize: a.labelSize ?? 1,
