@@ -107,3 +107,21 @@ test.describe('viewport-size invariance at fixed aspect ratio', () => {
 		expect(await maxCornerDelta(small, large)).toBeLessThan(1e-4);
 	});
 });
+
+test.describe('annotation layer setup', () => {
+	test('loading the annotated demo does not raise a maplibre style error', async ({ page }) => {
+		const errors: string[] = [];
+		page.on('pageerror', (e) => errors.push(e.message));
+		page.on('console', (msg) => {
+			if (msg.type() === 'error') errors.push(msg.text());
+		});
+		await openViewer(page, 1280, 720, DEMO_HASH, SEEK_TIME);
+		// Filter to maplibre-relevant noise — tile fetches and the like can
+		// flutter on slow CI but the text-font / layout error we care about
+		// will surface here.
+		const styleErrors = errors.filter(
+			(e) => /text-font|annotations-layer|layout|paint/i.test(e) && !/AbortError|fetch/i.test(e)
+		);
+		expect(styleErrors).toEqual([]);
+	});
+});

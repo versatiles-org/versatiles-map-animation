@@ -251,10 +251,245 @@ export interface Annotation {
 	 * Ignored if `visibleUntil` is undefined.
 	 */
 	fadeOut?: number;
+	/**
+	 * Glyph font for the label, drawn from the VersaTiles tileserver's bundled
+	 * fonts. Default `noto_sans_bold`. See `ANNOTATION_LABEL_FONTS`.
+	 */
+	labelFont?: AnnotationLabelFont;
 }
 
 export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
 export const DEFAULT_ANNOTATION_LABEL_SIZE = 1;
+
+// ---------------------------------------------------------------------------
+// Annotation label fonts
+//
+// Mirrors https://tiles.versatiles.org/assets/glyphs/index.json — the set of
+// SDF glyph stacks the VersaTiles tile server bundles. Pinned in code so the
+// codec enum index is stable (changing this list reorders the wire encoding;
+// it'd be a breaking change). When the upstream font set changes meaningfully,
+// re-fetch and update both this list and any tests that pin specific entries.
+// ---------------------------------------------------------------------------
+
+export const ANNOTATION_LABEL_FONTS = [
+	'fira_sans_black',
+	'fira_sans_black_italic',
+	'fira_sans_bold',
+	'fira_sans_bold_italic',
+	'fira_sans_condensed_black',
+	'fira_sans_condensed_black_italic',
+	'fira_sans_condensed_bold',
+	'fira_sans_condensed_bold_italic',
+	'fira_sans_condensed_extrabold',
+	'fira_sans_condensed_extrabold_italic',
+	'fira_sans_condensed_extralight',
+	'fira_sans_condensed_extralight_italic',
+	'fira_sans_condensed_light',
+	'fira_sans_condensed_light_italic',
+	'fira_sans_condensed_medium',
+	'fira_sans_condensed_medium_italic',
+	'fira_sans_condensed_regular',
+	'fira_sans_condensed_regular_italic',
+	'fira_sans_condensed_semibold',
+	'fira_sans_condensed_semibold_italic',
+	'fira_sans_condensed_thin',
+	'fira_sans_condensed_thin_italic',
+	'fira_sans_extra_condensed_black',
+	'fira_sans_extra_condensed_black_italic',
+	'fira_sans_extra_condensed_bold',
+	'fira_sans_extra_condensed_bold_italic',
+	'fira_sans_extra_condensed_extrabold',
+	'fira_sans_extra_condensed_extrabold_italic',
+	'fira_sans_extra_condensed_extralight',
+	'fira_sans_extra_condensed_extralight_italic',
+	'fira_sans_extra_condensed_light',
+	'fira_sans_extra_condensed_light_italic',
+	'fira_sans_extra_condensed_medium',
+	'fira_sans_extra_condensed_medium_italic',
+	'fira_sans_extra_condensed_regular',
+	'fira_sans_extra_condensed_regular_italic',
+	'fira_sans_extra_condensed_semibold',
+	'fira_sans_extra_condensed_semibold_italic',
+	'fira_sans_extra_condensed_thin',
+	'fira_sans_extra_condensed_thin_italic',
+	'fira_sans_extrabold',
+	'fira_sans_extrabold_italic',
+	'fira_sans_extralight',
+	'fira_sans_extralight_italic',
+	'fira_sans_light',
+	'fira_sans_light_italic',
+	'fira_sans_medium',
+	'fira_sans_medium_italic',
+	'fira_sans_regular',
+	'fira_sans_regular_italic',
+	'fira_sans_semibold',
+	'fira_sans_semibold_italic',
+	'fira_sans_thin',
+	'fira_sans_thin_italic',
+	'lato_black',
+	'lato_black_italic',
+	'lato_bold',
+	'lato_bold_italic',
+	'lato_light',
+	'lato_light_italic',
+	'lato_regular',
+	'lato_regular_italic',
+	'lato_thin',
+	'lato_thin_italic',
+	'libre_baskerville_bold',
+	'libre_baskerville_regular',
+	'libre_baskerville_regular_italic',
+	'merriweather_sans_bold',
+	'merriweather_sans_bold_italic',
+	'merriweather_sans_extrabold',
+	'merriweather_sans_extrabold_italic',
+	'merriweather_sans_light',
+	'merriweather_sans_light_italic',
+	'merriweather_sans_medium',
+	'merriweather_sans_medium_italic',
+	'merriweather_sans_regular',
+	'merriweather_sans_regular_italic',
+	'merriweather_sans_semibold',
+	'merriweather_sans_semibold_italic',
+	'noto_sans_bold',
+	'noto_sans_regular',
+	'nunito_black',
+	'nunito_black_italic',
+	'nunito_bold',
+	'nunito_bold_italic',
+	'nunito_extrabold',
+	'nunito_extrabold_italic',
+	'nunito_extralight',
+	'nunito_extralight_italic',
+	'nunito_light',
+	'nunito_light_italic',
+	'nunito_medium',
+	'nunito_medium_italic',
+	'nunito_regular',
+	'nunito_regular_italic',
+	'nunito_semibold',
+	'nunito_semibold_italic',
+	'open_sans_bold',
+	'open_sans_bold_italic',
+	'open_sans_condensed_bold',
+	'open_sans_condensed_bold_italic',
+	'open_sans_condensed_extrabold',
+	'open_sans_condensed_extrabold_italic',
+	'open_sans_condensed_light',
+	'open_sans_condensed_light_italic',
+	'open_sans_condensed_medium',
+	'open_sans_condensed_medium_italic',
+	'open_sans_condensed_regular',
+	'open_sans_condensed_regular_italic',
+	'open_sans_condensed_semibold',
+	'open_sans_condensed_semibold_italic',
+	'open_sans_extrabold',
+	'open_sans_extrabold_italic',
+	'open_sans_light',
+	'open_sans_light_italic',
+	'open_sans_medium',
+	'open_sans_medium_italic',
+	'open_sans_regular',
+	'open_sans_regular_italic',
+	'open_sans_semi_condensed_bold',
+	'open_sans_semi_condensed_bold_italic',
+	'open_sans_semi_condensed_extrabold',
+	'open_sans_semi_condensed_extrabold_italic',
+	'open_sans_semi_condensed_light',
+	'open_sans_semi_condensed_light_italic',
+	'open_sans_semi_condensed_medium',
+	'open_sans_semi_condensed_medium_italic',
+	'open_sans_semi_condensed_regular',
+	'open_sans_semi_condensed_regular_italic',
+	'open_sans_semi_condensed_semibold',
+	'open_sans_semi_condensed_semibold_italic',
+	'open_sans_semibold',
+	'open_sans_semibold_italic',
+	'pt_sans_bold',
+	'pt_sans_bold_italic',
+	'pt_sans_caption_bold',
+	'pt_sans_caption_regular',
+	'pt_sans_narrow_bold',
+	'pt_sans_narrow_regular',
+	'pt_sans_regular',
+	'pt_sans_regular_italic',
+	'roboto_black',
+	'roboto_black_italic',
+	'roboto_bold',
+	'roboto_bold_italic',
+	'roboto_condensed_black',
+	'roboto_condensed_black_italic',
+	'roboto_condensed_bold',
+	'roboto_condensed_bold_italic',
+	'roboto_condensed_extrabold',
+	'roboto_condensed_extrabold_italic',
+	'roboto_condensed_extralight',
+	'roboto_condensed_extralight_italic',
+	'roboto_condensed_light',
+	'roboto_condensed_light_italic',
+	'roboto_condensed_medium',
+	'roboto_condensed_medium_italic',
+	'roboto_condensed_regular',
+	'roboto_condensed_regular_italic',
+	'roboto_condensed_semibold',
+	'roboto_condensed_semibold_italic',
+	'roboto_condensed_thin',
+	'roboto_condensed_thin_italic',
+	'roboto_light',
+	'roboto_light_italic',
+	'roboto_medium',
+	'roboto_medium_italic',
+	'roboto_regular',
+	'roboto_regular_italic',
+	'roboto_thin',
+	'roboto_thin_italic',
+	'source_sans_3_black',
+	'source_sans_3_black_italic',
+	'source_sans_3_bold',
+	'source_sans_3_bold_italic',
+	'source_sans_3_extrabold',
+	'source_sans_3_extrabold_italic',
+	'source_sans_3_extralight',
+	'source_sans_3_extralight_italic',
+	'source_sans_3_light',
+	'source_sans_3_light_italic',
+	'source_sans_3_medium',
+	'source_sans_3_medium_italic',
+	'source_sans_3_regular',
+	'source_sans_3_regular_italic',
+	'source_sans_3_semibold',
+	'source_sans_3_semibold_italic'
+] as const;
+export type AnnotationLabelFont = (typeof ANNOTATION_LABEL_FONTS)[number];
+export const DEFAULT_ANNOTATION_LABEL_FONT: AnnotationLabelFont = 'noto_sans_bold';
+
+export function isAnnotationLabelFont(value: unknown): value is AnnotationLabelFont {
+	return typeof value === 'string' && (ANNOTATION_LABEL_FONTS as readonly string[]).includes(value);
+}
+
+/**
+ * Strip the trailing weight/style from a font name to get the family the UI
+ * groups on. `fira_sans_condensed_black_italic` → `fira_sans_condensed`.
+ * Used by AnnotationPanel to build `<optgroup>`s in the font picker.
+ */
+export function fontFamilyOf(font: AnnotationLabelFont): string {
+	const STYLE_SUFFIX =
+		/(_thin|_extralight|_light|_regular|_medium|_semibold|_bold|_extrabold|_black)?(_italic)?$/;
+	return font.replace(STYLE_SUFFIX, '');
+}
+
+/**
+ * Human label for a font's weight/style — what shows inside the `<optgroup>`
+ * for a font family. `fira_sans_condensed_black_italic` → `Black Italic`.
+ */
+export function fontVariantLabel(font: AnnotationLabelFont): string {
+	const variant = font.slice(fontFamilyOf(font).length).replace(/^_/, '');
+	if (!variant) return 'Regular';
+	return variant
+		.split('_')
+		.map((s) => s[0].toUpperCase() + s.slice(1))
+		.join(' ');
+}
 
 /**
  * Where the label sits relative to the icon. The name describes where the

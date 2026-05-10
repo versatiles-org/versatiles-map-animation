@@ -173,7 +173,9 @@ describe('annotations round-trip', () => {
 	it('round-trips unicode labels', () => {
 		const anim: Animation = {
 			...example,
-			annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'Köln 🦊' }]
+			annotations: [
+				{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'Köln 🦊' }
+			]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
 		expect(decoded?.annotations[0].label).toBe('Köln 🦊');
@@ -209,7 +211,9 @@ describe('annotationScale option', () => {
 describe('per-annotation extras', () => {
 	const ann = (extra: Partial<{ iconSize: number; labelSize: number }> = {}): Animation => ({
 		...example,
-		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'A', ...extra }]
+		annotations: [
+			{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#ffffff', label: 'A', ...extra }
+		]
 	});
 
 	it('default sizes cost nothing extra', () => {
@@ -320,6 +324,44 @@ describe('per-annotation extras', () => {
 			]
 		});
 		expect(explicitDefault.length).toBe(noPos.length);
+	});
+
+	it('labelFont round-trips and survives carry-forward', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					iconColor: '#fff',
+					label: 'A',
+					labelFont: 'roboto_bold_italic'
+				},
+				// Same font on the next annotation: carry-forward should mean it's
+				// not re-emitted (the encoded bytes barely grow).
+				{
+					lng: 1,
+					lat: 1,
+					icon: 'symbol-marker',
+					iconColor: '#fff',
+					label: 'B',
+					labelFont: 'roboto_bold_italic'
+				}
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].labelFont).toBe('roboto_bold_italic');
+		expect(decoded?.annotations[1].labelFont).toBe('roboto_bold_italic');
+	});
+
+	it('default labelFont (noto_sans_bold) is omitted from the decoded annotation', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', iconColor: '#fff', label: 'A' }]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].labelFont).toBeUndefined();
 	});
 });
 

@@ -131,7 +131,14 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 		lng: requiredNum(o, 'lng', ctx),
 		lat: requiredNum(o, 'lat', ctx),
 		icon: isAnnotationIcon(o.icon) ? o.icon : DEFAULT_ANNOTATION_ICON,
-		iconColor: typeof o.color === 'string' ? o.color : DEFAULT_ANNOTATION_COLOR,
+		// Accept the canonical `iconColor` first; fall back to the legacy
+		// `color` key so JSON files written before the field rename still load.
+		iconColor:
+			typeof o.iconColor === 'string'
+				? o.iconColor
+				: typeof o.color === 'string'
+					? o.color
+					: DEFAULT_ANNOTATION_COLOR,
 		label: typeof o.label === 'string' ? o.label : ''
 	};
 	// rotation, visibleUntil, labelPosition aren't in FIELD_SPECS (their wire

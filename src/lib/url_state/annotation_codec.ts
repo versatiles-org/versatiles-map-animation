@@ -14,12 +14,15 @@
 import { type Codec, enumOf, stringCodec, uint, vuint } from '../codec';
 import {
 	ANNOTATION_ICONS,
+	ANNOTATION_LABEL_FONTS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_ANNOTATION_LABEL_COLOR,
+	DEFAULT_ANNOTATION_LABEL_FONT,
 	DEFAULT_LABEL_DISTANCE,
 	DEFAULT_LABEL_POSITION,
 	isAnnotationIcon,
+	isAnnotationLabelFont,
 	isLabelPosition,
 	LABEL_POSITIONS
 } from '../types';
@@ -28,7 +31,7 @@ import {
 // plenty for a halo. Wider would just be silly.
 import { ufixed } from '../codec';
 const haloWidthCodec = ufixed(8, 10);
-import type { Annotation, AnnotationIcon, LabelPosition } from '../types';
+import type { Annotation, AnnotationIcon, AnnotationLabelFont, LabelPosition } from '../types';
 import { lngLatToMercator, mercatorToLngLat } from './mercator';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +57,11 @@ const annotationSizeCodec: Codec<number> = {
 	decode: (r) => vuint.decode(r) / 100
 };
 const labelPositionCodec = enumOf(LABEL_POSITIONS as readonly [LabelPosition, ...LabelPosition[]]);
+// Font enum: 187 entries → 8 bits. Pinned in `types.ts`; see the note there
+// about why we mirror the upstream font index in code.
+const labelFontCodec = enumOf(
+	ANNOTATION_LABEL_FONTS as readonly [AnnotationLabelFont, ...AnnotationLabelFont[]]
+);
 // labelDistance: vuint of round(v * 100). Default 1.5 → 150 (1-byte vuint).
 // 0 collapses the label onto the geo point; >5 em is silly but legal.
 const labelDistanceCodec: Codec<number> = {
@@ -97,6 +105,8 @@ export interface WireAnnotation {
 	labelHaloWidth: number | undefined;
 	iconHaloColor: number | undefined;
 	iconHaloWidth: number | undefined;
+	/** Glyph font for the label. Default `DEFAULT_ANNOTATION_LABEL_FONT`. */
+	labelFont: AnnotationLabelFont;
 }
 
 const ANNOTATION_DEFAULTS: WireAnnotation = {
@@ -124,7 +134,8 @@ const ANNOTATION_DEFAULTS: WireAnnotation = {
 	labelHaloColor: undefined,
 	labelHaloWidth: undefined,
 	iconHaloColor: undefined,
-	iconHaloWidth: undefined
+	iconHaloWidth: undefined,
+	labelFont: DEFAULT_ANNOTATION_LABEL_FONT
 };
 
 // ---------------------------------------------------------------------------
@@ -310,7 +321,8 @@ const V5_EXTRA: AnnField[] = [
 	presentField(15, 'labelHaloColor', annotationColorCodec),
 	presentField(16, 'labelHaloWidth', haloWidthCodec),
 	presentField(17, 'iconHaloColor', annotationColorCodec),
-	presentField(18, 'iconHaloWidth', haloWidthCodec)
+	presentField(18, 'iconHaloWidth', haloWidthCodec),
+	simpleField(19, 'labelFont', labelFontCodec)
 ];
 
 /**
@@ -446,6 +458,30 @@ function presentNumField(key: 'labelHaloWidth' | 'iconHaloWidth'): FieldSpec {
 	};
 }
 
+/**
+ * Carry-forward enum field with an in-memory default. Stored on the wire as
+ * the enum's index; the in-memory default is omitted from the decoded
+ * Annotation when it matches `defaultVal`.
+ */
+function enumField(
+	key: 'labelFont',
+	defaultVal: AnnotationLabelFont,
+	check: (v: unknown) => v is AnnotationLabelFont
+): FieldSpec {
+	return {
+		key,
+		toWire(ann, wire) {
+			wire[key] = check(ann[key]) ? ann[key] : defaultVal;
+		},
+		fromWire(wire, out) {
+			if (wire[key] !== defaultVal) out[key] = wire[key];
+		},
+		fromJson(raw, out) {
+			if (check(raw[key])) out[key] = raw[key];
+		}
+	};
+}
+
 /** Present-only halo colour — undefined ↔ undefined. */
 function presentColorField(key: 'labelHaloColor' | 'iconHaloColor'): FieldSpec {
 	return {
@@ -474,7 +510,8 @@ export const FIELD_SPECS: FieldSpec[] = [
 	presentColorField('labelHaloColor'),
 	presentNumField('labelHaloWidth'),
 	presentColorField('iconHaloColor'),
-	presentNumField('iconHaloWidth')
+	presentNumField('iconHaloWidth'),
+	enumField('labelFont', DEFAULT_ANNOTATION_LABEL_FONT, isAnnotationLabelFont)
 ];
 
 // ---------------------------------------------------------------------------

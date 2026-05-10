@@ -3,15 +3,20 @@
 	import { spritePreviewStyle } from '../sprite_meta';
 	import {
 		ANNOTATION_ICONS,
+		ANNOTATION_LABEL_FONTS,
 		DEFAULT_ANNOTATION_COLOR,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
+		DEFAULT_ANNOTATION_LABEL_FONT,
 		DEFAULT_ICON_HALO_COLOR,
 		DEFAULT_ICON_HALO_WIDTH,
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
+		fontFamilyOf,
+		fontVariantLabel,
 		type Annotation,
 		type AnnotationIcon,
+		type AnnotationLabelFont,
 		type LabelPosition
 	} from '../types';
 
@@ -85,6 +90,32 @@
 		document.addEventListener('click', handleDocClick);
 		return () => document.removeEventListener('click', handleDocClick);
 	});
+
+	// Group all 187 fonts by family so the `<select>` can render them under
+	// `<optgroup>`s — the flat list is overwhelming, but most users want
+	// "pick a family, pick a weight" and `<optgroup>` matches that mental
+	// model. Computed once at module load by walking the (already family-
+	// adjacent) ANNOTATION_LABEL_FONTS in order.
+	const FONT_GROUPS: { family: string; fonts: AnnotationLabelFont[] }[] = (() => {
+		const groups: { family: string; fonts: AnnotationLabelFont[] }[] = [];
+		for (const f of ANNOTATION_LABEL_FONTS) {
+			const fam = fontFamilyOf(f);
+			const last = groups[groups.length - 1];
+			if (last && last.family === fam) last.fonts.push(f);
+			else groups.push({ family: fam, fonts: [f] });
+		}
+		return groups;
+	})();
+	function familyLabel(family: string): string {
+		return family
+			.split('_')
+			.map((s) => s[0].toUpperCase() + s.slice(1))
+			.join(' ');
+	}
+	function onLabelFont(e: Event) {
+		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
+		patch({ labelFont: v });
+	}
 
 	// 3×3 grid of label-position options. The dot in the center represents
 	// the icon; each surrounding slot is one cardinal/diagonal placement.
@@ -257,7 +288,7 @@
 			<input
 				type="color"
 				value={normalizeHex(ann.iconColor)}
-				oninput={onText('color')}
+				oninput={onText('iconColor')}
 				aria-label="Icon color"
 			/>
 			<span class="hex">{ann.iconColor}</span>
@@ -318,6 +349,24 @@
 		<label class="row">
 			<span class="lbl">Text</span>
 			<input type="text" value={ann.label} oninput={onText('label')} placeholder="(no label)" />
+		</label>
+
+		<label class="row">
+			<span class="lbl">Font</span>
+			<select
+				class="font-select"
+				value={ann.labelFont ?? DEFAULT_ANNOTATION_LABEL_FONT}
+				onchange={onLabelFont}
+				title="Glyph font for this label. Drawn from the VersaTiles tileserver's bundled fonts."
+			>
+				{#each FONT_GROUPS as g (g.family)}
+					<optgroup label={familyLabel(g.family)}>
+						{#each g.fonts as f (f)}
+							<option value={f}>{fontVariantLabel(f)}</option>
+						{/each}
+					</optgroup>
+				{/each}
+			</select>
 		</label>
 
 		<label class="row">
@@ -614,6 +663,26 @@
 	input[type='range'] {
 		flex: 1 1 auto;
 		min-width: 0;
+	}
+	.font-select {
+		flex: 1 1 auto;
+		min-width: 0;
+		padding: 0.25rem 0.4rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+
+		&:hover {
+			border-color: #4a9eff;
+		}
+		&:focus {
+			outline: none;
+			border-color: #4a9eff;
+		}
 	}
 	.num,
 	.hex,

@@ -135,11 +135,19 @@ describe('validateAnimation - error paths', () => {
 });
 
 describe('validateAnnotation (via validateAnimation)', () => {
-	const minimalAnn = { lng: 1, lat: 2, icon: 'symbol-marker', color: '#ff0000', label: 'Hi' };
+	const minimalAnn = { lng: 1, lat: 2, icon: 'symbol-marker', iconColor: '#ff0000', label: 'Hi' };
 
 	it('accepts a minimal annotation and preserves required fields', () => {
 		const a = validateAnimation({ ...minimalAnim, annotations: [minimalAnn] });
 		expect(a.annotations[0]).toMatchObject(minimalAnn);
+	});
+
+	it('accepts the legacy "color" key and maps it to iconColor', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			annotations: [{ lng: 1, lat: 2, icon: 'symbol-marker', color: '#00ff00', label: 'X' }]
+		});
+		expect(a.annotations[0].iconColor).toBe('#00ff00');
 	});
 
 	it('falls back to default icon for unknown sprite ids', () => {

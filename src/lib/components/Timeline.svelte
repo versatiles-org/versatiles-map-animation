@@ -384,7 +384,8 @@
 				<div
 					class="ann-bar"
 					class:draggable={barDraggable}
-					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {selAnn.iconColor};"
+					style="left: {pct(barL)}%; width: {pct(barR) -
+						pct(barL)}%; background: {selAnn.iconColor};"
 					title={barDraggable
 						? `Drag to shift the visibility window (${fmt(vFrom)}s → ${fmt(vUntil)}s)`
 						: vFrom !== undefined || vUntil !== undefined

@@ -8,8 +8,10 @@
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
+		ANNOTATION_LABEL_FONTS,
 		aspectRatioValue,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
+		DEFAULT_ANNOTATION_LABEL_FONT,
 		DEFAULT_ICON_HALO_COLOR,
 		DEFAULT_ICON_HALO_WIDTH,
 		DEFAULT_INITIAL_VIEW,
@@ -21,6 +23,22 @@
 		type CameraState,
 		type LabelPosition
 	} from '../types';
+
+	/**
+	 * `text-font` is one of the few MapLibre properties that requires *literal*
+	 * font names at style-load time (so the renderer can pre-fetch each
+	 * glyph stack). A bare `['get', 'labelFont']` is rejected. We build a
+	 * `match` expression once that maps every supported font name to a
+	 * `['literal', [font]]` array — the `literal` wrapper is required because
+	 * any other array starting with a string is parsed as an expression call.
+	 * The trailing default arm covers any unknown value.
+	 */
+	const TEXT_FONT_EXPRESSION = (() => {
+		const expr: unknown[] = ['match', ['get', 'labelFont']];
+		for (const f of ANNOTATION_LABEL_FONTS) expr.push(f, ['literal', [f]]);
+		expr.push(['literal', [DEFAULT_ANNOTATION_LABEL_FONT]]);
+		return expr;
+	})();
 
 	// Pick a halo colour with the opposite brightness so the label stays
 	// legible regardless of the user's chosen text color. Uses the standard
@@ -164,7 +182,11 @@
 						labelHalo: a.labelHaloColor ?? haloFor(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR),
 						labelHaloWidth: a.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH,
 						iconHalo: a.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR,
-						iconHaloWidth: a.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH
+						iconHaloWidth: a.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH,
+						// Read by `TEXT_FONT_EXPRESSION` (a `match` over the full font
+						// list) — MapLibre needs every possible font as a literal at
+						// style-load time, so a bare `['get', ...]` would be rejected.
+						labelFont: a.labelFont ?? DEFAULT_ANNOTATION_LABEL_FONT
 					}
 				};
 			})
@@ -197,7 +219,10 @@
 					'icon-allow-overlap': true,
 					'icon-ignore-placement': true,
 					'text-field': ['get', 'label'],
-					'text-font': ['noto_sans_bold'],
+					// Data-driven font: see `TEXT_FONT_EXPRESSION` at the top of
+					// the file for why this is a `match` (with literal arms) rather
+					// than a bare `['get', ...]`.
+					'text-font': TEXT_FONT_EXPRESSION as unknown as string[],
 					'text-size': 13,
 					// Per-feature label placement (computed in `buildAnnotationFeatures`
 					// from the annotation's `labelPosition`). text-offset is in ems so

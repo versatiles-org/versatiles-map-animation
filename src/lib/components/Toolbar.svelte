@@ -258,7 +258,7 @@
 					visibleFrom: 0,
 					labelDistance: 2.5,
 					fadeIn: 1,
-					
+
 					iconColor: '#660000',
 					iconHaloColor: '#ffffff',
 					iconHaloWidth: 1,
@@ -266,7 +266,7 @@
 					labelColor: '#660000',
 					labelHaloColor: '#ffffff',
 					labelHaloWidth: 1,
-					labelSize: 1.75,
+					labelSize: 1.75
 				},
 				// Supporting peaks of the Wetterstein massif, fanned out so the
 				// labels don't collide at the panoramic shot. Coordinates from
