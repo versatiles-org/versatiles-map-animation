@@ -25,6 +25,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Toggle place-name / road-shield labels (or, for satellite, the colorful overlay on top).
 - Optional 3D terrain (with hillshade).
 - Optional atmospheric sky (visible when the camera is pitched).
+- Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
 
 ### Annotations
 
@@ -83,6 +84,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"terrain": false,
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize
+	"aspectRatio": "16:9", // "16:9" | "21:9" | "4:3" | "3:2" | "1:1" | "4:5" | "9:16"
 	"keyframes": [
 		{
 			"t": 0.0, // seconds
@@ -123,7 +125,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 
 `version` is the JSON-format compat marker; new optional fields are added without bumping it. Files written before a feature was added still load — every additional field is optional and falls back to a sensible default.
 
-The URL hash uses a separate layered binary format with five tags (`V1`..`V5`); the encoder picks the smallest version that round-trips the current animation losslessly, so simple animations stay short and existing share links remain stable as new features land.
+The URL hash uses a separate compact binary format (single tag, `V1`). New optional features extend an in-struct options mask without bumping the format tag, so simple animations stay short and adding a feature doesn't invalidate previously-shared links. The format tag bumps to `V2` only on a genuinely-breaking change — see the rule documented at the top of `src/lib/url_state/animation_codec.ts`.
 
 ## License
 

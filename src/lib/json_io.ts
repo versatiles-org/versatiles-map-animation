@@ -3,11 +3,13 @@ import {
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_ANNOTATION_SCALE,
+	DEFAULT_ASPECT_RATIO,
 	DEFAULT_LABELS,
 	DEFAULT_SKY,
 	DEFAULT_STYLE,
 	DEFAULT_TERRAIN,
 	isAnnotationIcon,
+	isAspectRatio,
 	isLabelPosition,
 	isMapStyleId,
 	isPathStyle,
@@ -105,6 +107,7 @@ export function validateAnimation(input: unknown): Animation {
 		typeof obj.annotationScale === 'number' && Number.isFinite(obj.annotationScale)
 			? Math.max(0.01, obj.annotationScale)
 			: DEFAULT_ANNOTATION_SCALE;
+	const aspectRatio = isAspectRatio(obj.aspectRatio) ? obj.aspectRatio : DEFAULT_ASPECT_RATIO;
 	return {
 		version: SCHEMA_VERSION,
 		style,
@@ -113,7 +116,8 @@ export function validateAnimation(input: unknown): Animation {
 		sky,
 		keyframes,
 		annotations,
-		annotationScale
+		annotationScale,
+		aspectRatio
 	};
 }
 

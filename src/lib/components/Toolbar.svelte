@@ -2,7 +2,7 @@
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
+	import { aspectRatioValue, DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
 	import { encodeAnimation } from '../url_state';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -134,7 +134,11 @@
 	function buildEmbedSnippet(): string {
 		const encoded = encodeAnimation(store.toAnimation());
 		const url = `${window.location.origin}${base}/view#kf=${encoded}`;
-		return `<iframe src="${url}" style="width:100%;aspect-ratio:16/9;border:0" loading="lazy" allowfullscreen></iframe>`;
+		// `aspect-ratio` mirrors the composition aspect so the iframe stays
+		// the right shape in any container width (the viewer letterboxes
+		// internally too, but matching here avoids visible bars).
+		const aspect = store.aspectRatio.replace(':', '/');
+		return `<iframe src="${url}" style="width:100%;aspect-ratio:${aspect};border:0" loading="lazy" allowfullscreen></iframe>`;
 	}
 
 	function onToggleEmbed() {
@@ -158,12 +162,15 @@
 		embedCopied.set(true);
 	}
 
+	const videoHeight = $derived(Math.round(videoWidth / aspectRatioValue(store.aspectRatio)));
+
 	function buildVideoCommand(): string {
 		const hash = encodeAnimation(store.toAnimation());
 		// Single-line so users can paste-and-run; --pull always keeps the image
 		// fresh; the working directory is mounted at /out so the MP4 lands next
-		// to where the user invoked the command.
-		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --fps ${videoFps} --output /out/animation.mp4`;
+		// to where the user invoked the command. `--height` is derived from
+		// `--width` and the composition aspect ratio chosen in the editor.
+		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps} --output /out/animation.mp4`;
 	}
 
 	function onToggleVideo() {
@@ -251,7 +258,8 @@
 					labelHaloWidth: 1
 				}
 			],
-			annotationScale: 1
+			annotationScale: 1,
+			aspectRatio: '16:9'
 		});
 	}
 
@@ -454,7 +462,7 @@
 				<span class="lbl">Resolution</span>
 				<select id="video-width" bind:value={videoWidth}>
 					{#each VIDEO_WIDTHS as w (w)}
-						<option value={w}>{w} × {Math.round((w * 9) / 16)}</option>
+						<option value={w}>{w} × {Math.round(w / aspectRatioValue(store.aspectRatio))}</option>
 					{/each}
 				</select>
 			</label>

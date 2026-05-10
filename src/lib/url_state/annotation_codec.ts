@@ -314,27 +314,14 @@ const V5_EXTRA: AnnField[] = [
 ];
 
 /**
- * V2/V3: keyframes + annotations at default scale + default per-annotation
- * sizes — bits 0..7. Older binary versions stay byte-stable for share links.
+ * Single annotation array codec covering every field. 24-bit per-annotation
+ * mask: bits 0..7 = position/icon/colour/label/rotation/visibility, bits 8..14
+ * = sizes/positioning/fade/colour, bits 15..18 = halo overrides (present-only).
+ *
+ * Adding a future per-annotation field is a one-row addition to one of the
+ * field arrays above and a free bit in the 24-bit mask.
  */
-export const annotationsCodec = makeAnnotationsCodec(8, V2_FIELDS);
-
-/**
- * V4: extends each annotation with iconSize / labelSize / labelPosition /
- * labelDistance / fadeIn / fadeOut / labelColor — bits 8..14.
- */
-export const annotationsCodecV4 = makeAnnotationsCodec(16, [...V2_FIELDS, ...V4_EXTRA]);
-
-/**
- * V5: per-annotation halo overrides for both label and icon — bits 15..18.
- * Halo fields are present-only (no carry-forward), so each annotation's
- * halo state is independent.
- */
-export const annotationsCodecV5 = makeAnnotationsCodec(24, [
-	...V2_FIELDS,
-	...V4_EXTRA,
-	...V5_EXTRA
-]);
+export const annotationsCodec = makeAnnotationsCodec(24, [...V2_FIELDS, ...V4_EXTRA, ...V5_EXTRA]);
 
 // ---------------------------------------------------------------------------
 // Hex colour helpers — wire stores RGB as a 24-bit int; in-memory keeps the

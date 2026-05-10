@@ -3,6 +3,7 @@ import {
 	cameraOf,
 	createEmptyAnimation,
 	DEFAULT_ANNOTATION_SCALE,
+	DEFAULT_ASPECT_RATIO,
 	DEFAULT_INITIAL_VIEW,
 	DEFAULT_LABELS,
 	DEFAULT_SKY,
@@ -10,7 +11,15 @@ import {
 	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
 } from './types';
-import type { Animation, Annotation, CameraState, Keyframe, MapStyleId, PathStyle } from './types';
+import type {
+	Animation,
+	Annotation,
+	AspectRatio,
+	CameraState,
+	Keyframe,
+	MapStyleId,
+	PathStyle
+} from './types';
 
 const MIN_TIME_GAP = 0.01;
 
@@ -91,6 +100,7 @@ export class AnimationStore {
 	terrain = $state(DEFAULT_TERRAIN);
 	sky = $state(DEFAULT_SKY);
 	annotationScale = $state(DEFAULT_ANNOTATION_SCALE);
+	aspectRatio = $state<AspectRatio>(DEFAULT_ASPECT_RATIO);
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 
@@ -250,6 +260,7 @@ export class AnimationStore {
 		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
 		this.sky = anim.sky ?? DEFAULT_SKY;
 		this.annotationScale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
+		this.aspectRatio = anim.aspectRatio ?? DEFAULT_ASPECT_RATIO;
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
 		this.currentTime = 0;
@@ -265,7 +276,8 @@ export class AnimationStore {
 			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),
 			annotations: this.annotations.map((a) => ({ ...a })),
-			annotationScale: this.annotationScale
+			annotationScale: this.annotationScale,
+			aspectRatio: this.aspectRatio
 		};
 	}
 

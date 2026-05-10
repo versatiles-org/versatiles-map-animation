@@ -14,7 +14,7 @@ declare global {
  * viewport height.
  */
 const DEMO_HASH =
-	'BRsh_gMZEhN5cto_FxU4_rxdbktXYYxHWKqe5vcPaTDbL7d3D_lfh1Ml5l11G_AQQFfX4ThT9bPuAeyAABSa3tzoQITYwtzHja9P-odPx4dkAAAVQwA';
+	'ARsh_gMZEhN5cto_FxU4_nxc8ElyItRDWKrf5vcNbkjCoYZkG3dzf8vMXZkjkdJxFvP-CAr6_CcKfrZ9wD2QAAKTW9udCBCbGFuY8bXp_1Dp-PDsgAACgAA';
 
 const SEEK_TIME = 1.0; // seconds — pick a moment with the camera at high pitch
 
@@ -52,8 +52,12 @@ async function projectedCorners(page: Page): Promise<[number, number][]> {
 	});
 }
 
-/** Flat-pitch animation (no perspective) — Berlin centre, zoom 10, pitch 0. */
-const FLAT_HASH = 'ARQQdjw4mITU_TcBxiYQ';
+/**
+ * Flat-pitch animation (no perspective) — Berlin centre, zoom 10, pitch 0.
+ * Two-keyframe loop so the playhead position doesn't matter.
+ */
+const FLAT_HASH = 'ARQQdjw4mITU_TcBxiYQAAA'; // 16:9 (default)
+const FLAT_HASH_4_3 = 'ARQQdjw4mITU_TcBxiYQASA'; // same shot, 4:3 composition
 
 async function maxCornerDelta(a: [number, number][], b: [number, number][]): Promise<number> {
 	let m = 0;
@@ -88,5 +92,18 @@ test.describe('viewport-size invariance at fixed aspect ratio', () => {
 		// (~5 km at the equator) — visually negligible at this zoom range, and
 		// over an order of magnitude better than no adjustment at all.
 		expect(await maxCornerDelta(small, large)).toBeLessThan(0.05);
+	});
+
+	test('4:3 composition: 800x600 and 1600x1200 project identical corners', async ({ page }) => {
+		// Different display sizes, both at 4:3 — the letterbox CSS gives both
+		// containers a 4:3 inner map area, so the adaptive-zoom math should
+		// give pixel-perfect equivalence at pitch 0.
+		await openViewer(page, 800, 600, FLAT_HASH_4_3, 0);
+		const small = await projectedCorners(page);
+
+		await openViewer(page, 1600, 1200, FLAT_HASH_4_3, 0);
+		const large = await projectedCorners(page);
+
+		expect(await maxCornerDelta(small, large)).toBeLessThan(1e-4);
 	});
 });

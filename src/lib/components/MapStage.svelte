@@ -8,6 +8,7 @@
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
+		aspectRatioValue,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_ICON_HALO_COLOR,
 		DEFAULT_ICON_HALO_WIDTH,
@@ -507,9 +508,16 @@
 	// Watermark colours flip with the base map: dark text + light outline reads
 	// best on the colourful style, light text + dark outline on satellite imagery.
 	const onSatellite = $derived(store.style === 'satellite');
+
+	// Composition aspect ratio drives the letterbox CSS — see `.map-stage-frame`.
+	const aspectNum = $derived(aspectRatioValue(store.aspectRatio));
 </script>
 
-<div class="map-stage-frame" data-testid="map-stage-frame">
+<div
+	class="map-stage-frame"
+	data-testid="map-stage-frame"
+	style="--map-aspect: {aspectNum}; --map-aspect-css: {store.aspectRatio.replace(':', ' / ')};"
+>
 	<div class="map-stage" data-testid="map-stage">
 		<div bind:this={container} class="map-canvas"></div>
 		<a
@@ -525,8 +533,10 @@
 <style>
 	.map-stage-frame {
 		/* Letterbox / pillarbox container: black bars fill any space the
-		   16:9 map can't claim, so what the editor previews is exactly what the
-		   embed iframe and the rendered video show. */
+		   chosen-aspect map can't claim, so what the editor previews is exactly
+		   what the embed iframe and the rendered video show. The aspect itself
+		   comes from `--map-aspect-css` (a `<num> / <den>` pair) and
+		   `--map-aspect` (the numeric ratio), set inline by MapStage. */
 		width: 100%;
 		height: 100%;
 		background: #000;
@@ -538,9 +548,9 @@
 	}
 	.map-stage {
 		position: relative;
-		/* Largest 16:9 box that fits inside the frame, centred. */
-		aspect-ratio: 16 / 9;
-		width: min(100cqw, calc(100cqh * 16 / 9));
+		/* Largest box of the chosen aspect that fits inside the frame, centred. */
+		aspect-ratio: var(--map-aspect-css, 16 / 9);
+		width: min(100cqw, calc(100cqh * var(--map-aspect, 1.7778)));
 		background: #111;
 		/* Make `.map-stage` a query container so the watermark can size itself
 		   relative to the actual map width via `cqw` units. */

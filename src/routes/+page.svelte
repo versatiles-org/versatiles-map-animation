@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { AnimationStore } from '$lib/animation.svelte';
+	import { aspectRatioValue } from '$lib/types';
 	import {
 		clearUrlHash,
 		readAnimationFromStorage,
@@ -18,6 +19,12 @@
 	// annotations faintly visible at 20% opacity so the user can spot and
 	// click markers that are outside their visibility window.
 	const EDIT_MODE = true;
+
+	// Composition aspect ratio drives the editor's `.map-area` CSS — see
+	// `MapStyleControl` for the picker. The numeric form is for `min(...)`
+	// width math; the slash-separated form for the CSS `aspect-ratio` property.
+	const aspectNum = $derived(aspectRatioValue(store.aspectRatio));
+	const aspectCss = $derived(store.aspectRatio.replace(':', ' / '));
 
 	// Load before children mount so MapStage sees the correct style/terrain on
 	// first build. Precedence: URL hash (shared link) > localStorage (last
@@ -79,7 +86,7 @@
 
 		<div class="main">
 			<div class="stage-wrap">
-				<div class="map-area">
+				<div class="map-area" style="--map-aspect: {aspectNum}; --map-aspect-css: {aspectCss};">
 					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
@@ -174,8 +181,9 @@
 	.map-area {
 		position: relative;
 		box-sizing: border-box;
-		width: min(100cqw, calc(100cqh * 16 / 9));
-		aspect-ratio: 16 / 9;
+		/* Largest box of the chosen composition aspect that fits the stage. */
+		width: min(100cqw, calc(100cqh * var(--map-aspect, 1.7778)));
+		aspect-ratio: var(--map-aspect-css, 16 / 9);
 		border: 1px solid #222;
 		border-radius: 4px;
 	}

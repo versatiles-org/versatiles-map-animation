@@ -23,7 +23,8 @@ const sample: Animation = {
 		{ t: 2, lng: 5, lat: 35, zoom: 6, pitch: 30, bearing: 45, roll: 0 }
 	],
 	annotations: [],
-	annotationScale: 1
+	annotationScale: 1,
+	aspectRatio: '16:9'
 };
 
 beforeEach(() => {

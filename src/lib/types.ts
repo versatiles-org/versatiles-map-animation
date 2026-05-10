@@ -1,16 +1,47 @@
 export const SCHEMA_VERSION = 1;
 
 /**
- * Map composition format. Both the editor preview and the viewer iframe
- * letterbox the map to this aspect ratio so what you compose is what gets
- * rendered, regardless of window/iframe size.
+ * Map composition aspect ratios. Both the editor preview and the viewer iframe
+ * letterbox the map to the chosen aspect so what you compose is what gets
+ * rendered, regardless of window/iframe size. The editor exposes a picker;
+ * the chosen ratio rides on the `aspectRatio` field on `Animation`.
  *
+ * Curated set covers landscape video (`16:9`, `21:9`, `4:3`), photo (`3:2`),
+ * square (`1:1`), and the two vertical formats people actually compose for
+ * (`4:5`, `9:16`). Order matters: index 0 is the wire-format default.
+ */
+export const ASPECT_RATIOS = ['16:9', '21:9', '4:3', '3:2', '1:1', '4:5', '9:16'] as const;
+export type AspectRatio = (typeof ASPECT_RATIOS)[number];
+export const DEFAULT_ASPECT_RATIO: AspectRatio = '16:9';
+
+export function isAspectRatio(value: unknown): value is AspectRatio {
+	return typeof value === 'string' && (ASPECT_RATIOS as readonly string[]).includes(value);
+}
+
+/** Numeric width/height ratio for use in CSS `aspect-ratio` and arithmetic. */
+export function aspectRatioValue(ar: AspectRatio): number {
+	const [w, h] = ar.split(':').map(Number);
+	return w / h;
+}
+
+/** Human label used in the aspect picker UI. */
+export const ASPECT_RATIO_LABELS: Record<AspectRatio, string> = {
+	'16:9': '16:9 — landscape',
+	'21:9': '21:9 — cinematic',
+	'4:3': '4:3 — TV',
+	'3:2': '3:2 — photo',
+	'1:1': '1:1 — square',
+	'4:5': '4:5 — portrait',
+	'9:16': '9:16 — vertical'
+};
+
+/**
  * `MAP_REFERENCE_WIDTH` is the canonical pixel width that camera zoom values
  * are stored against — when the map is rendered at a different display width,
  * MapStage adjusts zoom by `log2(actualWidth / MAP_REFERENCE_WIDTH)` so the
- * same geographic content fills the frame at any size.
+ * same geographic content fills the frame at any size. Independent of the
+ * chosen aspect ratio: still measured along the width.
  */
-export const MAP_ASPECT_RATIO = 16 / 9;
 export const MAP_REFERENCE_WIDTH = 1280;
 
 export const PATH_STYLES = ['arc', 'linear'] as const;
@@ -273,6 +304,8 @@ export interface Animation {
 	annotations: Annotation[];
 	/** Multiplier for icon + label size. Defaults to 1. */
 	annotationScale: number;
+	/** Composition aspect ratio. Defaults to 16:9. */
+	aspectRatio: AspectRatio;
 }
 
 export const DEFAULT_INITIAL_VIEW: CameraState = {
@@ -293,7 +326,8 @@ export function createEmptyAnimation(): Animation {
 		sky: DEFAULT_SKY,
 		keyframes: [],
 		annotations: [],
-		annotationScale: DEFAULT_ANNOTATION_SCALE
+		annotationScale: DEFAULT_ANNOTATION_SCALE,
+		aspectRatio: DEFAULT_ASPECT_RATIO
 	};
 }
 

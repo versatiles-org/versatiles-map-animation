@@ -1,11 +1,19 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import { MAP_STYLE_IDS, MAP_STYLE_LABELS } from '../types';
+	import { ASPECT_RATIOS, MAP_STYLE_IDS, MAP_STYLE_LABELS } from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
 </script>
 
 <div class="map-style-control" role="group" aria-label="Map style">
+	<label class="row" title="Composition aspect ratio (letterboxed in editor and viewer alike)">
+		<span class="lbl">Aspect</span>
+		<select bind:value={store.aspectRatio}>
+			{#each ASPECT_RATIOS as ar (ar)}
+				<option value={ar}>{ar}</option>
+			{/each}
+		</select>
+	</label>
 	<label class="row" title="Base map style">
 		<span class="lbl">Map</span>
 		<select bind:value={store.style}>

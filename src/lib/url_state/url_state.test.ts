@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { decodeAnimation, encodeAnimation } from '.';
-import { SCHEMA_VERSION, type Animation } from '../types';
+import { ASPECT_RATIOS, SCHEMA_VERSION, type Animation } from '../types';
 
 const example: Animation = {
 	version: SCHEMA_VERSION,
@@ -14,7 +14,8 @@ const example: Animation = {
 		{ t: 6, lng: 13.405, lat: 52.52, zoom: 14, pitch: 70, bearing: 120, roll: 0 }
 	],
 	annotations: [],
-	annotationScale: 1
+	annotationScale: 1,
+	aspectRatio: '16:9'
 };
 
 describe('encode/decode round-trip', () => {
@@ -154,12 +155,9 @@ describe('annotations round-trip', () => {
 		expect(manyLen).toBeLessThan(singleLen * 2);
 	});
 
-	it('legacy V1-encoded URLs still decode (with empty annotations)', () => {
-		// Encode an animation without annotations — should still emit V1 tag —
-		// then verify decode produces an empty annotations array.
+	it('empty annotations decode to []', () => {
 		const noAnn: Animation = { ...example, annotations: [] };
-		const encoded = encodeAnimation(noAnn);
-		const decoded = decodeAnimation(encoded);
+		const decoded = decodeAnimation(encodeAnimation(noAnn));
 		expect(decoded?.annotations).toEqual([]);
 	});
 
@@ -172,17 +170,6 @@ describe('annotations round-trip', () => {
 		expect(decoded?.annotations[0].color).toBe('#ffaa00');
 	});
 
-	it('does not emit V2 tag when annotations are empty', () => {
-		// V1 is byte-for-byte stable for older share links — guard against
-		// accidentally bumping every existing URL to a longer V2 encoding.
-		const noAnn = encodeAnimation({ ...example, annotations: [] });
-		const withAnn = encodeAnimation({
-			...example,
-			annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: '' }]
-		});
-		expect(withAnn.length).toBeGreaterThan(noAnn.length);
-	});
-
 	it('round-trips unicode labels', () => {
 		const anim: Animation = {
 			...example,
@@ -193,72 +180,51 @@ describe('annotations round-trip', () => {
 	});
 });
 
-describe('annotationScale (V3)', () => {
+describe('annotationScale option', () => {
 	const oneAnn: Animation = {
 		...example,
 		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A' }]
 	};
 
-	it('default scale stays in V2 (no extra bytes for byte-stable share URLs)', () => {
-		const v2 = encodeAnimation({ ...oneAnn, annotationScale: 1 });
-		const v3 = encodeAnimation({ ...oneAnn, annotationScale: 1.5 });
-		// V3 carries an extra annotationScale field, so it must be longer than V2.
-		expect(v3.length).toBeGreaterThan(v2.length);
+	it('default scale (1) costs no extra bytes via the options mask', () => {
+		// shouldEmit returns false when annotationScale === 1, so the option is
+		// not encoded — the mask bit stays 0 and the field is omitted.
+		const at1 = encodeAnimation({ ...oneAnn, annotationScale: 1 });
+		const at1_5 = encodeAnimation({ ...oneAnn, annotationScale: 1.5 });
+		expect(at1_5.length).toBeGreaterThan(at1.length);
 	});
 
-	it('non-default scale switches to V3 and round-trips', () => {
+	it('non-default scale round-trips at 2-decimal precision', () => {
 		const decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 1.75 }));
 		expect(decoded?.annotationScale).toBeCloseTo(1.75, 2);
 		expect(decoded?.annotations.length).toBe(1);
 	});
 
-	it('two-decimal scale precision is preserved', () => {
-		const decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 0.55 }));
-		expect(decoded?.annotationScale).toBeCloseTo(0.55, 2);
-	});
-
-	it('V1 + V2 decode default scale 1', () => {
-		// No annotations → V1 path; decoded animation gets default scale.
-		const v1Decoded = decodeAnimation(encodeAnimation({ ...example, annotationScale: 1 }));
-		expect(v1Decoded?.annotationScale).toBe(1);
-		// Annotations + default scale → V2 path; decoded animation gets default scale.
-		const v2Decoded = decodeAnimation(encodeAnimation({ ...oneAnn, annotationScale: 1 }));
-		expect(v2Decoded?.annotationScale).toBe(1);
+	it('default scale decodes back to 1', () => {
+		const decoded = decodeAnimation(encodeAnimation({ ...example, annotationScale: 1 }));
+		expect(decoded?.annotationScale).toBe(1);
 	});
 });
 
-describe('per-annotation iconSize / labelSize (V4)', () => {
+describe('per-annotation extras', () => {
 	const ann = (extra: Partial<{ iconSize: number; labelSize: number }> = {}): Animation => ({
 		...example,
 		annotations: [{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#ffffff', label: 'A', ...extra }]
 	});
 
-	it('default sizes stay in V2 (byte-stable for V2/V3 share links)', () => {
-		const v2 = encodeAnimation(ann());
-		const v4 = encodeAnimation(ann({ iconSize: 1.5 }));
-		// V4 has a wider mask + extra field, so its byte length must exceed V2.
-		expect(v4.length).toBeGreaterThan(v2.length);
+	it('default sizes cost nothing extra', () => {
+		const defaults = encodeAnimation(ann());
+		const withSize = encodeAnimation(ann({ iconSize: 1.5 }));
+		expect(withSize.length).toBeGreaterThan(defaults.length);
 	});
 
-	it('round-trips a per-annotation iconSize', () => {
-		const decoded = decodeAnimation(encodeAnimation(ann({ iconSize: 1.5 })));
-		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
-		expect(decoded?.annotations[0].labelSize).toBeUndefined();
-	});
-
-	it('round-trips a per-annotation labelSize', () => {
-		const decoded = decodeAnimation(encodeAnimation(ann({ labelSize: 0.7 })));
-		expect(decoded?.annotations[0].labelSize).toBeCloseTo(0.7, 2);
-		expect(decoded?.annotations[0].iconSize).toBeUndefined();
-	});
-
-	it('round-trips both at once', () => {
+	it('iconSize / labelSize round-trip', () => {
 		const decoded = decodeAnimation(encodeAnimation(ann({ iconSize: 2, labelSize: 0.5 })));
 		expect(decoded?.annotations[0].iconSize).toBeCloseTo(2, 2);
 		expect(decoded?.annotations[0].labelSize).toBeCloseTo(0.5, 2);
 	});
 
-	it('V4 carries annotationScale too (combines V3 + V4 features)', () => {
+	it('annotationScale + iconSize combine correctly', () => {
 		const anim: Animation = {
 			...example,
 			annotations: [
@@ -271,20 +237,7 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
 	});
 
-	it('carry-forward across annotations', () => {
-		const anim: Animation = {
-			...example,
-			annotations: [
-				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 },
-				{ lng: 1, lat: 1, icon: 'symbol-marker', color: '#fff', label: 'B', iconSize: 1.5 }
-			]
-		};
-		const decoded = decodeAnimation(encodeAnimation(anim));
-		expect(decoded?.annotations[0].iconSize).toBeCloseTo(1.5, 2);
-		expect(decoded?.annotations[1].iconSize).toBeCloseTo(1.5, 2);
-	});
-
-	it('halo overrides switch to V5 and round-trip', () => {
+	it('halo overrides round-trip', () => {
 		const anim: Animation = {
 			...example,
 			annotations: [
@@ -309,34 +262,7 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 		expect(a?.iconHaloWidth).toBeCloseTo(1.2, 1);
 	});
 
-	it('default halo (undefined) stays in V4 / V2', () => {
-		// No halo override → V4-or-lower, not V5.
-		const annV4: Animation = {
-			...example,
-			annotations: [
-				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 }
-			]
-		};
-		const annV5: Animation = {
-			...example,
-			annotations: [
-				{
-					lng: 0,
-					lat: 0,
-					icon: 'symbol-marker',
-					color: '#fff',
-					label: 'A',
-					iconSize: 1.5,
-					labelHaloColor: '#ff0000'
-				}
-			]
-		};
-		const v4 = encodeAnimation(annV4);
-		const v5 = encodeAnimation(annV5);
-		expect(v5.length).toBeGreaterThan(v4.length);
-	});
-
-	it('non-default labelColor switches to V4 and round-trips', () => {
+	it('halo override is present-only (does not carry forward)', () => {
 		const anim: Animation = {
 			...example,
 			annotations: [
@@ -345,16 +271,18 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 					lat: 0,
 					icon: 'symbol-marker',
 					color: '#fff',
-					label: 'L',
-					labelColor: '#ff0080'
-				}
+					label: 'A',
+					labelHaloColor: '#f00'
+				},
+				{ lng: 1, lat: 1, icon: 'symbol-marker', color: '#fff', label: 'B' }
 			]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
-		expect(decoded?.annotations[0].labelColor).toBe('#ff0080');
+		expect(decoded?.annotations[0].labelHaloColor).toBe('#ff0000');
+		expect(decoded?.annotations[1].labelHaloColor).toBeUndefined();
 	});
 
-	it('non-default labelDistance switches to V4 and round-trips', () => {
+	it('non-default labelColor / labelDistance / labelPosition round-trip', () => {
 		const anim: Animation = {
 			...example,
 			annotations: [
@@ -364,36 +292,21 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 					icon: 'symbol-marker',
 					color: '#fff',
 					label: 'A',
-					labelDistance: 2.7
-				}
-			]
-		};
-		const decoded = decodeAnimation(encodeAnimation(anim));
-		expect(decoded?.annotations[0].labelDistance).toBeCloseTo(2.7, 2);
-	});
-
-	it('non-default labelPosition switches to V4 and round-trips', () => {
-		const anim: Animation = {
-			...example,
-			annotations: [
-				{
-					lng: 0,
-					lat: 0,
-					icon: 'symbol-marker',
-					color: '#fff',
-					label: 'A',
+					labelColor: '#ff0080',
+					labelDistance: 2.7,
 					labelPosition: 'right'
 				}
 			]
 		};
 		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(decoded?.annotations[0].labelColor).toBe('#ff0080');
+		expect(decoded?.annotations[0].labelDistance).toBeCloseTo(2.7, 2);
 		expect(decoded?.annotations[0].labelPosition).toBe('right');
 	});
 
-	it('default labelPosition (bottom) stays in V2', () => {
-		const v2 = encodeAnimation(ann());
-		const v4 = encodeAnimation(ann({ labelSize: 1.5 })); // forces V4
-		const v2WithBottom = encodeAnimation({
+	it('explicit default labelPosition (bottom) costs nothing extra', () => {
+		const noPos = encodeAnimation(ann());
+		const explicitDefault = encodeAnimation({
 			...example,
 			annotations: [
 				{
@@ -406,9 +319,23 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 				}
 			]
 		});
-		// Setting labelPosition explicitly to the default doesn't bump the codec.
-		expect(v2WithBottom.length).toBe(v2.length);
-		// Sanity: V4 is bigger than V2.
-		expect(v4.length).toBeGreaterThan(v2.length);
+		expect(explicitDefault.length).toBe(noPos.length);
+	});
+});
+
+describe('aspectRatio option', () => {
+	// The aspectRatio option costs 3 bits when present (7-value enum). At base64
+	// granularity that often falls within an already-padded byte, so we don't
+	// assert on encoded length here — just on round-trip.
+	for (const ar of ASPECT_RATIOS) {
+		it(`round-trips ${ar}`, () => {
+			const decoded = decodeAnimation(encodeAnimation({ ...example, aspectRatio: ar }));
+			expect(decoded?.aspectRatio).toBe(ar);
+		});
+	}
+
+	it('default 16:9 decodes back even when omitted from the wire', () => {
+		const decoded = decodeAnimation(encodeAnimation({ ...example, aspectRatio: '16:9' }));
+		expect(decoded?.aspectRatio).toBe('16:9');
 	});
 });

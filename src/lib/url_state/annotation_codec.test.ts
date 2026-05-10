@@ -10,7 +10,8 @@ const wrap = (annotations: Annotation[]): Animation => ({
 	sky: false,
 	keyframes: [{ t: 0, lng: 0, lat: 0, zoom: 4, pitch: 0, bearing: 0, roll: 0 }],
 	annotations,
-	annotationScale: 1
+	annotationScale: 1,
+	aspectRatio: '16:9'
 });
 
 const baseAnn = (overrides: Partial<Annotation> = {}): Annotation => ({

@@ -27,6 +27,10 @@ import { chromium } from 'playwright';
 const ALLOWED_WIDTHS = [640, 1280, 1920, 3840];
 const DEFAULT_OPTS = {
 	width: 1280,
+	// Optional explicit pixel height. When omitted, defaults to width * 9/16
+	// (legacy 16:9 behaviour). The editor always passes both `--width` and
+	// `--height` derived from the chosen composition aspect ratio.
+	height: null,
 	fps: 30,
 	crf: 18,
 	preset: 'slow',
@@ -121,6 +125,9 @@ function parseArgv(argv) {
 			case '--width':
 				out.width = parseInt(next(), 10);
 				break;
+			case '--height':
+				out.height = parseInt(next(), 10);
+				break;
 			case '--fps':
 				out.fps = parseInt(next(), 10);
 				break;
@@ -170,6 +177,7 @@ function usage() {
 		'  --site-root <dir>      static-files root to serve (default: /app/site or ./build)',
 		'  --site-url <url>       skip the built-in static server and use this base URL instead',
 		'  --width <n>            video width — one of 640, 1280, 1920, 3840 (default 1280)',
+		'  --height <n>           video height (default: width * 9/16 — i.e. 16:9 aspect)',
 		'  --fps <n>              frame rate (default 30)',
 		'  --crf <n>              x264 CRF, lower = higher quality (default 18)',
 		'  --preset <name>        x264 preset (default "slow")',
@@ -336,7 +344,7 @@ async function waitForFrameReady(page, timeoutMs) {
 }
 
 async function setupPage(browser, opts, hash) {
-	const height = Math.round((opts.width * 9) / 16);
+	const height = opts.height ?? Math.round((opts.width * 9) / 16);
 	const ctx = await browser.newContext({ viewport: { width: opts.width, height } });
 	const page = await ctx.newPage();
 	// Real exceptions in the page bubble up; non-fatal warnings (font glyph
@@ -461,7 +469,7 @@ async function main() {
 		const { ctx, page, duration } = await setupPage(browser, opts, hash);
 		const cappedDuration = opts.endTime != null ? Math.min(duration, opts.endTime) : duration;
 		const totalFrames = Math.max(2, Math.ceil(cappedDuration * opts.fps) + 1);
-		const height = Math.round((opts.width * 9) / 16);
+		const height = opts.height ?? Math.round((opts.width * 9) / 16);
 		log(
 			`  ${cappedDuration.toFixed(2)}s · ${totalFrames} frames at ${opts.fps} fps · ${opts.width}×${height}` +
 				(opts.endTime != null ? ` (capped from ${duration.toFixed(2)}s)` : '')
