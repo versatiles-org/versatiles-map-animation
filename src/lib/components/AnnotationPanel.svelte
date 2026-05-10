@@ -352,9 +352,16 @@
 		<!-- Label section: text + appearance + placement -->
 		<h3 class="section">Label</h3>
 
-		<label class="row">
+		<label class="row text-row">
 			<span class="lbl">Text</span>
-			<input type="text" value={ann.label} oninput={onText('label')} placeholder="(no label)" />
+			<textarea
+				class="label-text"
+				value={ann.label}
+				oninput={onText('label')}
+				placeholder="(no label)"
+				rows="2"
+				title="Press Enter for a line break — MapLibre renders \\n as a hard wrap in the label."
+			></textarea>
 		</label>
 
 		<label class="row">
@@ -642,7 +649,8 @@
 	}
 
 	input[type='text'],
-	input[type='number'] {
+	input[type='number'],
+	.label-text {
 		flex: 1 1 auto;
 		min-width: 0;
 		padding: 0.3rem 0.45rem;
@@ -655,6 +663,22 @@
 		&:focus {
 			outline: none;
 			border-color: #4a9eff;
+		}
+	}
+	.label-text {
+		/* Two-line minimum, vertical resize so longer labels fit. */
+		resize: vertical;
+		min-height: 2.4rem;
+		line-height: 1.3;
+		font-family: inherit;
+	}
+	/* Top-align the "Text" label with the multi-line textarea so the lbl
+	   doesn't visually float above an empty box. */
+	.text-row {
+		align-items: flex-start;
+
+		.lbl {
+			padding-top: 0.4rem;
 		}
 	}
 	input[type='color'] {
