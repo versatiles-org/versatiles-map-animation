@@ -28,10 +28,12 @@ import {
 	AnimationCodecV2,
 	AnimationCodecV3,
 	AnimationCodecV4,
+	AnimationCodecV5,
 	FORMAT_TAG_BINARY_V1,
 	FORMAT_TAG_BINARY_V2,
 	FORMAT_TAG_BINARY_V3,
-	FORMAT_TAG_BINARY_V4
+	FORMAT_TAG_BINARY_V4,
+	FORMAT_TAG_BINARY_V5
 } from './animation_codec';
 import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
 import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
@@ -53,6 +55,15 @@ export function encodeAnimation(anim: Animation): string {
 	const w = new BitWriter();
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
+	const needsV5 =
+		hasAnnotations &&
+		anim.annotations.some(
+			(a) =>
+				a.labelHaloColor !== undefined ||
+				a.labelHaloWidth !== undefined ||
+				a.iconHaloColor !== undefined ||
+				a.iconHaloWidth !== undefined
+		);
 	const needsV4 =
 		hasAnnotations &&
 		anim.annotations.some(
@@ -66,7 +77,21 @@ export function encodeAnimation(anim: Animation): string {
 				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	if (needsV4) {
+	if (needsV5) {
+		w.writeBits(FORMAT_TAG_BINARY_V5, 8);
+		AnimationCodecV5.encode(
+			{
+				version: anim.version,
+				style: anim.style,
+				labels: anim.labels,
+				terrain: anim.terrain,
+				keyframes: anim.keyframes.map(normalizeKeyframe),
+				annotations: anim.annotations.map(normalizeAnnotation),
+				annotationScale: scale
+			},
+			w
+		);
+	} else if (needsV4) {
 		w.writeBits(FORMAT_TAG_BINARY_V4, 8);
 		AnimationCodecV4.encode(
 			{
@@ -143,12 +168,26 @@ function decodeOrThrow(encoded: string): Animation {
 		tag !== FORMAT_TAG_BINARY_V1 &&
 		tag !== FORMAT_TAG_BINARY_V2 &&
 		tag !== FORMAT_TAG_BINARY_V3 &&
-		tag !== FORMAT_TAG_BINARY_V4
+		tag !== FORMAT_TAG_BINARY_V4 &&
+		tag !== FORMAT_TAG_BINARY_V5
 	) {
 		throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
 	}
 	const r = new BitReader(bytes);
 	r.readBits(8); // consume tag
+	if (tag === FORMAT_TAG_BINARY_V5) {
+		const wire = AnimationCodecV5.decode(r);
+		assertVersion(wire.version);
+		return {
+			version: SCHEMA_VERSION,
+			style: wire.style,
+			labels: wire.labels,
+			terrain: wire.terrain,
+			keyframes: wire.keyframes.map(denormalizeKeyframe),
+			annotations: wire.annotations.map(denormalizeAnnotation),
+			annotationScale: wire.annotationScale
+		};
+	}
 	if (tag === FORMAT_TAG_BINARY_V4) {
 		const wire = AnimationCodecV4.decode(r);
 		assertVersion(wire.version);
@@ -233,6 +272,15 @@ export function readAnimationFromUrl(): Animation | null {
 export function inspectAnimation(anim: Animation): InspectionNode {
 	const scale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
 	const hasAnnotations = anim.annotations && anim.annotations.length > 0;
+	const needsV5 =
+		hasAnnotations &&
+		anim.annotations.some(
+			(a) =>
+				a.labelHaloColor !== undefined ||
+				a.labelHaloWidth !== undefined ||
+				a.iconHaloColor !== undefined ||
+				a.iconHaloWidth !== undefined
+		);
 	const needsV4 =
 		hasAnnotations &&
 		anim.annotations.some(
@@ -246,8 +294,8 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR) !== DEFAULT_ANNOTATION_LABEL_COLOR
 		);
 	const needsV3 = hasAnnotations && scale !== DEFAULT_ANNOTATION_SCALE;
-	const inner = needsV4
-		? inspect(AnimationCodecV4, {
+	const inner = needsV5
+		? inspect(AnimationCodecV5, {
 				version: anim.version,
 				style: anim.style,
 				labels: anim.labels,
@@ -256,8 +304,8 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 				annotations: anim.annotations.map(normalizeAnnotation),
 				annotationScale: scale
 			})
-		: needsV3
-			? inspect(AnimationCodecV3, {
+		: needsV4
+			? inspect(AnimationCodecV4, {
 					version: anim.version,
 					style: anim.style,
 					labels: anim.labels,
@@ -266,22 +314,32 @@ export function inspectAnimation(anim: Animation): InspectionNode {
 					annotations: anim.annotations.map(normalizeAnnotation),
 					annotationScale: scale
 				})
-			: hasAnnotations
-				? inspect(AnimationCodecV2, {
+			: needsV3
+				? inspect(AnimationCodecV3, {
 						version: anim.version,
 						style: anim.style,
 						labels: anim.labels,
 						terrain: anim.terrain,
 						keyframes: anim.keyframes.map(normalizeKeyframe),
-						annotations: anim.annotations.map(normalizeAnnotation)
+						annotations: anim.annotations.map(normalizeAnnotation),
+						annotationScale: scale
 					})
-				: inspect(AnimationCodecV1, {
-						version: anim.version,
-						style: anim.style,
-						labels: anim.labels,
-						terrain: anim.terrain,
-						keyframes: anim.keyframes.map(normalizeKeyframe)
-					});
+				: hasAnnotations
+					? inspect(AnimationCodecV2, {
+							version: anim.version,
+							style: anim.style,
+							labels: anim.labels,
+							terrain: anim.terrain,
+							keyframes: anim.keyframes.map(normalizeKeyframe),
+							annotations: anim.annotations.map(normalizeAnnotation)
+						})
+					: inspect(AnimationCodecV1, {
+							version: anim.version,
+							style: anim.style,
+							labels: anim.labels,
+							terrain: anim.terrain,
+							keyframes: anim.keyframes.map(normalizeKeyframe)
+						});
 	// Wrap with the 1-byte format-tag prefix that `encodeAnimation` adds, so
 	// the tree's bit total matches the actual on-the-wire payload.
 	return {

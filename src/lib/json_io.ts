@@ -128,6 +128,12 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 		label: typeof o.label === 'string' ? o.label : ''
 	};
 	if (typeof o.labelColor === 'string') out.labelColor = o.labelColor;
+	if (typeof o.labelHaloColor === 'string') out.labelHaloColor = o.labelHaloColor;
+	const lhw = optionalNum('labelHaloWidth');
+	if (lhw !== undefined) out.labelHaloWidth = Math.max(0, lhw);
+	if (typeof o.iconHaloColor === 'string') out.iconHaloColor = o.iconHaloColor;
+	const ihw = optionalNum('iconHaloWidth');
+	if (ihw !== undefined) out.iconHaloWidth = Math.max(0, ihw);
 	const rotation = optionalNum('rotation');
 	if (rotation !== undefined) out.rotation = rotation;
 	const visibleFrom = optionalNum('visibleFrom');

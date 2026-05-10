@@ -5,7 +5,10 @@
 		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
+		DEFAULT_ICON_HALO_COLOR,
+		DEFAULT_ICON_HALO_WIDTH,
 		DEFAULT_LABEL_DISTANCE,
+		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
 		type AnnotationIcon,
@@ -26,6 +29,18 @@
 
 	function shortName(icon: string): string {
 		return icon.replace(/^symbol-/, '').replace(/^icon-/, '');
+	}
+	// Mirror MapStage's auto-flip so the picker shows the same color the map
+	// would render when the user hasn't customised the halo.
+	function haloAuto(hex: string): string {
+		const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+		if (!m) return '#ffffff';
+		const n = parseInt(m[1], 16);
+		const r = (n >> 16) & 0xff;
+		const g = (n >> 8) & 0xff;
+		const b = n & 0xff;
+		const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+		return lum > 0.5 ? '#000000' : '#ffffff';
 	}
 	function normalizeHex(c: string): string {
 		// <input type=color> requires #rrggbb (no shorthand, no alpha). Falling
@@ -48,6 +63,18 @@
 	}
 	function onLabelColor(e: Event) {
 		patch({ labelColor: (e.currentTarget as HTMLInputElement).value });
+	}
+	function onLabelHaloColor(e: Event) {
+		patch({ labelHaloColor: (e.currentTarget as HTMLInputElement).value });
+	}
+	function onLabelHaloWidth(e: Event) {
+		patch({ labelHaloWidth: Number((e.currentTarget as HTMLInputElement).value) });
+	}
+	function onIconHaloColor(e: Event) {
+		patch({ iconHaloColor: (e.currentTarget as HTMLInputElement).value });
+	}
+	function onIconHaloWidth(e: Event) {
+		patch({ iconHaloWidth: Number((e.currentTarget as HTMLInputElement).value) });
 	}
 	function onIcon(icon: AnnotationIcon) {
 		patch({ icon });
@@ -271,10 +298,58 @@
 				value={normalizeHex(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
 				oninput={onLabelColor}
 				aria-label="Label color"
-				title="Label text color. The halo automatically flips to a contrasting brightness to keep the label legible."
+				title="Label text color. The halo defaults to a contrasting brightness; override below."
 			/>
 			<span class="hex">{ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
 		</label>
+
+		<div class="row">
+			<span class="lbl">Label halo</span>
+			<input
+				type="color"
+				value={normalizeHex(
+					ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
+				)}
+				oninput={onLabelHaloColor}
+				aria-label="Label halo color"
+				title="Halo (text outline) color. Defaults to a contrasting brightness; pick to override."
+			/>
+			<input
+				class="halo-width"
+				type="range"
+				min="0"
+				max="4"
+				step="0.1"
+				value={ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
+				oninput={onLabelHaloWidth}
+				aria-label="Label halo width"
+				title="Halo width in px. 0 turns the halo off."
+			/>
+			<span class="num">{(ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
+		</div>
+
+		<div class="row">
+			<span class="lbl">Icon halo</span>
+			<input
+				type="color"
+				value={normalizeHex(ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
+				oninput={onIconHaloColor}
+				aria-label="Icon halo color"
+				title="Halo (icon outline) color. Default white; only visible when width > 0."
+			/>
+			<input
+				class="halo-width"
+				type="range"
+				min="0"
+				max="4"
+				step="0.1"
+				value={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+				oninput={onIconHaloWidth}
+				aria-label="Icon halo width"
+				title="Halo width in px. 0 turns the halo off (default)."
+			/>
+			<span class="num">{(ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
+		</div>
 
 		<label class="row">
 			<span class="lbl">Rotation</span>

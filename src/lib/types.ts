@@ -71,6 +71,12 @@ export const DEFAULT_ANNOTATION_COLOR = '#cc0000';
 // Near-black text reads on the colourful basemap; the auto-flipped halo
 // (white here, black when the label is light) keeps it legible on satellite.
 export const DEFAULT_ANNOTATION_LABEL_COLOR = '#111111';
+// Halo geometry. The defaults reproduce what the editor used to render
+// before halo was per-annotation: a 1.5-px halo with the auto-flipped colour
+// for labels, and no halo at all for icons. Both can be overridden.
+export const DEFAULT_LABEL_HALO_WIDTH = 1.5;
+export const DEFAULT_ICON_HALO_WIDTH = 0;
+export const DEFAULT_ICON_HALO_COLOR = '#ffffff';
 
 /**
  * Animation-wide multiplier on annotation icon and label size. The map also
@@ -127,6 +133,18 @@ export interface Annotation {
 	 * legible on any basemap.
 	 */
 	labelColor?: string;
+	/**
+	 * Label halo (text outline). When undefined, MapStage auto-picks a colour
+	 * with the contrasting brightness of `labelColor`. Width default 1.5 px.
+	 */
+	labelHaloColor?: string;
+	labelHaloWidth?: number;
+	/**
+	 * Icon halo (icon outline). Both default to "off" (width 0). Set the width
+	 * to give the icon a contrasting outline; default colour is white.
+	 */
+	iconHaloColor?: string;
+	iconHaloWidth?: number;
 	/** Text shown next to the marker. Empty string = no label. */
 	label: string;
 	/** Degrees clockwise; only meaningful for arrow-style icons. */

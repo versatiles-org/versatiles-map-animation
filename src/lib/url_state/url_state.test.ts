@@ -283,6 +283,58 @@ describe('per-annotation iconSize / labelSize (V4)', () => {
 		expect(decoded?.annotations[1].iconSize).toBeCloseTo(1.5, 2);
 	});
 
+	it('halo overrides switch to V5 and round-trip', () => {
+		const anim: Animation = {
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					color: '#fff',
+					label: 'H',
+					labelHaloColor: '#ff0000',
+					labelHaloWidth: 2.5,
+					iconHaloColor: '#00ff00',
+					iconHaloWidth: 1.2
+				}
+			]
+		};
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		const a = decoded?.annotations[0];
+		expect(a?.labelHaloColor).toBe('#ff0000');
+		expect(a?.labelHaloWidth).toBeCloseTo(2.5, 1);
+		expect(a?.iconHaloColor).toBe('#00ff00');
+		expect(a?.iconHaloWidth).toBeCloseTo(1.2, 1);
+	});
+
+	it('default halo (undefined) stays in V4 / V2', () => {
+		// No halo override → V4-or-lower, not V5.
+		const annV4: Animation = {
+			...example,
+			annotations: [
+				{ lng: 0, lat: 0, icon: 'symbol-marker', color: '#fff', label: 'A', iconSize: 1.5 }
+			]
+		};
+		const annV5: Animation = {
+			...example,
+			annotations: [
+				{
+					lng: 0,
+					lat: 0,
+					icon: 'symbol-marker',
+					color: '#fff',
+					label: 'A',
+					iconSize: 1.5,
+					labelHaloColor: '#ff0000'
+				}
+			]
+		};
+		const v4 = encodeAnimation(annV4);
+		const v5 = encodeAnimation(annV5);
+		expect(v5.length).toBeGreaterThan(v4.length);
+	});
+
 	it('non-default labelColor switches to V4 and round-trips', () => {
 		const anim: Animation = {
 			...example,

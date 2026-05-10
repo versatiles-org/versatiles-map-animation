@@ -8,8 +8,11 @@
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
+		DEFAULT_ICON_HALO_COLOR,
+		DEFAULT_ICON_HALO_WIDTH,
 		DEFAULT_INITIAL_VIEW,
 		DEFAULT_LABEL_DISTANCE,
+		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
 		type CameraState,
@@ -134,7 +137,12 @@
 						textAnchor: LABEL_TEXT_ANCHOR[pos],
 						textOffset: [unit[0] * dist, unit[1] * dist] as [number, number],
 						labelColor: a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR,
-						labelHalo: haloFor(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
+						// Halo: per-annotation override if present, else auto-flip for
+						// labels (good legibility default) / off for icons.
+						labelHalo: a.labelHaloColor ?? haloFor(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR),
+						labelHaloWidth: a.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH,
+						iconHalo: a.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR,
+						iconHaloWidth: a.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH
 					}
 				};
 			})
@@ -180,17 +188,21 @@
 				},
 				paint: {
 					'icon-color': ['get', 'color'],
+					// Per-feature icon halo (SDF only — all our icons are SDF).
+					// Width 0 disables the halo entirely.
+					'icon-halo-color': ['get', 'iconHalo'],
+					'icon-halo-width': ['get', 'iconHaloWidth'],
 					// Opacity flows from feature-state, set per frame from
 					// `getAnnotationOpacity`. Default 1 if state is missing (e.g.
 					// in the brief moment after the layer is re-installed but
 					// before the per-frame effect runs).
 					'icon-opacity': ['coalesce', ['feature-state', 'opacity'], 1],
-					// Per-feature label colour. Halo is auto-flipped to the
-					// contrasting brightness in `buildAnnotationFeatures`, so
-					// any user-picked text colour stays legible.
+					// Per-feature label colour + halo. When the user hasn't set
+					// labelHaloColor, `buildAnnotationFeatures` falls back to
+					// the auto-flipped contrasting brightness.
 					'text-color': ['get', 'labelColor'],
 					'text-halo-color': ['get', 'labelHalo'],
-					'text-halo-width': 1.5,
+					'text-halo-width': ['get', 'labelHaloWidth'],
 					'text-opacity': ['coalesce', ['feature-state', 'opacity'], 1]
 				}
 			});
