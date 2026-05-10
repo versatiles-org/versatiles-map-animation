@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>Embed demo — versatiles-map-animation</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+			}
+			body {
+				font:
+					16px/1.55 ui-sans-serif,
+					system-ui,
+					-apple-system,
+					sans-serif;
+				margin: 0;
+				padding: 0;
+				background: #fafafa;
+				color: #1a1a1a;
+			}
+			@media (prefers-color-scheme: dark) {
+				body {
+					background: #11161e;
+					color: #ddd;
+				}
+				article {
+					background: #1a2029;
+					box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+				}
+				code,
+				pre {
+					background: #0d1117;
+					color: #d4d4d4;
+				}
+				a {
+					color: #6ab0ff;
+				}
+			}
+			article {
+				max-width: 720px;
+				margin: 2rem auto;
+				padding: 2rem 1.5rem;
+				background: #fff;
+				border-radius: 8px;
+				box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+			}
+			h1 {
+				font-size: 1.6rem;
+				margin: 0 0 0.6rem;
+			}
+			.byline {
+				font-size: 0.85rem;
+				color: #888;
+				margin: 0 0 2rem;
+			}
+			p {
+				margin: 0 0 1.1rem;
+			}
+			figure {
+				margin: 2rem 0;
+			}
+			figcaption {
+				font-size: 0.85rem;
+				color: #888;
+				margin-top: 0.5rem;
+				text-align: center;
+			}
+			iframe {
+				width: 100%;
+				aspect-ratio: 16 / 9;
+				border: 0;
+				border-radius: 4px;
+				display: block;
+			}
+			pre {
+				background: #f4f4f4;
+				padding: 0.85rem 1rem;
+				border-radius: 4px;
+				overflow-x: auto;
+				font-size: 0.85rem;
+				line-height: 1.5;
+			}
+			code {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				background: #f4f4f4;
+				padding: 0.05em 0.3em;
+				border-radius: 3px;
+				font-size: 0.92em;
+			}
+			pre code {
+				background: transparent;
+				padding: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<article>
+			<h1>How embedding the map animation looks in real text</h1>
+			<p class="byline">A demo page so we can see the iframe in context — and copy the snippet.</p>
+
+			<p>
+				Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut
+				labore et dolore magna aliqua. The animation below was composed in the editor and shared as
+				a URL hash; the iframe loads the chrome-free <code>/view</code> route at that hash.
+			</p>
+
+			<p>
+				Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
+				commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+				dolore eu fugiat nulla pariatur.
+			</p>
+
+			<figure>
+				<!-- Relative src so this page works whether served from the production
+				     deploy, a preview build, or `npm run preview` locally. -->
+				<iframe
+					src="view#kf=BRsh_gMZEhN5cto_FxU4_rxdbktXYYxHWKqe5vcPaTDbL7d3D_lfh1Ml5l11G_AQQFfX4ThT9bPuAeyAABSa3tzoQITYwtzHja9P-odPx4dkAAAVQwA"
+					loading="lazy"
+					allowfullscreen
+					title="Map animation demo"
+				></iframe>
+				<figcaption>
+					An alpine flight composed in the editor and embedded here at 16:9, fluid width.
+				</figcaption>
+			</figure>
+
+			<p>
+				Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit
+				anim id est laborum. The iframe scales to whatever container it sits in — drop it into a
+				blog post, a landing page, or a presentation slide.
+			</p>
+
+			<h2 style="font-size: 1.1rem; margin-top: 2rem">The snippet</h2>
+			<p>
+				Paste this into any HTML page. The
+				<code>aspect-ratio</code> + <code>width: 100%</code> combo keeps the player responsive;
+				<code>loading="lazy"</code> defers the map until the iframe scrolls into view.
+			</p>
+			<pre><code>&lt;iframe
+  src="https://versatiles.org/versatiles-map-animation/view#kf=BRsh_gMZEhN5cto_FxU4_rxdbktXYYxHWKqe5vcPaTDbL7d3D_lfh1Ml5l11G_AQQFfX4ThT9bPuAeyAABSa3tzoQITYwtzHja9P-odPx4dkAAAVQwA"
+  style="width:100%;aspect-ratio:16/9;border:0"
+  loading="lazy"
+  allowfullscreen&gt;&lt;/iframe&gt;</code></pre>
+
+			<p style="font-size: 0.85rem; color: #888; margin-top: 2rem">
+				Compose your own animation in
+				<a href="./">the editor</a> and use the <strong>🖼 Embed…</strong> menu item to copy a
+				snippet for your animation.
+			</p>
+		</article>
+	</body>
+</html>
