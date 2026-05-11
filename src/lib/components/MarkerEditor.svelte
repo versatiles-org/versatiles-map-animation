@@ -1,20 +1,17 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
 	import {
-		familyLabel,
-		FONT_GROUPS,
-		fontVariantLabel,
 		haloAuto,
 		makeOnNum,
 		makeOnText,
 		normalizeHex,
 		POSITION_GRID
 	} from '../annotation_panel_helpers';
+	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
 	import IconPicker from './IconPicker.svelte';
 	import {
-		DEFAULT_ANNOTATION_COLOR,
-		DEFAULT_ANNOTATION_ICON,
+		ANNOTATION_FIELD_DEFAULTS,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
 		DEFAULT_ANNOTATION_LABEL_FONT,
 		DEFAULT_ICON_HALO_COLOR,
@@ -22,8 +19,7 @@
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
-		type Annotation,
-		type AnnotationLabelFont
+		type Annotation
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -39,33 +35,25 @@
 	const onNum = makeOnNum(patch);
 
 	/**
-	 * Hardcoded fallbacks for fields that need a real value at render time.
-	 * Required fields (icon, iconColor) get a real value on reset; optional
-	 * fields not listed here resolve to `undefined` and are deleted from the
-	 * annotation by `updateAnnotation`.
+	 * Resolve a field on reset: user-defined default → hardcoded baseline
+	 * (`ANNOTATION_FIELD_DEFAULTS`) → `undefined` (which `updateAnnotation`
+	 * treats as "delete the override"). For required fields like `icon` /
+	 * `iconColor` the table guarantees a real value; for present-only fields
+	 * like `labelHaloColor` it's `undefined`, so the field is removed and
+	 * the renderer's auto-flip kicks back in.
 	 */
-	const HARDCODED_DEFAULTS: Partial<Annotation> = {
-		icon: DEFAULT_ANNOTATION_ICON,
-		iconColor: DEFAULT_ANNOTATION_COLOR
-	};
-
 	function resetAnnFields(...keys: (keyof Annotation)[]): void {
 		if (idx === null) return;
 		const p: Record<string, unknown> = {};
 		for (const k of keys) {
 			const fromDefault = (store.defaultAnnotation as Record<string, unknown>)[k];
-			const hardcoded = (HARDCODED_DEFAULTS as Record<string, unknown>)[k];
+			const hardcoded = (ANNOTATION_FIELD_DEFAULTS as Record<string, unknown>)[k];
 			p[k] = fromDefault ?? hardcoded;
 		}
 		store.updateAnnotation(idx, p as Partial<Annotation>);
 	}
 	function isAnnSet(...keys: (keyof Annotation)[]): boolean {
 		return ann !== null && keys.some((k) => k in ann);
-	}
-
-	function onLabelFont(e: Event) {
-		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
-		patch({ labelFont: v });
 	}
 
 	// Visibility/fade clamping. Two invariants:
@@ -289,20 +277,11 @@
 
 	<label class="row">
 		<span class="lbl">Font</span>
-		<select
-			class="font-select"
+		<FontSelect
 			value={ann.labelFont ?? DEFAULT_ANNOTATION_LABEL_FONT}
-			onchange={onLabelFont}
+			onChange={(font) => patch({ labelFont: font })}
 			title="Glyph font for this label. Drawn from the VersaTiles tileserver's bundled fonts."
-		>
-			{#each FONT_GROUPS as g (g.family)}
-				<optgroup label={familyLabel(g.family)}>
-					{#each g.fonts as f (f)}
-						<option value={f}>{fontVariantLabel(f)}</option>
-					{/each}
-				</optgroup>
-			{/each}
-		</select>
+		/>
 		<button
 			type="button"
 			class="mini reset"
@@ -623,24 +602,7 @@
 		flex: 1 1 auto;
 		min-width: 0;
 	}
-	.font-select {
-		flex: 1 1 auto;
-		min-width: 0;
-		padding: 0.25rem 0.4rem;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid #333;
-		border-radius: 4px;
-		color: #ddd;
-		font: inherit;
-		font-size: 12px;
-		cursor: pointer;
-
-		&:hover,
-		&:focus {
-			border-color: #4a9eff;
-			outline: none;
-		}
-	}
+	/* `.font-select` styles live in FontSelect.svelte. */
 	.num,
 	.hex,
 	.coord {

@@ -523,6 +523,31 @@ export function isLabelPosition(value: unknown): value is LabelPosition {
 	return typeof value === 'string' && (LABEL_POSITIONS as readonly string[]).includes(value);
 }
 
+/**
+ * Single source of truth for per-annotation field defaults. Each `DEFAULT_*`
+ * named export above is a re-spelling of one entry here; new code should
+ * prefer `ANNOTATION_FIELD_DEFAULTS[key]` so adding a future field is a
+ * one-row table edit.
+ *
+ * `labelHaloColor` is intentionally `undefined` — its baseline is "auto-flip
+ * from labelColor", computed at render time, not a literal hex.
+ */
+export const ANNOTATION_FIELD_DEFAULTS = {
+	icon: DEFAULT_ANNOTATION_ICON,
+	iconColor: DEFAULT_ANNOTATION_COLOR,
+	iconSize: DEFAULT_ANNOTATION_ICON_SIZE,
+	iconHaloColor: DEFAULT_ICON_HALO_COLOR,
+	iconHaloWidth: DEFAULT_ICON_HALO_WIDTH,
+	labelColor: DEFAULT_ANNOTATION_LABEL_COLOR,
+	labelSize: DEFAULT_ANNOTATION_LABEL_SIZE,
+	labelPosition: DEFAULT_LABEL_POSITION,
+	labelDistance: DEFAULT_LABEL_DISTANCE,
+	labelFont: DEFAULT_ANNOTATION_LABEL_FONT,
+	labelHaloColor: undefined as string | undefined,
+	labelHaloWidth: DEFAULT_LABEL_HALO_WIDTH,
+	rotation: 0
+} as const satisfies Partial<Annotation>;
+
 export interface Animation {
 	version: number;
 	style: MapStyleId;
