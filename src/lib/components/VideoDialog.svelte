@@ -39,7 +39,7 @@
 		// fresh; the working directory is mounted at /out so the MP4 lands next
 		// to where the user invoked the command. `--height` is derived from
 		// `--width` and the composition aspect ratio chosen in the editor.
-		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps} --output /out/animation.mp4`;
+		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps} --output animation.mp4`;
 	}
 	const command = $derived(buildCommand());
 

@@ -28,6 +28,12 @@ RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
 COPY --from=app-builder /src/build /app/site
 COPY render/render.mjs ./
 
+# Final WORKDIR is the volume mount point so `--output` accepts plain
+# filenames (`--output animation.mp4`) — they resolve relative to the
+# caller's mounted host directory instead of leaking into the image layer.
+# The entry-point uses an absolute path because `render.mjs` lives in
+# `/app/render`, not in the runtime WORKDIR.
+WORKDIR /out
 VOLUME ["/out"]
-ENTRYPOINT ["node", "render.mjs"]
+ENTRYPOINT ["node", "/app/render/render.mjs"]
 CMD ["--help"]

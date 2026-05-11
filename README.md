@@ -48,7 +48,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
   ```sh
   docker run --rm --pull always -v "$PWD:/out" \
     ghcr.io/versatiles-org/versatiles-map-animation:latest \
-    --hash '<URL-hash payload>' --width 1920 --fps 30 --output /out/animation.mp4
+    --hash '<URL-hash payload>' --width 1920 --fps 30 --output animation.mp4
   ```
 
 ## Run locally

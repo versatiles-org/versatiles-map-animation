@@ -28,21 +28,26 @@ and `render/` in the build context.)
 ## Render an animation
 
 ```sh
-docker run --rm -v "$PWD/out:/out" \
+docker run --rm -v "$PWD:/out" \
   ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --hash 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3...' \
   --width 1920 \
   --fps 30 \
-  --output /out/animation.mp4
+  --output animation.mp4
 ```
+
+The container's working directory is `/out`, so a plain filename for
+`--output` lands in whatever the caller mounted there. The mount above
+(`-v "$PWD:/out"`) makes the resulting MP4 appear in the host's current
+directory; absolute paths (`--output /out/sub/foo.mp4`) still work too.
 
 You can also pass a full URL with `--url` and the renderer will extract the hash:
 
 ```sh
-docker run --rm -v "$PWD/out:/out" \
+docker run --rm -v "$PWD:/out" \
   ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --url 'https://example.org/#kf=AVYw...' \
-  --output /out/animation.mp4
+  --output animation.mp4
 ```
 
 ## Options
@@ -58,7 +63,7 @@ docker run --rm -v "$PWD/out:/out" \
 | `--frame-timeout <ms>` | `10000`           | per-frame settle deadline                             |
 | `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
-| `--output <path>`      | (required)        | output MP4 path (mount as a volume — see examples)    |
+| `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |
 
 ## How it works
 
