@@ -397,8 +397,9 @@
 		map?.remove();
 	});
 
-	// Drive the playhead during playback. The cameraDriver effect (below) reacts
-	// to currentTime changes and applies the sampled camera each frame.
+	// effect: RAF playback driver — advances currentTime each frame while playing.
+	// The cameraDriver effect (below) reacts to currentTime changes and applies
+	// the sampled camera each frame.
 	$effect(() => {
 		if (!store.isPlaying || store.keyframes.length < 2) return;
 		let last = performance.now();
@@ -422,15 +423,20 @@
 		};
 	});
 
-	// Apply the sampled camera to the map whenever it changes (playback or scrub).
-	// When the user navigates freely, this effect doesn't fire because neither
-	// keyframes nor currentTime changed.
+	// effect: apply the sampled camera to the map.
+	// Re-runs whenever `sampledCamera` changes (playback or scrub). When the
+	// user navigates freely, this effect doesn't fire because neither keyframes
+	// nor currentTime changed.
 	$effect(() => {
 		const cam = store.sampledCamera;
 		if (!cam || !map) return;
 		applyCamera(cam);
 	});
 
+	// effect: rebuild the map style on style/labels/terrain/sky changes.
+	// `setStyle({ diff: false })` wipes our custom annotation source/layer
+	// along with everything else, so we re-install them via `setupAnnotationLayer`
+	// once the new style has finished loading.
 	$effect(() => {
 		const id = store.style;
 		const labels = store.labels;
@@ -454,11 +460,12 @@
 		};
 	});
 
-	// Push the annotation array to the GeoJSON source whenever it changes
-	// (or after a style swap re-installed the source). Re-using `setData()`
-	// instead of recreating the source preserves any feature state we set.
-	// Read `annotationsReady` before the `map` check so JS short-circuit
-	// can't skip its tracking on the first run (when map is still undefined).
+	// effect: push the annotation array to the GeoJSON source.
+	// Runs on annotation changes and after a style swap re-installs the source.
+	// Re-using `setData()` instead of recreating the source preserves any
+	// feature state we set. Read `annotationsReady` before the `map` check so
+	// JS short-circuit can't skip its tracking on the first run (when map is
+	// still undefined).
 	$effect(() => {
 		const anns = store.annotations;
 		const ready = annotationsReady;
@@ -468,11 +475,12 @@
 		source.setData(buildAnnotationFeatures(anns));
 	});
 
-	// Per-frame opacity. Tracks `currentTime` and `annotations` so it re-runs
-	// during playback and after edits. Sets `opacity` feature-state (0..1) on
-	// every annotation; the layer's icon/text-opacity expressions read it via
-	// `coalesce`. Pushing a continuous value lets fade-in / fade-out tails
-	// render as smooth ramps rather than hard cuts.
+	// effect: per-frame annotation opacity feature-state.
+	// Tracks `currentTime` and `annotations` so it re-runs during playback and
+	// after edits. Sets `opacity` feature-state (0..1) on every annotation; the
+	// layer's icon/text-opacity expressions read it via `coalesce`. Pushing a
+	// continuous value lets fade-in / fade-out tails render as smooth ramps
+	// rather than hard cuts.
 	//
 	// Edit mode: when the user is composing (not rendering, not playing, not
 	// scrubbing), floor the opacity at `ANNOTATION_OPACITY_FLOOR` so hidden
@@ -492,6 +500,7 @@
 		}
 	});
 
+	// effect: re-apply combined annotation scale to icon/text/halo layout.
 	// Combined scale = container-width factor × user-set annotationScale ×
 	// per-annotation iconSize / labelSize. The per-annotation factor is read
 	// from the feature property, so the layer expression encodes both halves
