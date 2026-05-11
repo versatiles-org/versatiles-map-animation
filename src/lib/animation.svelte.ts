@@ -34,6 +34,13 @@ export type ResolvedAnnotation = Annotation & {
 
 const MIN_TIME_GAP = 0.01;
 
+/** Snap a time value to the nearest centi-second (1/100 s). Keyframe `t`
+ *  values are stored on this grid so the timeline reads as clean decimals
+ *  ("3.27 s") rather than floating-point dust from drag math. */
+function snapTime(t: number): number {
+	return Math.round(t * 100) / 100;
+}
+
 /** Return a new array with `arr[idx]` replaced by `value`. */
 function replaceAt<T>(arr: T[], idx: number, value: T): T[] {
 	return [...arr.slice(0, idx), value, ...arr.slice(idx + 1)];
@@ -177,13 +184,13 @@ export class AnimationStore {
 	);
 
 	addKeyframeFromCamera(cam: CameraState): void {
-		let t = this.currentTime;
+		let t = snapTime(this.currentTime);
 		// If the playhead is parked on (or right next to) an existing keyframe,
 		// fall back to appending after the last one — otherwise consecutive
 		// clicks would all collide at the same time.
 		const collides = this.keyframes.some((kf) => Math.abs(kf.t - t) < MIN_TIME_GAP);
 		if (collides) {
-			t = this.keyframes[this.keyframes.length - 1].t + 1.0;
+			t = snapTime(this.keyframes[this.keyframes.length - 1].t + 1.0);
 		}
 		const kf: Keyframe = { t, ...cam };
 		const after = this.keyframes.findIndex((k) => k.t > t);
@@ -231,13 +238,14 @@ export class AnimationStore {
 	 */
 	setKeyframeTime(index: number, t: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
-		const moved: Keyframe = { ...this.keyframes[index], t: Math.max(0, t) };
+		// Snap to the 1/100s grid so dragged values land on clean centi-second
+		// stops, then clamp to t ≥ 0.
+		const moved: Keyframe = { ...this.keyframes[index], t: Math.max(0, snapTime(t)) };
 		const others = this.keyframes.filter((_, i) => i !== index);
-		// Nudge until no other keyframe is within MIN_TIME_GAP. In the worst
-		// case this loops once per existing keyframe; in practice it almost
-		// never triggers since the user is dragging through fractional seconds.
+		// Nudge until no other keyframe is within MIN_TIME_GAP. MIN_TIME_GAP is
+		// itself one grid step, so nudged values stay on the grid.
 		while (others.some((o) => Math.abs(o.t - moved.t) < MIN_TIME_GAP)) {
-			moved.t += MIN_TIME_GAP;
+			moved.t = snapTime(moved.t + MIN_TIME_GAP);
 		}
 		const sorted = [...others, moved].sort((a, b) => a.t - b.t);
 		const newIndex = sorted.indexOf(moved);

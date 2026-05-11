@@ -125,6 +125,24 @@ describe('AnimationStore - keyframe CRUD', () => {
 		expect(s.selectedIndex).toBe(2);
 	});
 
+	it('setKeyframeTime snaps t to the nearest 1/100 second', () => {
+		const s = new AnimationStore();
+		s.addKeyframeFromCamera(cam(0, 0)); // t=0
+		s.addKeyframeFromCamera(cam(1, 0)); // t=1
+		s.setKeyframeTime(1, 1.23456789);
+		// Snapped down to two decimal places.
+		expect(s.keyframes[1].t).toBe(1.23);
+		s.setKeyframeTime(1, 2.5078);
+		expect(s.keyframes[1].t).toBe(2.51);
+	});
+
+	it('addKeyframeFromCamera snaps the inserted t to 1/100 second', () => {
+		const s = new AnimationStore();
+		s.currentTime = 0.123456;
+		s.addKeyframeFromCamera(cam());
+		expect(s.keyframes[0].t).toBe(0.12);
+	});
+
 	it('setKeyframeTime nudges to avoid colliding with another keyframe', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());
