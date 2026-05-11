@@ -187,8 +187,15 @@
 		store.isScrubbing = true;
 		capturePointer(e.target as HTMLElement, e, {
 			onMove: (ev) => {
-				store.setKeyframeTime(index, tFromClientX(ev.clientX));
-				const kf = store.keyframes[index];
+				// Track the moving keyframe via `selectedIndex` rather than the
+				// captured `index`: when the keyframe is dragged past a neighbor,
+				// `setKeyframeTime` re-sorts the array and updates the selection
+				// to follow it. Reading the live selection picks up the new slot
+				// on the next frame.
+				const i = store.selectedIndex;
+				if (i === null) return;
+				store.setKeyframeTime(i, tFromClientX(ev.clientX));
+				const kf = store.keyframes[store.selectedIndex ?? i];
 				if (kf) store.currentTime = kf.t;
 			},
 			onUp: () => {

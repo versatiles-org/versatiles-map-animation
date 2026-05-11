@@ -217,16 +217,41 @@ export class AnimationStore {
 		this.keyframes = replaceAt(this.keyframes, index, updated);
 	}
 
-	/** Move a keyframe in time, clamped to a 0.01s buffer from neighbors. */
+	/**
+	 * Set a keyframe's time `t`. The keyframe is allowed to cross its
+	 * neighbors — when it does, the array is re-sorted and `selectedIndex` is
+	 * adjusted so the moved keyframe stays selected and surrounding
+	 * selections track correctly. Only constraint: `t ≥ 0`, and if the new
+	 * time collides with another keyframe within `MIN_TIME_GAP` it's
+	 * nudged forward by that gap so every keyframe stays distinguishable.
+	 *
+	 * That lets the user drag a keyframe along the timeline past other
+	 * keyframes to reorder the sequence, instead of being clamped to its
+	 * starting slot.
+	 */
 	setKeyframeTime(index: number, t: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
-		const minT = index > 0 ? this.keyframes[index - 1].t + MIN_TIME_GAP : 0;
-		const maxT =
-			index < this.keyframes.length - 1
-				? this.keyframes[index + 1].t - MIN_TIME_GAP
-				: Number.POSITIVE_INFINITY;
-		const clamped = Math.max(minT, Math.min(maxT, t));
-		this.keyframes = replaceAt(this.keyframes, index, { ...this.keyframes[index], t: clamped });
+		const moved: Keyframe = { ...this.keyframes[index], t: Math.max(0, t) };
+		const others = this.keyframes.filter((_, i) => i !== index);
+		// Nudge until no other keyframe is within MIN_TIME_GAP. In the worst
+		// case this loops once per existing keyframe; in practice it almost
+		// never triggers since the user is dragging through fractional seconds.
+		while (others.some((o) => Math.abs(o.t - moved.t) < MIN_TIME_GAP)) {
+			moved.t += MIN_TIME_GAP;
+		}
+		const sorted = [...others, moved].sort((a, b) => a.t - b.t);
+		const newIndex = sorted.indexOf(moved);
+		// Follow the moved keyframe with the selection (if it was selected),
+		// and shift `selectedIndex` left/right when the moved keyframe crossed
+		// over the currently-selected one.
+		if (this.selectedIndex === index) {
+			this.selectedIndex = newIndex;
+		} else if (this.selectedIndex !== null) {
+			const sel = this.selectedIndex;
+			if (index < sel && newIndex >= sel) this.selectedIndex = sel - 1;
+			else if (index > sel && newIndex <= sel) this.selectedIndex = sel + 1;
+		}
+		this.keyframes = sorted;
 	}
 
 	selectAt(index: number): void {

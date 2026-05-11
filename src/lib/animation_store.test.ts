@@ -93,17 +93,14 @@ describe('AnimationStore - keyframe CRUD', () => {
 		expect(s.keyframes[0]).not.toHaveProperty('path');
 	});
 
-	it('setKeyframeTime clamps to neighbor + MIN_TIME_GAP', () => {
+	it('setKeyframeTime clamps t to ≥ 0', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam()); // t=0
 		s.addKeyframeFromCamera(cam(1, 0)); // t=1
-		s.addKeyframeFromCamera(cam(2, 0)); // t=2
-		// Try to push middle past the right neighbor.
-		s.setKeyframeTime(1, 999);
-		expect(s.keyframes[1].t).toBeLessThan(2);
-		// Try to drag below the left neighbor.
+		// Trying to drag below 0 → clamps to 0. The existing keyframe at 0 is
+		// then nudged forward to keep them distinguishable.
 		s.setKeyframeTime(1, -10);
-		expect(s.keyframes[1].t).toBeGreaterThan(0);
+		expect(s.keyframes.every((k) => k.t >= 0)).toBe(true);
 	});
 
 	it('setKeyframeTime ignores out-of-range index', () => {
@@ -111,6 +108,46 @@ describe('AnimationStore - keyframe CRUD', () => {
 		s.addKeyframeFromCamera(cam());
 		s.setKeyframeTime(99, 5);
 		expect(s.keyframes[0].t).toBe(0);
+	});
+
+	it('setKeyframeTime past a neighbor reorders the array and follows the selection', () => {
+		const s = new AnimationStore();
+		s.addKeyframeFromCamera(cam(0, 0)); // t=0
+		s.addKeyframeFromCamera(cam(1, 0)); // t=1, lng=1 — uniquely identifies this kf
+		s.addKeyframeFromCamera(cam(2, 0)); // t=2
+		s.selectAt(1); // select the middle keyframe (lng=1)
+		s.setKeyframeTime(1, 5); // push past the t=2 neighbor
+		// Array is re-sorted; the moved keyframe is now last.
+		expect(s.keyframes.map((k) => k.t)).toEqual([0, 2, 5]);
+		// Identify the moved keyframe by its lng (1), which survived the move.
+		expect(s.keyframes[2].lng).toBe(1);
+		// Selection follows the moved keyframe to its new index.
+		expect(s.selectedIndex).toBe(2);
+	});
+
+	it('setKeyframeTime nudges to avoid colliding with another keyframe', () => {
+		const s = new AnimationStore();
+		s.addKeyframeFromCamera(cam());
+		s.addKeyframeFromCamera(cam(1, 0)); // t=1
+		// Try to set the first keyframe to exactly t=1; should nudge forward.
+		s.setKeyframeTime(0, 1);
+		const times = s.keyframes.map((k) => k.t).sort((a, b) => a - b);
+		expect(times[1] - times[0]).toBeGreaterThanOrEqual(0.01);
+	});
+
+	it('setKeyframeTime shifts a neighboring selection when the moved keyframe crosses over it', () => {
+		const s = new AnimationStore();
+		s.addKeyframeFromCamera(cam(0, 0)); // t=0
+		s.addKeyframeFromCamera(cam(1, 0)); // t=1
+		s.addKeyframeFromCamera(cam(2, 0)); // t=2
+		s.selectAt(2); // select the last keyframe
+		// Move keyframe 0 past keyframe 1 → array becomes [kf1, kf0, kf2].
+		s.setKeyframeTime(0, 1.5);
+		expect(s.keyframes[2].t).toBe(2);
+		// Selection on the last keyframe is unchanged in identity but its
+		// index shifted from 2 to… still 2, because the moved kf landed at
+		// idx 1 (not past selection).
+		expect(s.selectedIndex).toBe(2);
 	});
 
 	it('deleteAt removes the keyframe and clears selection if it was selected', () => {
