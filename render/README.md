@@ -60,7 +60,7 @@ docker run --rm -v "$PWD:/out" \
 | `--fps <n>`            | `30`              | frame rate                                            |
 | `--crf <n>`            | `18`              | x264 CRF — lower = higher quality, larger file        |
 | `--preset <name>`      | `slow`            | x264 preset (`ultrafast`…`veryslow`)                  |
-| `--frame-timeout <ms>` | `10000`           | per-frame settle deadline                             |
+| `--frame-timeout <ms>` | `30000`           | per-frame settle deadline                             |
 | `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
 | `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |
@@ -75,12 +75,12 @@ so WebGL runs on the CPU, then drives the page frame-by-frame:
    exposes `window.__renderer.{seekTo, duration}` and `window.__map`.
 2. Optional pre-warm pass: walk the trajectory once at 2 fps to populate the
    browser's HTTP tile cache. Skips with `--no-prewarm`.
-3. Capture pass: install a virtual clock (`page.clock`) so MapLibre's internal
-   animations (label fades, transitions) evaluate at _animation_ time rather
-   than wall-clock time. For each frame, pause the virtual clock at the
-   animation time (firing any queued rAF / setTimeout callbacks up to that
-   point, so MapLibre's repaint actually runs), drive the playhead, wait
-   for `map.idle`, screenshot.
+3. Capture pass: for each frame, drive the playhead with
+   `__renderer.seekTo(t)`, wait for `map.on('idle')`, screenshot. The
+   idle wait is the synchronisation point — by the time it resolves,
+   tiles are loaded and any MapLibre internal animations have settled —
+   so wall-clock time spent rendering each frame doesn't leak into the
+   captured output.
 4. Frames stream into ffmpeg over stdin → H.264 / yuv420p MP4 with `+faststart`.
 
 Per-frame render time scales with viewport size and animation complexity.

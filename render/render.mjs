@@ -34,7 +34,7 @@ const DEFAULT_OPTS = {
 	fps: 30,
 	crf: 18,
 	preset: 'slow',
-	frameTimeoutMs: 10_000,
+	frameTimeoutMs: 30_000,
 	prewarm: true,
 	endTime: null,
 	verbose: false
@@ -408,23 +408,23 @@ async function prewarmPass(page, duration, opts) {
 async function capturePass(page, duration, opts, ffmpegStdin) {
 	const total = Math.max(2, Math.ceil(duration * opts.fps) + 1);
 
-	// Install a virtual clock so MapLibre's internal animations evaluate at
-	// the correct *animation* time, not wall-clock time, regardless of how
-	// long each SwiftShader-rendered frame actually takes.
-	await page.clock.install({ time: 0 });
-
+	// No virtual clock here. Earlier versions installed `page.clock` to keep
+	// MapLibre's internal animations (label fades, tile fades) on animation
+	// time rather than wall-clock time, but that broke the post-network
+	// repaint chain — tile fetches resolve in real time, schedule a new rAF,
+	// and that rAF gets stuck in the controlled queue until the next
+	// `pauseAt`, by which point `waitForFrameReady` has already timed out.
+	//
+	// We don't actually need virtual time, because `waitForFrameReady` waits
+	// for `map.on('idle')` *before* each screenshot — at idle, every
+	// MapLibre-internal animation has settled to its end state, regardless
+	// of how long real wall-clock time it took to get there. Our annotation
+	// fades use `store.currentTime` (the animation timeline, not the system
+	// clock), and the camera is set with direct jumps, so wall-clock leakage
+	// has no visible effect on the captured frames.
 	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
 		const t = Math.min(duration, i / opts.fps);
-		// `pauseAt` (not `setFixedTime`) advances the controlled clock to `t`,
-		// firing every queued setTimeout / setInterval / requestAnimationFrame
-		// whose scheduled time falls in the interval, then pauses there. That's
-		// what lets MapLibre's `triggerRepaint()` (further down in
-		// `waitForFrameReady`) actually run its rAF-scheduled render pass —
-		// `setFixedTime` only changes `Date.now()` and would leave the rAF
-		// callback queued forever, so `map.on('idle')` would never fire and
-		// every frame hit the 60 s timeout with a half-drawn screenshot.
-		await page.clock.pauseAt(t * 1000);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 		try {
 			await waitForFrameReady(page, opts.frameTimeoutMs);
