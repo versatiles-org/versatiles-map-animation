@@ -1,13 +1,8 @@
 import { FIELD_SPECS } from './url_state/annotation_codec';
 import {
+	ANIMATION_DEFAULTS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
-	DEFAULT_ANNOTATION_SCALE,
-	DEFAULT_ASPECT_RATIO,
-	DEFAULT_LABELS,
-	DEFAULT_SKY,
-	DEFAULT_STYLE,
-	DEFAULT_TERRAIN,
 	isAnnotationIcon,
 	isAspectRatio,
 	isLabelPosition,
@@ -75,10 +70,10 @@ export function validateAnimation(input: unknown): Animation {
 			`File was made with a newer version (v${version}); this tool supports v${SCHEMA_VERSION}.`
 		);
 	}
-	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : DEFAULT_STYLE;
-	const labels = typeof obj.labels === 'boolean' ? obj.labels : DEFAULT_LABELS;
-	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : DEFAULT_TERRAIN;
-	const sky = typeof obj.sky === 'boolean' ? obj.sky : DEFAULT_SKY;
+	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : ANIMATION_DEFAULTS.style;
+	const labels = typeof obj.labels === 'boolean' ? obj.labels : ANIMATION_DEFAULTS.labels;
+	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : ANIMATION_DEFAULTS.terrain;
+	const sky = typeof obj.sky === 'boolean' ? obj.sky : ANIMATION_DEFAULTS.sky;
 	if (!Array.isArray(obj.keyframes)) {
 		throw new Error('Invalid file: "keyframes" missing or not an array.');
 	}
@@ -106,8 +101,10 @@ export function validateAnimation(input: unknown): Animation {
 	const annotationScale =
 		typeof obj.annotationScale === 'number' && Number.isFinite(obj.annotationScale)
 			? Math.max(0.01, obj.annotationScale)
-			: DEFAULT_ANNOTATION_SCALE;
-	const aspectRatio = isAspectRatio(obj.aspectRatio) ? obj.aspectRatio : DEFAULT_ASPECT_RATIO;
+			: ANIMATION_DEFAULTS.annotationScale;
+	const aspectRatio = isAspectRatio(obj.aspectRatio)
+		? obj.aspectRatio
+		: ANIMATION_DEFAULTS.aspectRatio;
 	const defaultAnnotation =
 		obj.defaultAnnotation && typeof obj.defaultAnnotation === 'object'
 			? validatePartialAnnotation(obj.defaultAnnotation as Record<string, unknown>)

@@ -160,6 +160,30 @@ export const DEFAULT_LABELS = true;
 export const DEFAULT_TERRAIN = false;
 export const DEFAULT_SKY = false;
 
+/**
+ * Animation-level defaults — the fields that aren't per-keyframe or
+ * per-annotation. Used by `createEmptyAnimation`, the JSON validator, and
+ * the URL-state decoder so a single edit here covers every fallback site.
+ * The named `DEFAULT_*` constants above stay as the source-of-truth values;
+ * this object just bundles them for callers that want to spread or look up
+ * by key.
+ */
+export const ANIMATION_DEFAULTS: {
+	style: MapStyleId;
+	labels: boolean;
+	terrain: boolean;
+	sky: boolean;
+	annotationScale: number;
+	aspectRatio: AspectRatio;
+} = {
+	style: DEFAULT_STYLE,
+	labels: DEFAULT_LABELS,
+	terrain: DEFAULT_TERRAIN,
+	sky: DEFAULT_SKY,
+	annotationScale: DEFAULT_ANNOTATION_SCALE,
+	aspectRatio: DEFAULT_ASPECT_RATIO
+};
+
 export function isMapStyleId(value: unknown): value is MapStyleId {
 	return typeof value === 'string' && (MAP_STYLE_IDS as readonly string[]).includes(value);
 }
@@ -588,14 +612,9 @@ export const DEFAULT_INITIAL_VIEW: CameraState = {
 export function createEmptyAnimation(): Animation {
 	return {
 		version: SCHEMA_VERSION,
-		style: DEFAULT_STYLE,
-		labels: DEFAULT_LABELS,
-		terrain: DEFAULT_TERRAIN,
-		sky: DEFAULT_SKY,
+		...ANIMATION_DEFAULTS,
 		keyframes: [],
 		annotations: [],
-		annotationScale: DEFAULT_ANNOTATION_SCALE,
-		aspectRatio: DEFAULT_ASPECT_RATIO,
 		defaultAnnotation: {}
 	};
 }

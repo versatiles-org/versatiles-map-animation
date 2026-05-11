@@ -1,14 +1,9 @@
 import { sampleAt } from './interpolate';
 import {
+	ANIMATION_DEFAULTS,
 	cameraOf,
 	createEmptyAnimation,
-	DEFAULT_ANNOTATION_SCALE,
-	DEFAULT_ASPECT_RATIO,
 	DEFAULT_INITIAL_VIEW,
-	DEFAULT_LABELS,
-	DEFAULT_SKY,
-	DEFAULT_STYLE,
-	DEFAULT_TERRAIN,
 	SCHEMA_VERSION
 } from './types';
 import type {
@@ -95,12 +90,12 @@ export class AnimationStore {
 	isScrubbing = $state(false);
 	selectedIndex = $state<number | null>(null);
 	selectedAnnotationIndex = $state<number | null>(null);
-	style = $state<MapStyleId>(DEFAULT_STYLE);
-	labels = $state(DEFAULT_LABELS);
-	terrain = $state(DEFAULT_TERRAIN);
-	sky = $state(DEFAULT_SKY);
-	annotationScale = $state(DEFAULT_ANNOTATION_SCALE);
-	aspectRatio = $state<AspectRatio>(DEFAULT_ASPECT_RATIO);
+	style = $state<MapStyleId>(ANIMATION_DEFAULTS.style);
+	labels = $state(ANIMATION_DEFAULTS.labels);
+	terrain = $state(ANIMATION_DEFAULTS.terrain);
+	sky = $state(ANIMATION_DEFAULTS.sky);
+	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
+	aspectRatio = $state<AspectRatio>(ANIMATION_DEFAULTS.aspectRatio);
 	/**
 	 * Per-animation marker style defaults. New markers start from these; the
 	 * URL/JSON codec uses them as the carry-forward baseline so annotations
@@ -322,12 +317,12 @@ export class AnimationStore {
 	loadFromAnimation(anim: Animation): void {
 		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
 		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
-		this.style = anim.style ?? DEFAULT_STYLE;
-		this.labels = anim.labels ?? DEFAULT_LABELS;
-		this.terrain = anim.terrain ?? DEFAULT_TERRAIN;
-		this.sky = anim.sky ?? DEFAULT_SKY;
-		this.annotationScale = anim.annotationScale ?? DEFAULT_ANNOTATION_SCALE;
-		this.aspectRatio = anim.aspectRatio ?? DEFAULT_ASPECT_RATIO;
+		this.style = anim.style ?? ANIMATION_DEFAULTS.style;
+		this.labels = anim.labels ?? ANIMATION_DEFAULTS.labels;
+		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
+		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
+		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
+		this.aspectRatio = anim.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio;
 		this.defaultAnnotation = { ...(anim.defaultAnnotation ?? {}) };
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;

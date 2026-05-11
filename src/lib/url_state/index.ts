@@ -16,7 +16,7 @@
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
-import { DEFAULT_ANNOTATION_SCALE, DEFAULT_ASPECT_RATIO, SCHEMA_VERSION } from '../types';
+import { ANIMATION_DEFAULTS, SCHEMA_VERSION } from '../types';
 import type { Animation } from '../types';
 import { AnimationCodec, FORMAT_TAG_BINARY_V1 } from './animation_codec';
 import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
@@ -54,8 +54,8 @@ function fromWire(wire: Wire): Animation {
 		sky: wire.sky,
 		keyframes: wire.keyframes.map(denormalizeKeyframe),
 		annotations: wire.annotations.map(denormalizeAnnotation),
-		annotationScale: wire.annotationScale ?? DEFAULT_ANNOTATION_SCALE,
-		aspectRatio: wire.aspectRatio ?? DEFAULT_ASPECT_RATIO,
+		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
+		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,
 		// `defaultAnnotation` isn't on the wire yet (UX-only feature for now —
 		// the wire codec optimisation is a follow-up). Decoded animations
 		// always come back with empty defaults.
