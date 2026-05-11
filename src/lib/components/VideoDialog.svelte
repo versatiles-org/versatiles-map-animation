@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * Modal that builds a `docker run` command line for rendering the current
+	 * animation to a video file via the standalone `versatiles-map-animation`
+	 * container image. The user picks width and FPS; height is derived from
+	 * the animation's aspect ratio. The encoded animation is passed on the
+	 * URL fragment, so it ships with the command line.
+	 */
+
 	import type { AnimationStore } from '../animation.svelte';
 	import { aspectRatioValue } from '../types';
 	import { encodeAnimation } from '../url_state';

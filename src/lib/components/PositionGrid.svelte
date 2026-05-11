@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * 3×3 picker for `labelPosition`. The dot in the middle represents the
+	 * icon; each surrounding slot is one of the 8 cardinal/diagonal label
+	 * placements (`top-left`, `top`, `top-right`, ...). The center slot itself
+	 * means "label centered on the icon". Each cell is a radio button under
+	 * the hood for keyboard navigation.
+	 */
+
 	import { POSITION_GRID } from '../annotation_panel_helpers';
 	import type { LabelPosition } from '../types';
 

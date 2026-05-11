@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * Edits `store.defaultAnnotation` — the per-animation template that new
+	 * markers (the "Pin" button) start from, and that the URL/JSON codecs use
+	 * as the carry-forward baseline. Each field has a reset button that
+	 * `delete`s the key from the template (so it falls back to the hardcoded
+	 * `ANNOTATION_FIELD_DEFAULTS`). Style-only: see `AnnotationStyle`.
+	 */
+
 	import type { AnimationStore } from '../animation.svelte';
 	import { haloAuto, makeOnNum, makeOnText } from '../annotation_panel_helpers';
 	import ColorRow from './ColorRow.svelte';

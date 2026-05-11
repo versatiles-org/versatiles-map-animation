@@ -1,4 +1,11 @@
 <script lang="ts">
+	/**
+	 * Single colour input row: label + native `<input type="color">` + hex
+	 * readout + reset button. Used for icon colour, label colour, and the
+	 * default-style equivalents — wherever a flat hex picker is enough (halo
+	 * controls combine colour + width and use `HaloRow` instead).
+	 */
+
 	import { normalizeHex } from '../annotation_panel_helpers';
 
 	let {

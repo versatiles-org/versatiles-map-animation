@@ -1,4 +1,13 @@
 <script lang="ts">
+	/**
+	 * Per-annotation editor — the panel content shown when one marker is
+	 * selected. Edits every per-annotation field (icon, colour, label,
+	 * visibility window, fades, position, halos, font, sizes), with reset
+	 * buttons against the current default style. Footer offers Duplicate /
+	 * Delete. Visibility-window inputs cross-clamp to keep `from ≤ until` and
+	 * fades inside the window.
+	 */
+
 	import type { AnimationStore } from '../animation.svelte';
 	import { haloAuto, makeOnNum, makeOnText } from '../annotation_panel_helpers';
 	import ColorRow from './ColorRow.svelte';

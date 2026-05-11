@@ -1,4 +1,11 @@
 <script lang="ts">
+	/**
+	 * Combined halo control: colour swatch + width slider + reset button on a
+	 * single row. Used wherever a SymbolLayer halo is editable (icon halo on
+	 * one row, label halo on another). Controlled — the parent owns the value
+	 * and supplies change/reset handlers.
+	 */
+
 	import { normalizeHex } from '../annotation_panel_helpers';
 
 	let {

@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * Searchable label-font picker. The 187 fonts in `ANNOTATION_LABEL_FONTS`
+	 * are too many for a flat `<select>`, so this renders a custom popup with
+	 * an `<optgroup>`-style family grouping plus a substring filter. Closes on
+	 * outside click / Escape; arrow-key navigation moves through filtered
+	 * results.
+	 */
+
 	import { familyLabel, FONT_GROUPS, fontVariantLabel } from '../annotation_panel_helpers';
 	import type { AnnotationLabelFont } from '../types';
 

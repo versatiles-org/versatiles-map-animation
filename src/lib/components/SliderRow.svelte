@@ -1,4 +1,11 @@
 <script lang="ts">
+	/**
+	 * Generic numeric-slider row: label + `<input type="range">` + a small
+	 * numeric readout (formatted via the `formatValue` prop) + reset button.
+	 * Used for every multiplier or distance field (icon size, label size, gap,
+	 * halo width, etc.). Stays controlled; the parent owns the value.
+	 */
+
 	let {
 		label,
 		value,

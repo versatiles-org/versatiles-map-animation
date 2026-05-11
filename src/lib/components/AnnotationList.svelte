@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * List of all annotations on the animation. Each row shows a sprite
+	 * preview + label, can be clicked to select (which routes the panel into
+	 * `AnnotationEditor`), and can be drag-reordered. When the list is empty,
+	 * an explanatory hint stands in for the rows. Lives next to
+	 * `DefaultStyleEditor` in the no-selection panel.
+	 */
+
 	import type { AnimationStore } from '../animation.svelte';
 	import { spritePreviewStyle } from '../sprite_meta';
 	import { DEFAULT_ANNOTATION_LABEL_COLOR } from '../types';

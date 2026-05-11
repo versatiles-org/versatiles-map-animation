@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * Modal that builds a copy-pasteable `<iframe>` snippet for the current
+	 * animation. The src URL points at the viewer page with the encoded
+	 * animation in its hash. The aspect-ratio attribute mirrors the
+	 * animation's `aspectRatio` so embedded copies letterbox the same way the
+	 * editor preview does.
+	 */
+
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { encodeAnimation } from '../url_state';

@@ -1,4 +1,12 @@
 <script lang="ts">
+	/**
+	 * Dropdown picker for the per-annotation icon. Renders a trigger button
+	 * showing the currently-selected sprite, and a click-to-open menu of all
+	 * `ANNOTATION_ICONS`. Closes on outside click or Escape. Used by both the
+	 * per-annotation editor and the default-style block, so styling and
+	 * accessibility (ariaLabel) are driven by props.
+	 */
+
 	import { shortName } from '../annotation_panel_helpers';
 	import { spritePreviewStyle } from '../sprite_meta';
 	import { ANNOTATION_ICONS, type AnnotationIcon } from '../types';
