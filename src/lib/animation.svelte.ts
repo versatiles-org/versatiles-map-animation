@@ -230,6 +230,59 @@ export class AnimationStore {
 		this.selectedAnnotationIndex = adjustIndexAfterDelete(this.selectedAnnotationIndex, index);
 	}
 
+	/**
+	 * Clone an annotation, nudge the copy slightly so it's not stacked exactly
+	 * on top of the original, insert it directly after, and select the clone.
+	 * The offset is small in degrees but visible at typical zoom levels.
+	 */
+	duplicateAnnotation(index: number): void {
+		if (index < 0 || index >= this.annotations.length) return;
+		const original = this.annotations[index];
+		const clone: Annotation = {
+			...original,
+			lng: original.lng + 0.001,
+			lat: original.lat + 0.001
+		};
+		this.annotations = [
+			...this.annotations.slice(0, index + 1),
+			clone,
+			...this.annotations.slice(index + 1)
+		];
+		this.selectedAnnotationIndex = index + 1;
+	}
+
+	/**
+	 * Move the annotation at `from` to position `to`. `to` is interpreted as
+	 * the destination slot in the *original* array (drop-target index from
+	 * the drag-and-drop flow), so dropping on slot `arr.length` appends. The
+	 * selection follows the moved item, and any selected item swept past by
+	 * the shift gets its index adjusted accordingly.
+	 */
+	reorderAnnotation(from: number, to: number): void {
+		if (from === to) return;
+		if (from < 0 || from >= this.annotations.length) return;
+		if (to < 0 || to > this.annotations.length) return;
+		const arr = [...this.annotations];
+		const [moved] = arr.splice(from, 1);
+		// After removing the source, the destination index shifts left by 1
+		// when the source was earlier in the array.
+		const insertAt = to > from ? to - 1 : to;
+		arr.splice(insertAt, 0, moved);
+		this.annotations = arr;
+
+		const sel = this.selectedAnnotationIndex;
+		if (sel === null) return;
+		if (sel === from) {
+			this.selectedAnnotationIndex = insertAt;
+		} else if (from < sel && sel <= insertAt) {
+			// The selected item shifted left to fill the source's vacancy.
+			this.selectedAnnotationIndex = sel - 1;
+		} else if (insertAt <= sel && sel < from) {
+			// The selected item shifted right to make room for the inserted item.
+			this.selectedAnnotationIndex = sel + 1;
+		}
+	}
+
 	selectAnnotation(index: number): void {
 		if (index < 0 || index >= this.annotations.length) return;
 		this.selectedAnnotationIndex = index;

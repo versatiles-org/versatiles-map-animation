@@ -148,6 +148,9 @@
 	function onDelete() {
 		if (idx !== null) store.deleteAnnotation(idx);
 	}
+	function onDuplicate() {
+		if (idx !== null) store.duplicateAnnotation(idx);
+	}
 	function onClose() {
 		store.clearAnnotationSelection();
 	}
@@ -429,6 +432,14 @@
 	</div>
 
 	<footer>
+		<button
+			type="button"
+			class="footer-btn"
+			onclick={onDuplicate}
+			title="Clone this annotation slightly offset from the original"
+		>
+			⧉ Duplicate
+		</button>
 		<button type="button" class="danger" onclick={onDelete}>✕ Delete</button>
 	</footer>
 {/if}
@@ -579,7 +590,23 @@
 	footer {
 		display: flex;
 		justify-content: flex-end;
+		gap: 0.4rem;
 		margin-top: 0.2rem;
+	}
+	.footer-btn {
+		padding: 0.3rem 0.6rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font: inherit;
+		font-size: 12px;
+		cursor: pointer;
+
+		&:hover {
+			background: rgba(255, 255, 255, 0.12);
+			border-color: #4a9eff;
+		}
 	}
 	.danger {
 		padding: 0.3rem 0.6rem;

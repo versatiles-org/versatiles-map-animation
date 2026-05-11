@@ -240,6 +240,68 @@ describe('AnimationStore - annotation CRUD', () => {
 		expect(s.selectedAnnotationIndex).toBe(0);
 	});
 
+	it('duplicateAnnotation inserts a clone after the source and selects it', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ label: 'a', lng: 10, lat: 20, iconColor: '#f00' }));
+		s.duplicateAnnotation(0);
+		expect(s.annotations).toHaveLength(2);
+		expect(s.annotations[1].label).toBe('a');
+		expect(s.annotations[1].iconColor).toBe('#f00');
+		// Slight position offset so the clone is visible.
+		expect(s.annotations[1].lng).toBeCloseTo(10.001, 5);
+		expect(s.annotations[1].lat).toBeCloseTo(20.001, 5);
+		expect(s.selectedAnnotationIndex).toBe(1);
+	});
+
+	it('duplicateAnnotation ignores out-of-range indexes', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann());
+		s.duplicateAnnotation(99);
+		expect(s.annotations).toHaveLength(1);
+	});
+
+	it('reorderAnnotation moves an item and follows the selection', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ label: 'a' }));
+		s.addAnnotation(ann({ label: 'b' }));
+		s.addAnnotation(ann({ label: 'c' }));
+		s.selectedAnnotationIndex = 0; // selecting 'a'
+		// Move 'a' to slot 3 (i.e. end of array)
+		s.reorderAnnotation(0, 3);
+		expect(s.annotations.map((a) => a.label)).toEqual(['b', 'c', 'a']);
+		expect(s.selectedAnnotationIndex).toBe(2);
+	});
+
+	it('reorderAnnotation: dragging later → earlier shifts items right', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ label: 'a' }));
+		s.addAnnotation(ann({ label: 'b' }));
+		s.addAnnotation(ann({ label: 'c' }));
+		s.selectedAnnotationIndex = 0; // 'a' selected
+		// Move 'c' (idx 2) to slot 0 (insert at front)
+		s.reorderAnnotation(2, 0);
+		expect(s.annotations.map((a) => a.label)).toEqual(['c', 'a', 'b']);
+		// 'a' shifted right → was 0, now 1
+		expect(s.selectedAnnotationIndex).toBe(1);
+	});
+
+	it('reorderAnnotation is a no-op when from === to', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ label: 'a' }));
+		s.addAnnotation(ann({ label: 'b' }));
+		s.reorderAnnotation(1, 1);
+		expect(s.annotations.map((a) => a.label)).toEqual(['a', 'b']);
+	});
+
+	it('reorderAnnotation ignores out-of-range indexes', () => {
+		const s = new AnimationStore();
+		s.addAnnotation(ann({ label: 'a' }));
+		s.addAnnotation(ann({ label: 'b' }));
+		s.reorderAnnotation(0, 99);
+		s.reorderAnnotation(99, 0);
+		expect(s.annotations.map((a) => a.label)).toEqual(['a', 'b']);
+	});
+
 	it('sampledAnnotations only returns visible ones', () => {
 		const s = new AnimationStore();
 		s.addAnnotation(ann({ visibleFrom: 0, visibleUntil: 2, label: 'early' }));
