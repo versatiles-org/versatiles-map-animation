@@ -297,8 +297,17 @@ function spawnFfmpeg(opts) {
 	// With motion blur, we stream N sub-frames per output frame at
 	// `fps × N`. ffmpeg's `tmix=frames=N` averages every N consecutive
 	// frames into one; then `fps=fps=…` decimates the output back to the
-	// requested rate. Net: each output frame is the linear average of N
-	// sub-frames that span one output-frame's duration of animation time.
+	// requested rate. Net: each output frame is the average of N sub-frames
+	// that span one output-frame's duration of animation time.
+	//
+	// The two `zscale` calls do the averaging in **linear light**: PNGs
+	// from Chromium are sRGB-encoded (perceptually uniform), but mixing
+	// photons in the real world is linear. Averaging sRGB samples directly
+	// crushes shadows and mid-tones; converting to linear, averaging there,
+	// then re-encoding to BT.709 transfer keeps blur trails the brightness
+	// a real shutter would produce. Requires ffmpeg built with libzimg —
+	// Debian's `ffmpeg` package has it, and that's what the Docker image
+	// ships.
 	const samples = Math.max(1, opts.motionBlur);
 	const inputFps = opts.fps * samples;
 	const args = [
@@ -313,7 +322,26 @@ function spawnFfmpeg(opts) {
 		'pipe:0'
 	];
 	if (samples > 1) {
-		args.push('-vf', `tmix=frames=${samples},fps=fps=${opts.fps}`);
+		// Both endpoints of each zscale call are fully specified — zimg's
+		// `code 3074: no path between colorspaces` fires whenever any of
+		// `transfer / primaries / matrix / range` is left "unspecified" on
+		// either end, and PNG from image2pipe arrives with all four blank.
+		// (Setting them via `setparams` doesn't help; zscale only consumes
+		// its own filter options as fallbacks.) Chromium's canvas output is
+		// full-range sRGB-encoded with BT.709 primaries — same gamut as
+		// H.264 / BT.709 video — so the re-encoding step uses `t=bt709` to
+		// match what the player will assume.
+		const inRGB = 'tin=iec61966-2-1:pin=bt709:rin=full:min=bt709';
+		const outLinear = 't=linear:p=bt709:r=full:m=bt709';
+		const inLinear = 'tin=linear:pin=bt709:rin=full:min=bt709';
+		const outRGB = 't=bt709:p=bt709:r=full:m=bt709';
+		const blurFilter = [
+			`zscale=${inRGB}:${outLinear}`,
+			`tmix=frames=${samples}`,
+			`zscale=${inLinear}:${outRGB}`,
+			`fps=fps=${opts.fps}`
+		].join(',');
+		args.push('-vf', blurFilter);
 	}
 	args.push(
 		'-c:v',
