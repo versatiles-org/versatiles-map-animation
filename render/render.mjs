@@ -412,7 +412,15 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
 		const t = Math.min(duration, i / opts.fps);
-		await page.clock.setFixedTime(t * 1000);
+		// `pauseAt` (not `setFixedTime`) advances the controlled clock to `t`,
+		// firing every queued setTimeout / setInterval / requestAnimationFrame
+		// whose scheduled time falls in the interval, then pauses there. That's
+		// what lets MapLibre's `triggerRepaint()` (further down in
+		// `waitForFrameReady`) actually run its rAF-scheduled render pass —
+		// `setFixedTime` only changes `Date.now()` and would leave the rAF
+		// callback queued forever, so `map.on('idle')` would never fire and
+		// every frame hit the 60 s timeout with a half-drawn screenshot.
+		await page.clock.pauseAt(t * 1000);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 		try {
 			await waitForFrameReady(page, opts.frameTimeoutMs);
