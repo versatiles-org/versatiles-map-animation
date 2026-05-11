@@ -1,137 +1,166 @@
 import type { Animation } from './types';
 
 /**
- * 10-second flight around Germany's Zugspitze (2962 m) and the surrounding
- * Wetterstein massif. Camera starts as a wide aerial north of
- * Garmisch-Partenkirchen, descends toward the Eibsee at the foot of the
- * Zugspitze, then pulls into a high-pitch panorama that reveals the whole
- * massif from west to east. Used by the editor's "★ Load example" menu item.
+ * 12-second flight westward across Corsica's Monte Cinto massif — the
+ * highest range in the Mediterranean. The camera enters from the east just
+ * north of the Asco valley, banks WSW to face the spine of the massif, and
+ * tracks across the headliner peaks (Cinto, Punta Minuta, Paglia Orba)
+ * before pulling out toward the western coast. Used by the editor's
+ * "★ Load example" menu item.
+ *
+ * Annotations mark the five most prominent summits visible from the path;
+ * staggered `visibleFrom` times let them fade in as the camera approaches.
+ * Shared halo / icon-style settings live in `defaultAnnotation` so each
+ * marker only spells out what's unique about it.
  */
 export const EXAMPLE_ANIMATION: Animation = {
 	version: 1,
 	style: 'satellite',
-	labels: false,
+	labels: true,
 	terrain: true,
 	sky: true,
 	keyframes: [
-		{ t: 0, lng: 11.05, lat: 47.62, zoom: 10, pitch: 30, bearing: 200, roll: 0 },
-		{ t: 3, lng: 10.99, lat: 47.52, zoom: 11.5, pitch: 55, bearing: 200, roll: 0 },
 		{
-			t: 6.5,
-			lng: 10.96,
-			lat: 47.5,
-			zoom: 11.8,
-			pitch: 72,
-			bearing: 220,
+			t: 0,
+			lng: 9.207562239246954,
+			lat: 42.46742573281935,
+			zoom: 13.037343523200418,
+			pitch: 64.8637611162829,
+			bearing: -33.59999999999956,
 			roll: 0,
 			path: 'linear'
 		},
-		{ t: 10, lng: 11.05, lat: 47.52, zoom: 11.3, pitch: 78, bearing: 245, roll: 0 }
+		{
+			t: 3,
+			lng: 9.082452682358053,
+			lat: 42.471667980467544,
+			zoom: 13.037343523200418,
+			pitch: 76.86376111628292,
+			bearing: -107.19999999999982,
+			roll: 0,
+			path: 'linear'
+		},
+		{
+			t: 6,
+			lng: 8.927959249318633,
+			lat: 42.42334184667922,
+			zoom: 13.037343523200418,
+			pitch: 76.86376111628292,
+			bearing: -107.19999999999982,
+			roll: 0,
+			path: 'linear'
+		},
+		{
+			t: 9,
+			lng: 8.889387884480328,
+			lat: 42.39070248767513,
+			zoom: 13.037343523200418,
+			pitch: 55.85460418718874,
+			bearing: -120.88520077304912,
+			roll: 0,
+			path: 'linear'
+		},
+		{
+			t: 12,
+			lng: 8.786494184837238,
+			lat: 42.37066289843767,
+			zoom: 13.73266865294977,
+			pitch: 55.85460418718874,
+			bearing: -111.28520077304904,
+			roll: 0
+		}
 	],
 	annotations: [
-		// Zugspitze — the headliner: Germany's highest peak. Larger icon and
-		// bolder colour to stand out from the supporting peaks.
+		// Monte Cinto — the headliner: highest peak in Corsica and the
+		// Mediterranean. Larger icon and bolder colour so it stands out from
+		// the supporting peaks.
 		{
-			lng: 10.985278,
-			lat: 47.421111,
+			lng: 8.9459,
+			lat: 42.3795,
 			icon: 'symbol-arrow1',
-			label: 'Zugspitze\n2962 m',
+			label: 'Monte Cinto\n2706 m',
 			labelPosition: 'top',
-			visibleFrom: 0,
+			visibleFrom: 3,
 			labelDistance: 2.5,
 			fadeIn: 1,
 			iconColor: '#660000',
-			iconHaloColor: '#ffffff',
-			iconHaloWidth: 1,
 			iconSize: 2.5,
 			labelColor: '#660000',
-			labelHaloColor: '#ffffff',
-			labelHaloWidth: 1,
-			labelSize: 1.75
+			labelSize: 1.6
 		},
-		// Supporting peaks of the Wetterstein massif, fanned out so the labels
-		// don't collide at the panoramic shot. Coordinates from each peak's
-		// Wikipedia summit page.
+		// Monte Padro — the northern sentinel of the massif, visible first as
+		// the camera enters from the east.
 		{
-			lng: 10.971944,
-			lat: 47.412917,
+			lng: 8.9895,
+			lat: 42.4667,
 			icon: 'symbol-arrow1',
+			label: 'Monte Padro\n2389 m',
+			labelPosition: 'top-right',
+			visibleFrom: 0.5,
+			labelDistance: 2.2,
+			fadeIn: 1,
 			iconColor: '#7a3030',
-			label: 'Schneefernerkopf\n2875 m',
+			iconSize: 1.8,
+			labelColor: '#7a3030',
+			labelSize: 1.2
+		},
+		// Punta Minuta — second-highest in the Asco section of the massif,
+		// just NW of Cinto on the same ridge.
+		{
+			lng: 8.911,
+			lat: 42.379,
+			icon: 'symbol-arrow1',
+			label: 'Punta Minuta\n2556 m',
 			labelPosition: 'bottom-left',
 			visibleFrom: 2,
-			iconSize: 1.8,
-			labelSize: 1.3,
 			labelDistance: 2.2,
 			fadeIn: 1,
-			labelColor: '#7a3030',
-			labelHaloWidth: 1
-		},
-		{
-			lng: 11.0375,
-			lat: 47.4525,
-			icon: 'symbol-arrow1',
 			iconColor: '#7a3030',
-			label: 'Alpspitze\n2628 m',
-			labelPosition: 'top-right',
-			visibleFrom: 2,
 			iconSize: 1.8,
-			labelSize: 1.3,
-			labelDistance: 2.2,
-			fadeIn: 1,
 			labelColor: '#7a3030',
-			labelHaloWidth: 1
+			labelSize: 1.2
 		},
+		// Paglia Orba — the iconic horn-shaped peak between the Golo and
+		// Cavicchia valleys, south of Cinto on the GR 20.
 		{
-			lng: 11.082222,
-			lat: 47.413056,
+			lng: 8.8787,
+			lat: 42.3431,
 			icon: 'symbol-arrow1',
-			iconColor: '#7a3030',
-			label: 'Hochwanner\n2744 m',
-			labelPosition: 'bottom-right',
-			visibleFrom: 2,
-			iconSize: 1.8,
-			labelSize: 1.3,
-			labelDistance: 2.2,
-			fadeIn: 1,
-			labelColor: '#7a3030',
-			labelHaloWidth: 1
-		},
-		{
-			lng: 11.013333,
-			lat: 47.430278,
-			icon: 'symbol-arrow1',
-			iconColor: '#7a3030',
-			label: 'Höllentalspitze\n2743 m',
+			label: 'Paglia Orba\n2525 m',
 			labelPosition: 'right',
-			visibleFrom: 2,
-			iconSize: 1.8,
-			labelSize: 1.3,
+			visibleFrom: 5,
 			labelDistance: 2.2,
 			fadeIn: 1,
+			iconColor: '#7a3030',
+			iconSize: 1.8,
 			labelColor: '#7a3030',
-			labelHaloWidth: 1
+			labelSize: 1.2
 		},
-		// Eibsee — the turquoise alpine lake at the foot of the Zugspitze.
-		// Different icon (marker pin) so it reads as a point of interest rather
-		// than another peak.
+		// Capo Tafonato — famous for its natural rock window (tafonu), just
+		// west of Paglia Orba on the same ridge.
 		{
-			lng: 10.9783,
-			lat: 47.4581,
-			icon: 'symbol-marker',
-			iconColor: '#1a6fa8',
-			label: 'Eibsee\n973 m',
-			labelPosition: 'top-left',
-			visibleFrom: 2,
-			iconSize: 1.6,
-			labelSize: 1.2,
-			labelDistance: 1.8,
+			lng: 8.867,
+			lat: 42.333,
+			icon: 'symbol-arrow1',
+			label: 'Capo Tafonato\n2335 m',
+			labelPosition: 'bottom-right',
+			visibleFrom: 7,
+			labelDistance: 2.2,
 			fadeIn: 1,
-			labelColor: '#1a6fa8',
-			labelHaloWidth: 1
+			iconColor: '#7a3030',
+			iconSize: 1.7,
+			labelColor: '#7a3030',
+			labelSize: 1.15
 		}
 	],
 	annotationScale: 1,
 	aspectRatio: '16:9',
-	defaultAnnotation: {}
+	defaultAnnotation: {
+		// Shared style for every marker: a white halo around both icon and
+		// label so they stay legible against the satellite imagery.
+		iconHaloColor: '#ffffff',
+		iconHaloWidth: 1,
+		labelHaloColor: '#ffffff',
+		labelHaloWidth: 1
+	}
 };

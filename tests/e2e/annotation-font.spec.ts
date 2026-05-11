@@ -27,7 +27,8 @@ test('changing font on an example-animation annotation actually fetches the new 
 
 	await openEditor(page);
 
-	// Load example: satellite + 6 annotations all on noto_sans_bold.
+	// Load example: satellite + 5 peak annotations across Corsica's
+	// Monte Cinto massif, all rendered in the default font (noto_sans_bold).
 	await page
 		.locator('details.more')
 		.evaluate((el) => (el as HTMLDetailsElement).setAttribute('open', ''));
@@ -36,10 +37,11 @@ test('changing font on an example-animation annotation actually fetches the new 
 		() => window.__viewer_map?.areTilesLoaded() && window.__viewer_map?.loaded()
 	);
 
-	// Pan to where the first annotation is visible.
+	// Pan to Monte Cinto (the first annotation) at flat pitch so the label
+	// is large and centred — gives a visible pixel diff when the font swaps.
 	await page.evaluate(() => {
 		const m = window.__viewer_map!;
-		m.jumpTo({ center: [10.985278, 47.421111], zoom: 11, pitch: 0, bearing: 0 });
+		m.jumpTo({ center: [8.9459, 42.3795], zoom: 13, pitch: 0, bearing: 0 });
 	});
 	await page.waitForFunction(
 		() => window.__viewer_map?.areTilesLoaded() && window.__viewer_map?.loaded()
