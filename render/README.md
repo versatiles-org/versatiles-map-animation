@@ -28,7 +28,7 @@ and `render/` in the build context.)
 ## Render an animation
 
 ```sh
-docker run --rm -v "$PWD:/out" \
+docker run --rm -it -v "$PWD:/out" \
   ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --hash 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3...' \
   --width 1920 \
@@ -44,7 +44,7 @@ directory; absolute paths (`--output /out/sub/foo.mp4`) still work too.
 You can also pass a full URL with `--url` and the renderer will extract the hash:
 
 ```sh
-docker run --rm -v "$PWD:/out" \
+docker run --rm -it -v "$PWD:/out" \
   ghcr.io/versatiles-org/versatiles-map-animation:latest \
   --url 'https://example.org/#kf=AVYw...' \
   --output animation.mp4
