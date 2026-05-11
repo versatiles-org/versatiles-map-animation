@@ -34,7 +34,7 @@ const DEFAULT_OPTS = {
 	fps: 30,
 	crf: 18,
 	preset: 'slow',
-	frameTimeoutMs: 60_000,
+	frameTimeoutMs: 10_000,
 	prewarm: true,
 	endTime: null,
 	verbose: false
@@ -385,7 +385,11 @@ async function setupPage(browser, opts, hash) {
 }
 
 async function prewarmPass(page, duration, opts) {
-	const fps = 5;
+	// 2 fps: each step covers a bigger camera jump, so the cache fills in
+	// fewer settle-waits than a finer-grained walk would need. Tiles for
+	// intermediate positions get fetched implicitly when the capture pass
+	// (or the next prewarm step) requires them.
+	const fps = 2;
 	const total = Math.max(2, Math.ceil(duration * fps) + 1);
 	const progress = new Progress(total, 'warming tile cache');
 	for (let i = 0; i < total; i++) {
