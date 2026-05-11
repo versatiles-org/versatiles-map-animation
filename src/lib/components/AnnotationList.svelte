@@ -51,7 +51,7 @@
 		style configured below.
 	</p>
 {:else}
-	<ul class="marker-list" role="list">
+	<ul class="annotation-list" role="list">
 		{#each store.annotations as a, i (i)}
 			<li
 				class:dragging={dragFrom === i}
@@ -65,7 +65,7 @@
 			>
 				<button
 					type="button"
-					class="marker-item"
+					class="annotation-item"
 					draggable="true"
 					ondragstart={(e) => onDragStart(e, i)}
 					ondragend={onDragEnd}
@@ -75,13 +75,13 @@
 					<span class="grip" aria-hidden="true">⋮⋮</span>
 					<span class="icon-prev" style={spritePreviewStyle(a.icon, 18)}></span>
 					<span
-						class="marker-label"
+						class="annotation-label"
 						class:empty={!a.label}
 						style="color: {a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR};"
 					>
 						{a.label || '(no label)'}
 					</span>
-					<span class="marker-num">#{i + 1}</span>
+					<span class="annotation-num">#{i + 1}</span>
 				</button>
 			</li>
 		{/each}
@@ -109,7 +109,7 @@
 		line-height: 1.45;
 	}
 
-	.marker-list {
+	.annotation-list {
 		list-style: none;
 		margin: 0;
 		padding: 0;
@@ -147,7 +147,7 @@
 			}
 		}
 	}
-	.marker-item {
+	.annotation-item {
 		width: 100%;
 		display: flex;
 		align-items: center;
@@ -174,11 +174,11 @@
 		cursor: grab;
 		user-select: none;
 
-		.marker-item:active & {
+		.annotation-item:active & {
 			cursor: grabbing;
 		}
 	}
-	.marker-label {
+	.annotation-label {
 		flex: 1 1 auto;
 		min-width: 0;
 		overflow: hidden;
@@ -193,7 +193,7 @@
 			font-style: italic;
 		}
 	}
-	.marker-num {
+	.annotation-num {
 		flex: 0 0 auto;
 		color: #777;
 		font-variant-numeric: tabular-nums;

@@ -1,25 +1,27 @@
 <script lang="ts">
 	/**
 	 * Routes between three sub-components based on selection state:
-	 *   - When a marker is selected → `MarkerEditor` for the per-annotation editor.
-	 *   - When nothing's selected   → `MarkerList` (clickable list) plus
-	 *                                 `DefaultStyleEditor` (template style for new pins).
-	 * Each sub-component owns its own handlers, lifecycle, and styles.
+	 *   - When an annotation is selected → `AnnotationEditor` (per-annotation form).
+	 *   - When nothing's selected        → `AnnotationList` (clickable list) plus
+	 *                                      `DefaultStyleEditor` (template for new pins).
+	 * Each sub-component owns its own handlers, lifecycle, and styles. The
+	 * visible UI text uses "Markers" / "Pin" because those read better in the
+	 * sidebar; the data model and code identifiers stay on `annotation`.
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
+	import AnnotationEditor from './AnnotationEditor.svelte';
+	import AnnotationList from './AnnotationList.svelte';
 	import DefaultStyleEditor from './DefaultStyleEditor.svelte';
-	import MarkerEditor from './MarkerEditor.svelte';
-	import MarkerList from './MarkerList.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 </script>
 
 <div class="annotation-panel">
 	{#if store.selectedAnnotationIndex !== null}
-		<MarkerEditor {store} />
+		<AnnotationEditor {store} />
 	{:else}
-		<MarkerList {store} />
+		<AnnotationList {store} />
 		<DefaultStyleEditor {store} />
 	{/if}
 </div>

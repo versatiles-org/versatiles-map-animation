@@ -1,8 +1,8 @@
 /**
  * Shared helpers used by the three annotation-panel sub-components
- * (`MarkerList`, `MarkerEditor`, `DefaultStyleEditor`). Pure functions and
- * one-shot constants — no state, no Svelte runes — so this can live in a
- * plain `.ts` and import cheaply from each.
+ * (`AnnotationList`, `AnnotationEditor`, `DefaultStyleEditor`). Pure
+ * functions and one-shot constants — no state, no Svelte runes — so this
+ * can live in a plain `.ts` and import cheaply from each.
  */
 
 import {
