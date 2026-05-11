@@ -8,12 +8,11 @@
 		makeOnNum,
 		makeOnText,
 		normalizeHex,
-		POSITION_GRID,
-		shortName
+		POSITION_GRID
 	} from '../annotation_panel_helpers';
-	import { spritePreviewStyle } from '../sprite_meta';
+	import HaloRow from './HaloRow.svelte';
+	import IconPicker from './IconPicker.svelte';
 	import {
-		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
 		DEFAULT_ANNOTATION_ICON,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
@@ -24,7 +23,6 @@
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
-		type AnnotationIcon,
 		type AnnotationLabelFont
 	} from '../types';
 
@@ -47,25 +45,10 @@
 	const onText = makeOnText(patchDefault);
 	const onNum = makeOnNum(patchDefault);
 
-	let iconMenuOpen = $state(false);
-	let iconMenuEl: HTMLDivElement | undefined = $state();
-
-	function onIcon(icon: AnnotationIcon) {
-		patchDefault({ icon });
-		iconMenuOpen = false;
-	}
 	function onLabelFont(e: Event) {
 		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
 		patchDefault({ labelFont: v });
 	}
-
-	function handleDocClick(e: MouseEvent) {
-		if (iconMenuOpen && iconMenuEl && !iconMenuEl.contains(e.target as Node)) iconMenuOpen = false;
-	}
-	$effect(() => {
-		document.addEventListener('click', handleDocClick);
-		return () => document.removeEventListener('click', handleDocClick);
-	});
 </script>
 
 <div class="default-style-header">
@@ -88,43 +71,11 @@
 <!-- Icon -->
 <div class="row">
 	<span class="lbl">Shape</span>
-	<div class="icon-dropdown" bind:this={iconMenuEl}>
-		<button
-			type="button"
-			class="icon-trigger"
-			onclick={() => (iconMenuOpen = !iconMenuOpen)}
-			aria-haspopup="listbox"
-			aria-expanded={iconMenuOpen}
-			title={defaults.icon ?? DEFAULT_ANNOTATION_ICON}
-		>
-			<span
-				class="icon-prev"
-				style={spritePreviewStyle(defaults.icon ?? DEFAULT_ANNOTATION_ICON, 22)}
-			></span>
-			<span class="icon-name">{shortName(defaults.icon ?? DEFAULT_ANNOTATION_ICON)}</span>
-			<span class="caret" aria-hidden="true">▾</span>
-		</button>
-		{#if iconMenuOpen}
-			<ul class="icon-menu" role="listbox" aria-label="Default icon">
-				{#each ANNOTATION_ICONS as icon (icon)}
-					<li>
-						<button
-							type="button"
-							class="icon-option"
-							class:selected={(defaults.icon ?? DEFAULT_ANNOTATION_ICON) === icon}
-							onclick={() => onIcon(icon)}
-							role="option"
-							aria-selected={(defaults.icon ?? DEFAULT_ANNOTATION_ICON) === icon}
-							title={icon}
-						>
-							<span class="icon-prev" style={spritePreviewStyle(icon, 22)}></span>
-							<span class="icon-name">{shortName(icon)}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		{/if}
-	</div>
+	<IconPicker
+		value={defaults.icon ?? DEFAULT_ANNOTATION_ICON}
+		onChange={(icon) => patchDefault({ icon })}
+		ariaLabel="Default icon"
+	/>
 	<button
 		type="button"
 		class="mini reset"
@@ -154,34 +105,18 @@
 	>
 </label>
 
-<div class="row">
-	<span class="lbl">Halo</span>
-	<input
-		type="color"
-		value={normalizeHex(defaults.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
-		oninput={onText('iconHaloColor')}
-		aria-label="Default icon halo color"
-	/>
-	<input
-		class="halo-width"
-		type="range"
-		min="0"
-		max="4"
-		step="0.1"
-		value={defaults.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
-		oninput={onNum('iconHaloWidth')}
-		aria-label="Default icon halo width"
-	/>
-	<span class="num">{(defaults.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('iconHaloColor', 'iconHaloWidth')}
-		disabled={!isDefaultSet('iconHaloColor', 'iconHaloWidth')}
-		title="Reset icon halo to the hardcoded default"
-		aria-label="Reset default icon halo">⟲</button
-	>
-</div>
+<HaloRow
+	color={defaults.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR}
+	onColorChange={onText('iconHaloColor')}
+	width={defaults.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+	onWidthChange={onNum('iconHaloWidth')}
+	onReset={() => unsetDefaults('iconHaloColor', 'iconHaloWidth')}
+	canReset={isDefaultSet('iconHaloColor', 'iconHaloWidth')}
+	colorAriaLabel="Default icon halo color"
+	widthAriaLabel="Default icon halo width"
+	resetTitle="Reset icon halo to the hardcoded default"
+	resetAriaLabel="Reset default icon halo"
+/>
 
 <label class="row">
 	<span class="lbl">Size</span>
@@ -251,36 +186,18 @@
 	>
 </label>
 
-<div class="row">
-	<span class="lbl">Halo</span>
-	<input
-		type="color"
-		value={normalizeHex(
-			defaults.labelHaloColor ?? haloAuto(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
-		)}
-		oninput={onText('labelHaloColor')}
-		aria-label="Default label halo color"
-	/>
-	<input
-		class="halo-width"
-		type="range"
-		min="0"
-		max="4"
-		step="0.1"
-		value={defaults.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
-		oninput={onNum('labelHaloWidth')}
-		aria-label="Default label halo width"
-	/>
-	<span class="num">{(defaults.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('labelHaloColor', 'labelHaloWidth')}
-		disabled={!isDefaultSet('labelHaloColor', 'labelHaloWidth')}
-		title="Reset label halo to the hardcoded default"
-		aria-label="Reset default label halo">⟲</button
-	>
-</div>
+<HaloRow
+	color={defaults.labelHaloColor ?? haloAuto(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
+	onColorChange={onText('labelHaloColor')}
+	width={defaults.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
+	onWidthChange={onNum('labelHaloWidth')}
+	onReset={() => unsetDefaults('labelHaloColor', 'labelHaloWidth')}
+	canReset={isDefaultSet('labelHaloColor', 'labelHaloWidth')}
+	colorAriaLabel="Default label halo color"
+	widthAriaLabel="Default label halo width"
+	resetTitle="Reset label halo to the hardcoded default"
+	resetAriaLabel="Reset default label halo"
+/>
 
 <label class="row">
 	<span class="lbl">Size</span>
@@ -434,109 +351,8 @@
 		font-size: 11px;
 	}
 
-	.icon-dropdown {
-		flex: 1 1 auto;
-		position: relative;
-		min-width: 0;
-	}
-	.icon-trigger {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		padding: 0.25rem 0.4rem;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid #333;
-		border-radius: 4px;
-		color: #ddd;
-		font: inherit;
-		cursor: pointer;
-		text-align: left;
-
-		&:hover {
-			border-color: #4a9eff;
-		}
-		.icon-name {
-			flex: 1 1 auto;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-		.caret {
-			color: #888;
-			font-size: 11px;
-		}
-	}
-	.icon-prev {
-		position: relative;
-		display: inline-block;
-		flex: 0 0 auto;
-		border-radius: 2px;
-
-		&::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			background-image: var(--sprite-bg);
-			background-position: var(--sprite-pos);
-			background-size: var(--sprite-size);
-			background-repeat: no-repeat;
-			filter: invert(1);
-			transform: rotate(var(--sprite-rotate, 0deg));
-		}
-	}
-	.icon-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		right: 0;
-		max-height: 240px;
-		overflow-y: auto;
-		margin: 0;
-		padding: 3px;
-		list-style: none;
-		background: #11161e;
-		border: 1px solid #333;
-		border-radius: 4px;
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-		z-index: 10;
-
-		li {
-			margin: 0;
-		}
-	}
-	.icon-option {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		padding: 0.25rem 0.4rem;
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 3px;
-		color: #ccc;
-		font: inherit;
-		cursor: pointer;
-		text-align: left;
-
-		&:hover {
-			background: rgba(74, 158, 255, 0.12);
-			border-color: rgba(74, 158, 255, 0.4);
-		}
-		&.selected {
-			background: rgba(74, 158, 255, 0.18);
-			border-color: #4a9eff;
-			color: #fff;
-		}
-		.icon-name {
-			flex: 1 1 auto;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-	}
+	/* Icon-picker styles live in IconPicker.svelte; halo-row styles live in
+	   HaloRow.svelte. Both are scoped so nothing leaks back here. */
 	.pos-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 22px);

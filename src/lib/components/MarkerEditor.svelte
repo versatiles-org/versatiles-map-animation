@@ -8,12 +8,11 @@
 		makeOnNum,
 		makeOnText,
 		normalizeHex,
-		POSITION_GRID,
-		shortName
+		POSITION_GRID
 	} from '../annotation_panel_helpers';
-	import { spritePreviewStyle } from '../sprite_meta';
+	import HaloRow from './HaloRow.svelte';
+	import IconPicker from './IconPicker.svelte';
 	import {
-		ANNOTATION_ICONS,
 		DEFAULT_ANNOTATION_COLOR,
 		DEFAULT_ANNOTATION_ICON,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
@@ -24,7 +23,6 @@
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
 		type Annotation,
-		type AnnotationIcon,
 		type AnnotationLabelFont
 	} from '../types';
 
@@ -65,25 +63,10 @@
 		return ann !== null && keys.some((k) => k in ann);
 	}
 
-	let iconMenuOpen = $state(false);
-	let iconMenuEl: HTMLDivElement | undefined = $state();
-
-	function onIcon(icon: AnnotationIcon) {
-		patch({ icon });
-		iconMenuOpen = false;
-	}
 	function onLabelFont(e: Event) {
 		const v = (e.currentTarget as HTMLSelectElement).value as AnnotationLabelFont;
 		patch({ labelFont: v });
 	}
-
-	function handleDocClick(e: MouseEvent) {
-		if (iconMenuOpen && iconMenuEl && !iconMenuEl.contains(e.target as Node)) iconMenuOpen = false;
-	}
-	$effect(() => {
-		document.addEventListener('click', handleDocClick);
-		return () => document.removeEventListener('click', handleDocClick);
-	});
 
 	// Visibility/fade clamping. Two invariants:
 	//   1. visibleFrom + ANN_MIN_GAP ≤ visibleUntil (matches the timeline)
@@ -93,80 +76,85 @@
 	const ANN_MIN_GAP = 0.01;
 	const round2 = (v: number) => Math.round(v * 100) / 100;
 
-	function readNonNegativeOrUndefined(e: Event): number | undefined {
-		const raw = (e.currentTarget as HTMLInputElement).value;
-		if (raw === '') return undefined;
-		const v = Number(raw);
-		return Number.isFinite(v) ? Math.max(0, v) : undefined;
-	}
-
-	// Svelte 5 short-circuits `<input value={x}>` updates when `x` is unchanged
-	// from the previous render — but the user's intermediate typing may have
-	// changed the DOM in between, so the clamped value never makes it back to
-	// the field. Force the DOM to mirror the clamped value after every patch.
+	/**
+	 * Force the DOM input to mirror the clamped value. Svelte 5 short-circuits
+	 * `<input value={x}>` when `x` hasn't changed across renders — but the
+	 * user's intermediate typing might have moved the DOM forward of the
+	 * stored state, so we patch the DOM directly after each clamp.
+	 */
 	function syncInput(input: HTMLInputElement, v: number | undefined): void {
 		const want = v === undefined ? '' : String(v);
 		if (input.value !== want) input.value = want;
 	}
 
-	function onVisibleFrom(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const raw = readNonNegativeOrUndefined(e);
-		if (raw === undefined) {
-			// Clearing the bound also resets its fade — a dangling fadeIn would
-			// be silently invisible (the opacity helper ignores it when there's
-			// no anchor) but would still persist via the codec.
-			patch({ visibleFrom: undefined, fadeIn: 0 });
-			return;
-		}
-		const until = ann?.visibleUntil;
-		const max = until !== undefined ? until - ANN_MIN_GAP : Number.POSITIVE_INFINITY;
-		const clamped = round2(Math.min(max, raw));
-		patch({ visibleFrom: clamped });
-		syncInput(input, clamped);
+	/**
+	 * Build a clamped-time input handler shared by visibleFrom/Until and
+	 * fadeIn/Out. The four were near-identical: read the value, clamp into
+	 * `[getMin(), getMax()]`, round, patch, sync. The visibility variants
+	 * additionally reset their associated fade when the user clears the field.
+	 */
+	function clampedTimeHandler(opts: {
+		key: 'visibleFrom' | 'visibleUntil' | 'fadeIn' | 'fadeOut';
+		getMin: () => number;
+		getMax: () => number;
+		/** Field to also reset when the user clears the input (visibility only). */
+		clearAlso?: 'fadeIn' | 'fadeOut';
+		/** Fades default to 0 instead of `undefined` on empty input. */
+		emptyValue: number | undefined;
+	}) {
+		return (e: Event) => {
+			const input = e.currentTarget as HTMLInputElement;
+			const raw = input.value;
+			if (raw === '' || !Number.isFinite(Number(raw))) {
+				const reset: Partial<Annotation> = { [opts.key]: opts.emptyValue };
+				if (opts.clearAlso) reset[opts.clearAlso] = 0;
+				patch(reset);
+				if (opts.emptyValue !== undefined) syncInput(input, opts.emptyValue);
+				return;
+			}
+			const clamped = round2(Math.max(opts.getMin(), Math.min(opts.getMax(), Number(raw))));
+			patch({ [opts.key]: clamped });
+			syncInput(input, clamped);
+		};
 	}
-	function onVisibleUntil(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const raw = readNonNegativeOrUndefined(e);
-		if (raw === undefined) {
-			patch({ visibleUntil: undefined, fadeOut: 0 });
-			return;
-		}
-		const from = ann?.visibleFrom;
-		const min = from !== undefined ? from + ANN_MIN_GAP : 0;
-		const clamped = round2(Math.max(min, raw));
-		patch({ visibleUntil: clamped });
-		syncInput(input, clamped);
-	}
-	function onFadeIn(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const v = Number(input.value);
-		if (!Number.isFinite(v)) {
-			patch({ fadeIn: 0 });
-			syncInput(input, 0);
-			return;
-		}
-		// Fade-in can't extend past the visible-from time (would push the
-		// fade-in tip into negative time). With no visibleFrom set, fade-in
-		// has no anchor — clamp to a sane upper bound to keep the input tidy.
-		const from = ann?.visibleFrom;
-		const max = from !== undefined ? from : Number.POSITIVE_INFINITY;
-		const clamped = round2(Math.max(0, Math.min(max, v)));
-		patch({ fadeIn: clamped });
-		syncInput(input, clamped);
-	}
-	function onFadeOut(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const v = Number(input.value);
-		if (!Number.isFinite(v)) {
-			patch({ fadeOut: 0 });
-			syncInput(input, 0);
-			return;
-		}
-		const clamped = round2(Math.max(0, v));
-		patch({ fadeOut: clamped });
-		syncInput(input, clamped);
-	}
+
+	const onVisibleFrom = $derived(
+		clampedTimeHandler({
+			key: 'visibleFrom',
+			getMin: () => 0,
+			getMax: () =>
+				ann?.visibleUntil !== undefined ? ann.visibleUntil - ANN_MIN_GAP : Number.POSITIVE_INFINITY,
+			clearAlso: 'fadeIn',
+			emptyValue: undefined
+		})
+	);
+	const onVisibleUntil = $derived(
+		clampedTimeHandler({
+			key: 'visibleUntil',
+			getMin: () => (ann?.visibleFrom !== undefined ? ann.visibleFrom + ANN_MIN_GAP : 0),
+			getMax: () => Number.POSITIVE_INFINITY,
+			clearAlso: 'fadeOut',
+			emptyValue: undefined
+		})
+	);
+	const onFadeIn = $derived(
+		clampedTimeHandler({
+			key: 'fadeIn',
+			getMin: () => 0,
+			// Fade-in can't push past visibleFrom (negative-time tip); with no
+			// visibleFrom, leave it free.
+			getMax: () => ann?.visibleFrom ?? Number.POSITIVE_INFINITY,
+			emptyValue: 0
+		})
+	);
+	const onFadeOut = $derived(
+		clampedTimeHandler({
+			key: 'fadeOut',
+			getMin: () => 0,
+			getMax: () => Number.POSITIVE_INFINITY,
+			emptyValue: 0
+		})
+	);
 
 	function onMoveHere() {
 		const cam = store.liveCamera;
@@ -199,40 +187,7 @@
 
 	<div class="row">
 		<span class="lbl">Shape</span>
-		<div class="icon-dropdown" bind:this={iconMenuEl}>
-			<button
-				type="button"
-				class="icon-trigger"
-				onclick={() => (iconMenuOpen = !iconMenuOpen)}
-				aria-haspopup="listbox"
-				aria-expanded={iconMenuOpen}
-				title={ann.icon}
-			>
-				<span class="icon-prev" style={spritePreviewStyle(ann.icon, 22)}></span>
-				<span class="icon-name">{shortName(ann.icon)}</span>
-				<span class="caret" aria-hidden="true">▾</span>
-			</button>
-			{#if iconMenuOpen}
-				<ul class="icon-menu" role="listbox" aria-label="Icon">
-					{#each ANNOTATION_ICONS as icon (icon)}
-						<li>
-							<button
-								type="button"
-								class="icon-option"
-								class:selected={ann.icon === icon}
-								onclick={() => onIcon(icon)}
-								role="option"
-								aria-selected={ann.icon === icon}
-								title={icon}
-							>
-								<span class="icon-prev" style={spritePreviewStyle(icon, 22)}></span>
-								<span class="icon-name">{shortName(icon)}</span>
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
+		<IconPicker value={ann.icon} onChange={(icon) => patch({ icon })} />
 		<button
 			type="button"
 			class="mini reset"
@@ -260,36 +215,20 @@
 		>
 	</label>
 
-	<div class="row">
-		<span class="lbl">Halo</span>
-		<input
-			type="color"
-			value={normalizeHex(ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR)}
-			oninput={onText('iconHaloColor')}
-			aria-label="Icon halo color"
-			title="Halo (icon outline) color. Default white; only visible when width > 0."
-		/>
-		<input
-			class="halo-width"
-			type="range"
-			min="0"
-			max="4"
-			step="0.1"
-			value={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
-			oninput={onNum('iconHaloWidth')}
-			aria-label="Icon halo width"
-			title="Halo width in px. 0 turns the halo off (default)."
-		/>
-		<span class="num">{(ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH).toFixed(1)}</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('iconHaloColor', 'iconHaloWidth')}
-			disabled={!isAnnSet('iconHaloColor', 'iconHaloWidth')}
-			title="Reset icon halo to the current default"
-			aria-label="Reset icon halo">⟲</button
-		>
-	</div>
+	<HaloRow
+		color={ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR}
+		onColorChange={onText('iconHaloColor')}
+		width={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+		onWidthChange={onNum('iconHaloWidth')}
+		onReset={() => resetAnnFields('iconHaloColor', 'iconHaloWidth')}
+		canReset={isAnnSet('iconHaloColor', 'iconHaloWidth')}
+		colorAriaLabel="Icon halo color"
+		widthAriaLabel="Icon halo width"
+		colorTitle="Halo (icon outline) color. Default white; only visible when width > 0."
+		widthTitle="Halo width in px. 0 turns the halo off (default)."
+		resetTitle="Reset icon halo to the current default"
+		resetAriaLabel="Reset icon halo"
+	/>
 
 	<label class="row">
 		<span class="lbl">Size</span>
@@ -394,38 +333,20 @@
 		>
 	</label>
 
-	<div class="row">
-		<span class="lbl">Halo</span>
-		<input
-			type="color"
-			value={normalizeHex(
-				ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)
-			)}
-			oninput={onText('labelHaloColor')}
-			aria-label="Label halo color"
-			title="Halo (text outline) color. Defaults to a contrasting brightness; pick to override."
-		/>
-		<input
-			class="halo-width"
-			type="range"
-			min="0"
-			max="4"
-			step="0.1"
-			value={ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
-			oninput={onNum('labelHaloWidth')}
-			aria-label="Label halo width"
-			title="Halo width in px. 0 turns the halo off."
-		/>
-		<span class="num">{(ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH).toFixed(1)}</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('labelHaloColor', 'labelHaloWidth')}
-			disabled={!isAnnSet('labelHaloColor', 'labelHaloWidth')}
-			title="Reset label halo to the current default"
-			aria-label="Reset label halo">⟲</button
-		>
-	</div>
+	<HaloRow
+		color={ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
+		onColorChange={onText('labelHaloColor')}
+		width={ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
+		onWidthChange={onNum('labelHaloWidth')}
+		onReset={() => resetAnnFields('labelHaloColor', 'labelHaloWidth')}
+		canReset={isAnnSet('labelHaloColor', 'labelHaloWidth')}
+		colorAriaLabel="Label halo color"
+		widthAriaLabel="Label halo width"
+		colorTitle="Halo (text outline) color. Defaults to a contrasting brightness; pick to override."
+		widthTitle="Halo width in px. 0 turns the halo off."
+		resetTitle="Reset label halo to the current default"
+		resetAriaLabel="Reset label halo"
+	/>
 
 	<label class="row">
 		<span class="lbl">Size</span>
@@ -731,109 +652,8 @@
 		flex: 1 1 auto;
 	}
 
-	.icon-dropdown {
-		flex: 1 1 auto;
-		position: relative;
-		min-width: 0;
-	}
-	.icon-trigger {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		padding: 0.25rem 0.4rem;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid #333;
-		border-radius: 4px;
-		color: #ddd;
-		font: inherit;
-		cursor: pointer;
-		text-align: left;
-
-		&:hover {
-			border-color: #4a9eff;
-		}
-		.icon-name {
-			flex: 1 1 auto;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-		.caret {
-			color: #888;
-			font-size: 11px;
-		}
-	}
-	.icon-prev {
-		position: relative;
-		display: inline-block;
-		flex: 0 0 auto;
-		border-radius: 2px;
-
-		&::after {
-			content: '';
-			position: absolute;
-			inset: 0;
-			background-image: var(--sprite-bg);
-			background-position: var(--sprite-pos);
-			background-size: var(--sprite-size);
-			background-repeat: no-repeat;
-			filter: invert(1);
-			transform: rotate(var(--sprite-rotate, 0deg));
-		}
-	}
-	.icon-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		right: 0;
-		max-height: 240px;
-		overflow-y: auto;
-		margin: 0;
-		padding: 3px;
-		list-style: none;
-		background: #11161e;
-		border: 1px solid #333;
-		border-radius: 4px;
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
-		z-index: 10;
-
-		li {
-			margin: 0;
-		}
-	}
-	.icon-option {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-		padding: 0.25rem 0.4rem;
-		background: transparent;
-		border: 1px solid transparent;
-		border-radius: 3px;
-		color: #ccc;
-		font: inherit;
-		cursor: pointer;
-		text-align: left;
-
-		&:hover {
-			background: rgba(74, 158, 255, 0.12);
-			border-color: rgba(74, 158, 255, 0.4);
-		}
-		&.selected {
-			background: rgba(74, 158, 255, 0.18);
-			border-color: #4a9eff;
-			color: #fff;
-		}
-		.icon-name {
-			flex: 1 1 auto;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-	}
+	/* Icon-picker styles live in IconPicker.svelte; halo-row styles live in
+	   HaloRow.svelte. Both are scoped, so nothing leaks back here. */
 	.pos-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 22px);
