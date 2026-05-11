@@ -616,8 +616,8 @@
 		container-type: inline-size;
 		/* Clip the maplibre canvas + watermark to the rounded box. The clip
 		   used to live on the parent `.map-area` but that also clipped the
-		   AnnotationPanel — which is a sibling of `.map-stage` and needs to
-		   extend below the map on short viewports. */
+		   sidebar's collapsible panels — which are a sibling of `.map-stage`
+		   and need to extend below the map on short viewports. */
 		overflow: hidden;
 
 		& :global(.maplibregl-canvas) {

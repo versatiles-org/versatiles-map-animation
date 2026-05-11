@@ -1,9 +1,36 @@
 <script lang="ts">
+	/**
+	 * Editor sidebar. Four collapsible panels, each driven by an independent
+	 * `open` state — except for "Annotation style", which is forced open when
+	 * an annotation is selected and forced closed (disabled) otherwise, since
+	 * it has nothing to style without a selection.
+	 *
+	 *   1. Map style              — open by default
+	 *   2. Annotation style       — open when a marker is selected, disabled otherwise
+	 *   3. Default annotation     — closed by default
+	 *   4. Markers (list)         — open by default
+	 *
+	 * The previous `AnnotationPanel` router (which switched between
+	 * editor/list/defaults based on selection) is replaced by these four
+	 * always-present panels — the user controls visibility, not the
+	 * application.
+	 */
+
 	import type { AnimationStore } from '../animation.svelte';
-	import AnnotationPanel from './AnnotationPanel.svelte';
+	import AnnotationEditor from './AnnotationEditor.svelte';
+	import AnnotationList from './AnnotationList.svelte';
+	import DefaultStyleEditor from './DefaultStyleEditor.svelte';
 	import MapStyleControl from './MapStyleControl.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
+
+	const hasSelection = $derived(store.selectedAnnotationIndex !== null);
+
+	// User-toggleable panel state. Initial values match the requested
+	// open-by-default set; the user can override by clicking the summary.
+	let mapStyleOpen = $state(true);
+	let defaultStyleOpen = $state(false);
+	let listOpen = $state(true);
 </script>
 
 <aside class="sidebar" aria-label="Editor sidebar">
@@ -12,17 +39,47 @@
 		<p class="lede">Drop keyframes on a map, hit play.</p>
 	</header>
 
-	<details class="sub-panel" open>
+	<!-- 1. Map style — always available -->
+	<details class="sub-panel" bind:open={mapStyleOpen}>
 		<summary>Map style</summary>
 		<div class="sub-body">
 			<MapStyleControl {store} />
 		</div>
 	</details>
 
-	<details class="sub-panel" open>
-		<summary>Annotation</summary>
+	<!-- 2. Annotation style — derived from selection. Force-open when a
+	     marker is selected, force-closed (and visually disabled) when none.
+	     Using `open={hasSelection}` rather than `bind:open` means clicks on
+	     a disabled summary can't open it. -->
+	<details class="sub-panel" class:is-disabled={!hasSelection} open={hasSelection}>
+		<summary
+			aria-disabled={!hasSelection}
+			title={hasSelection ? '' : 'Select a marker in the list below to edit its style'}
+			onclick={(e) => {
+				// Prevent the disabled summary from toggling the details element.
+				if (!hasSelection) e.preventDefault();
+			}}
+		>
+			Annotation style
+		</summary>
 		<div class="sub-body">
-			<AnnotationPanel {store} />
+			<AnnotationEditor {store} />
+		</div>
+	</details>
+
+	<!-- 3. Default annotation style — always available; closed by default -->
+	<details class="sub-panel" bind:open={defaultStyleOpen}>
+		<summary>Default annotation style</summary>
+		<div class="sub-body">
+			<DefaultStyleEditor {store} />
+		</div>
+	</details>
+
+	<!-- 4. Marker list — always available; open by default -->
+	<details class="sub-panel" bind:open={listOpen}>
+		<summary>Markers</summary>
+		<div class="sub-body">
+			<AnnotationList {store} />
 		</div>
 	</details>
 
@@ -104,6 +161,25 @@
 		background: rgba(255, 255, 255, 0.04);
 		color: #ddd;
 	}
+
+	/* Disabled state (no selection for the per-annotation editor): muted
+	   text, no hover affordance, summary is not clickable. The panel is
+	   always rendered closed in this state, so `.sub-body` is never visible. */
+	.sub-panel.is-disabled {
+		opacity: 0.45;
+	}
+	.sub-panel.is-disabled > summary {
+		cursor: not-allowed;
+		color: #666;
+	}
+	.sub-panel.is-disabled > summary:hover {
+		background: transparent;
+		color: #666;
+	}
+	.sub-panel.is-disabled > summary::before {
+		color: #444;
+	}
+
 	.sub-body {
 		padding: 0.55rem 0.6rem 0.65rem;
 		border-top: 1px solid #1f1f1f;

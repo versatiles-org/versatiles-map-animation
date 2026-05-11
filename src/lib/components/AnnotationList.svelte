@@ -1,10 +1,10 @@
 <script lang="ts">
 	/**
-	 * List of all annotations on the animation. Each row shows a sprite
-	 * preview + label, can be clicked to select (which routes the panel into
-	 * `AnnotationEditor`), and can be drag-reordered. When the list is empty,
-	 * an explanatory hint stands in for the rows. Lives next to
-	 * `DefaultStyleEditor` in the no-selection panel.
+	 * List of all annotations on the animation — the body of the sidebar's
+	 * "Markers" panel. Each row shows a sprite preview + label, can be
+	 * clicked to select (which opens the sidebar's "Annotation style" panel
+	 * for that marker), and can be drag-reordered. When the list is empty,
+	 * an explanatory hint stands in for the rows.
 	 */
 
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
@@ -52,7 +52,6 @@
 	}
 </script>
 
-<h3 class="section">Markers</h3>
 {#if store.annotations.length === 0}
 	<p class="placeholder">
 		No annotations yet. Click <strong>📍 Pin</strong> below to add one — new markers inherit the default
@@ -98,19 +97,6 @@
 {/if}
 
 <style>
-	.section {
-		margin: 0.4rem 0 0.1rem;
-		padding: 0.2rem 0 0.15rem;
-		font-size: 10px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.07em;
-		color: #888;
-
-		&:first-of-type {
-			margin-top: 0.1rem;
-		}
-	}
 	.placeholder {
 		margin: 0.2rem 0;
 		font-size: 12px;

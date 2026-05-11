@@ -49,7 +49,7 @@
 </script>
 
 <div class="default-style-header">
-	<h3 class="section">Default style</h3>
+	<h3 class="section">Icon</h3>
 	<button
 		type="button"
 		class="mini"
@@ -122,7 +122,7 @@
 />
 
 <!-- Label -->
-<h3 class="section">Default label</h3>
+<h3 class="section">Label</h3>
 
 <label class="row">
 	<span class="lbl">Font</span>

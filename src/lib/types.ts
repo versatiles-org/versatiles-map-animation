@@ -553,7 +553,7 @@ export function isAnnotationLabelFont(value: unknown): value is AnnotationLabelF
 /**
  * Strip the trailing weight/style from a font name to get the family the UI
  * groups on. `fira_sans_condensed_black_italic` → `fira_sans_condensed`.
- * Used by AnnotationPanel to build `<optgroup>`s in the font picker.
+ * Used by `FontSelect` to build `<optgroup>`s in the font picker.
  */
 export function fontFamilyOf(font: AnnotationLabelFont): string {
 	const STYLE_SUFFIX =
