@@ -150,20 +150,38 @@ describe('validateAnnotation (via validateAnimation)', () => {
 		expect(a.annotations[0].iconColor).toBe('#00ff00');
 	});
 
-	it('falls back to default icon for unknown sprite ids', () => {
+	it('leaves icon/iconColor undefined when missing — the renderer resolves them from defaultAnnotation', () => {
+		// Regression: validateAnnotation used to bake in DEFAULT_ANNOTATION_ICON
+		// and DEFAULT_ANNOTATION_COLOR for any annotation missing those fields.
+		// That clobbered the per-animation `defaultAnnotation` so a JSON with
+		// `defaultAnnotation.iconColor = '#ffffff'` would still render markers
+		// red (the hardcoded baseline) instead of white.
+		const a = validateAnimation({
+			...minimalAnim,
+			annotations: [{ lng: 1, lat: 2, label: 'just-position-and-label' }],
+			defaultAnnotation: { iconColor: '#ffffff', icon: 'symbol-arrow1' }
+		});
+		expect(a.annotations[0]).not.toHaveProperty('icon');
+		expect(a.annotations[0]).not.toHaveProperty('iconColor');
+		// And the defaults survive validation so the renderer can fall back.
+		expect(a.defaultAnnotation.icon).toBe('symbol-arrow1');
+		expect(a.defaultAnnotation.iconColor).toBe('#ffffff');
+	});
+
+	it('drops invalid icon values silently (and lets defaultAnnotation take over)', () => {
 		const a = validateAnimation({
 			...minimalAnim,
 			annotations: [{ ...minimalAnn, icon: 'mystery' }]
 		});
-		expect(a.annotations[0].icon).not.toBe('mystery');
+		expect(a.annotations[0]).not.toHaveProperty('icon');
 	});
 
-	it('falls back to default color when missing or wrong type', () => {
+	it('drops invalid iconColor types silently', () => {
 		const a = validateAnimation({
 			...minimalAnim,
-			annotations: [{ ...minimalAnn, color: 12345 }]
+			annotations: [{ lng: 1, lat: 2, label: 'X', iconColor: 12345 }]
 		});
-		expect(typeof a.annotations[0].iconColor).toBe('string');
+		expect(a.annotations[0]).not.toHaveProperty('iconColor');
 	});
 
 	it('preserves rotation/visibleFrom/visibleUntil when valid', () => {
@@ -240,5 +258,108 @@ describe('validateAnnotation (via validateAnimation)', () => {
 		expect(() => validateAnimation({ ...minimalAnim, annotations: [null] })).toThrow(
 			/Annotation 0/
 		);
+	});
+});
+
+describe('validateAnimation - defaultAnnotation round-trip', () => {
+	it('preserves every AnnotationStyle field through the validator', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			defaultAnnotation: {
+				icon: 'symbol-star',
+				iconColor: '#ff8800',
+				iconSize: 1.7,
+				iconHaloColor: '#222222',
+				iconHaloWidth: 0.5,
+				labelColor: '#003366',
+				labelSize: 1.3,
+				labelPosition: 'right',
+				labelDistance: 2.1,
+				labelFont: 'roboto_bold_italic',
+				labelHaloColor: '#ffffff',
+				labelHaloWidth: 1.5
+			}
+		});
+		expect(a.defaultAnnotation).toEqual({
+			icon: 'symbol-star',
+			iconColor: '#ff8800',
+			iconSize: 1.7,
+			iconHaloColor: '#222222',
+			iconHaloWidth: 0.5,
+			labelColor: '#003366',
+			labelSize: 1.3,
+			labelPosition: 'right',
+			labelDistance: 2.1,
+			labelFont: 'roboto_bold_italic',
+			labelHaloColor: '#ffffff',
+			labelHaloWidth: 1.5
+		});
+	});
+
+	it('treats a missing defaultAnnotation block as empty', () => {
+		const a = validateAnimation(minimalAnim);
+		expect(a.defaultAnnotation).toEqual({});
+	});
+
+	it('accepts the legacy "color" key inside defaultAnnotation and maps it to iconColor', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			defaultAnnotation: { color: '#00ff00' }
+		});
+		expect(a.defaultAnnotation.iconColor).toBe('#00ff00');
+	});
+
+	it('drops invalid icon / labelPosition values silently (matches per-annotation behaviour)', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			defaultAnnotation: { icon: 'mystery', labelPosition: 'oblique' }
+		});
+		expect(a.defaultAnnotation).not.toHaveProperty('icon');
+		expect(a.defaultAnnotation).not.toHaveProperty('labelPosition');
+	});
+
+	it('drops invalid font names silently', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			defaultAnnotation: { labelFont: 'comic_sans_ms' }
+		});
+		expect(a.defaultAnnotation).not.toHaveProperty('labelFont');
+	});
+
+	it('strips non-AnnotationStyle fields (visibility/timing fields, rotation, label text)', () => {
+		// `defaultAnnotation` is a per-animation STYLE template — visibility
+		// windows, fade timings, label text, and rotation don't belong in it.
+		// The validator should drop them even if a malformed file includes them.
+		const a = validateAnimation({
+			...minimalAnim,
+			defaultAnnotation: {
+				labelFont: 'roboto_bold',
+				visibleFrom: 2,
+				visibleUntil: 8,
+				fadeIn: 1,
+				fadeOut: 1,
+				rotation: 45,
+				label: 'should-not-survive',
+				lng: 99,
+				lat: 99
+			}
+		});
+		// The legitimate style field survives:
+		expect(a.defaultAnnotation.labelFont).toBe('roboto_bold');
+		// Everything else is dropped:
+		for (const key of [
+			'visibleFrom',
+			'visibleUntil',
+			'fadeIn',
+			'fadeOut',
+			'rotation',
+			'label',
+			'lng',
+			'lat'
+		]) {
+			expect(a.defaultAnnotation, `defaultAnnotation should not carry "${key}"`).not.toHaveProperty(
+				key
+			);
+		}
 	});
 });

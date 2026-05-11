@@ -1,8 +1,7 @@
 import { FIELD_SPECS } from './url_state/annotation_codec';
 import {
 	ANIMATION_DEFAULTS,
-	DEFAULT_ANNOTATION_COLOR,
-	DEFAULT_ANNOTATION_ICON,
+	ANNOTATION_STYLE_KEYS,
 	isAnnotationIcon,
 	isAspectRatio,
 	isLabelPosition,
@@ -130,9 +129,14 @@ export function validateAnimation(input: unknown): Animation {
  * field flows through the same FIELD_SPECS table the per-annotation
  * validator uses, so parsing behaviour matches.
  *
- * We cast to `Annotation` internally because FIELD_SPECS is defined on
- * the full Annotation shape; the cast is safe because we never read the
- * non-style fields (lng/lat/label/etc.) from `out`.
+ * Only fields named in `ANNOTATION_STYLE_KEYS` are kept — visibility
+ * windows, fade timings, rotation, label text, position are silently
+ * stripped if a malformed file includes them. They don't belong in a
+ * per-animation style template; `Animation.defaultAnnotation`'s type
+ * (`Partial<AnnotationStyle>`) already excludes them.
+ *
+ * Uses `Annotation` internally because FIELD_SPECS is defined on the full
+ * Annotation shape; we cast at the boundary.
  */
 function validatePartialAnnotation(o: Record<string, unknown>): Partial<AnnotationStyle> {
 	const out = {} as Annotation;
@@ -140,7 +144,10 @@ function validatePartialAnnotation(o: Record<string, unknown>): Partial<Annotati
 	if (typeof o.iconColor === 'string') out.iconColor = o.iconColor;
 	else if (typeof o.color === 'string') out.iconColor = o.color;
 	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
-	for (const f of FIELD_SPECS) f.fromJson(o, out, -1);
+	const styleKeys = new Set<string>(ANNOTATION_STYLE_KEYS);
+	for (const f of FIELD_SPECS) {
+		if (styleKeys.has(f.key)) f.fromJson(o, out, -1);
+	}
 	return out as Partial<AnnotationStyle>;
 }
 
@@ -153,17 +160,17 @@ function validateAnnotation(raw: unknown, i: number): Annotation {
 	const out: Annotation = {
 		lng: requiredNum(o, 'lng', ctx),
 		lat: requiredNum(o, 'lat', ctx),
-		icon: isAnnotationIcon(o.icon) ? o.icon : DEFAULT_ANNOTATION_ICON,
-		// Accept the canonical `iconColor` first; fall back to the legacy
-		// `color` key so JSON files written before the field rename still load.
-		iconColor:
-			typeof o.iconColor === 'string'
-				? o.iconColor
-				: typeof o.color === 'string'
-					? o.color
-					: DEFAULT_ANNOTATION_COLOR,
 		label: typeof o.label === 'string' ? o.label : ''
 	};
+	// Style fields stay undefined when absent so the renderer's
+	// `resolveAnnotation` can fall back to the per-animation `defaultAnnotation`
+	// (and then the hardcoded baseline). Baking in `DEFAULT_ANNOTATION_ICON` /
+	// `DEFAULT_ANNOTATION_COLOR` here would clobber the per-animation defaults.
+	if (isAnnotationIcon(o.icon)) out.icon = o.icon;
+	// Accept the canonical `iconColor` first; fall back to the legacy `color`
+	// key so JSON files written before the field rename still load.
+	if (typeof o.iconColor === 'string') out.iconColor = o.iconColor;
+	else if (typeof o.color === 'string') out.iconColor = o.color;
 	// rotation, visibleUntil, labelPosition aren't in FIELD_SPECS (their wire
 	// shape needs special-case handling in the codec), so validate them inline.
 	const rotation = optionalNum(o, 'rotation', ctx);

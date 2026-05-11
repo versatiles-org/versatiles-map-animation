@@ -306,6 +306,28 @@ export const DEFAULT_ANNOTATION_LABEL_SIZE = 1;
  * in `url_state/annotation_codec.ts` for any field that round-trips through
  * the wire codec.
  */
+/**
+ * Runtime list of every `AnnotationStyle` key. Used by the JSON validator
+ * (and anywhere else that needs to enumerate style fields) to keep the
+ * `defaultAnnotation` block free of non-style data — visibility windows,
+ * fade timings, rotation, label text, position — which should never appear
+ * in a per-animation template. Keep in sync with the `Pick` below.
+ */
+export const ANNOTATION_STYLE_KEYS = [
+	'icon',
+	'iconColor',
+	'iconSize',
+	'iconHaloColor',
+	'iconHaloWidth',
+	'labelColor',
+	'labelSize',
+	'labelPosition',
+	'labelDistance',
+	'labelFont',
+	'labelHaloColor',
+	'labelHaloWidth'
+] as const;
+
 export type AnnotationStyle = Pick<
 	Annotation,
 	| 'icon'
