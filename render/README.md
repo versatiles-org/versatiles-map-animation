@@ -61,6 +61,7 @@ docker run --rm -it -v "$PWD:/out" \
 | `--crf <n>`            | `18`              | x264 CRF — lower = higher quality, larger file        |
 | `--preset <name>`      | `slow`            | x264 preset (`ultrafast`…`veryslow`)                  |
 | `--frame-timeout <ms>` | `30000`           | per-frame settle deadline                             |
+| `--motion-blur <n>`    | `1` (off)         | sub-frames per output frame; 4–8 typical; N× slower   |
 | `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
 | `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |

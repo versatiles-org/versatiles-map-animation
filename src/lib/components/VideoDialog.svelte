@@ -16,6 +16,16 @@
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
 	const VIDEO_FPS = [24, 25, 30, 50, 60] as const;
 	type VideoFps = (typeof VIDEO_FPS)[number];
+	// Motion-blur sample counts. 1 = off (crisp), 4/8 = typical cinematic
+	// motion-blur strengths. Render time scales linearly with the sample
+	// count; we mention that in the option labels so users go in
+	// eyes-open.
+	const MOTION_BLUR_OPTS = [
+		{ value: 1, label: 'Off (crisp)' },
+		{ value: 4, label: '4× — light (4× render time)' },
+		{ value: 8, label: '8× — strong (8× render time)' }
+	] as const;
+	type MotionBlur = (typeof MOTION_BLUR_OPTS)[number]['value'];
 
 	let {
 		store,
@@ -31,6 +41,7 @@
 
 	let videoWidth = $state<VideoWidth>(1920);
 	let videoFps = $state<VideoFps>(30);
+	let motionBlur = $state<MotionBlur>(1);
 	const videoHeight = $derived(Math.round(videoWidth / aspectRatioValue(store.aspectRatio)));
 
 	function buildCommand(): string {
@@ -41,7 +52,10 @@
 		// `--width` and the composition aspect ratio chosen in the editor.
 		// `-it` allocates a pseudo-TTY (line-buffered progress bars, colour) and
 		// keeps stdin open so the user can `Ctrl-C` to abort the render.
-		return `docker run --rm -it --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps} --output animation.mp4`;
+		// `--motion-blur` is only emitted when the user picked > 1, so the
+		// default snippet stays as short as before.
+		const blurFlag = motionBlur > 1 ? ` --motion-blur ${motionBlur}` : '';
+		return `docker run --rm -it --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps}${blurFlag} --output animation.mp4`;
 	}
 	const command = $derived(buildCommand());
 
@@ -81,6 +95,14 @@
 			<select id="video-fps" bind:value={videoFps}>
 				{#each VIDEO_FPS as f (f)}
 					<option value={f}>{f}</option>
+				{/each}
+			</select>
+		</label>
+		<label for="video-blur" class="control-label">
+			<span class="lbl">Motion blur</span>
+			<select id="video-blur" bind:value={motionBlur}>
+				{#each MOTION_BLUR_OPTS as opt (opt.value)}
+					<option value={opt.value}>{opt.label}</option>
 				{/each}
 			</select>
 		</label>

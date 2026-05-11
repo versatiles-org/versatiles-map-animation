@@ -37,7 +37,12 @@ const DEFAULT_OPTS = {
 	frameTimeoutMs: 30_000,
 	prewarm: true,
 	endTime: null,
-	verbose: false
+	verbose: false,
+	// Motion blur: render `motionBlur` sub-frames per output frame, evenly
+	// spaced across one full frame duration (a 360° shutter), and let ffmpeg
+	// average them together. 1 = off (current crisp behaviour). 4–8 typical.
+	// Render time scales linearly: --motion-blur 8 is 8× slower.
+	motionBlur: 1
 };
 
 // ---------------------------------------------------------------------------
@@ -144,6 +149,9 @@ function parseArgv(argv) {
 			case '--frame-timeout':
 				out.frameTimeoutMs = parseInt(next(), 10);
 				break;
+			case '--motion-blur':
+				out.motionBlur = parseInt(next(), 10);
+				break;
 			case '--end-time':
 				out.endTime = parseFloat(next());
 				break;
@@ -181,7 +189,10 @@ function usage() {
 		'  --fps <n>              frame rate (default 30)',
 		'  --crf <n>              x264 CRF, lower = higher quality (default 18)',
 		'  --preset <name>        x264 preset (default "slow")',
-		'  --frame-timeout <ms>   per-frame settle timeout (default 60000)',
+		'  --frame-timeout <ms>   per-frame settle timeout (default 30000)',
+		'  --motion-blur <n>      render N sub-frames per output frame and average them',
+		'                          for accumulation-buffer motion blur. 1 (default) = off,',
+		'                          4–8 typical. Render time scales N× per frame.',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
 		'  --output <path>        output MP4 (required)',
 		'  -v, --verbose          show ffmpeg output and page console messages',
@@ -283,6 +294,13 @@ function buildPageUrl(baseUrl, hash, render) {
 }
 
 function spawnFfmpeg(opts) {
+	// With motion blur, we stream N sub-frames per output frame at
+	// `fps × N`. ffmpeg's `tmix=frames=N` averages every N consecutive
+	// frames into one; then `fps=fps=…` decimates the output back to the
+	// requested rate. Net: each output frame is the linear average of N
+	// sub-frames that span one output-frame's duration of animation time.
+	const samples = Math.max(1, opts.motionBlur);
+	const inputFps = opts.fps * samples;
 	const args = [
 		'-y',
 		'-loglevel',
@@ -290,9 +308,14 @@ function spawnFfmpeg(opts) {
 		'-f',
 		'image2pipe',
 		'-framerate',
-		String(opts.fps),
+		String(inputFps),
 		'-i',
-		'pipe:0',
+		'pipe:0'
+	];
+	if (samples > 1) {
+		args.push('-vf', `tmix=frames=${samples},fps=fps=${opts.fps}`);
+	}
+	args.push(
 		'-c:v',
 		'libx264',
 		'-preset',
@@ -304,7 +327,7 @@ function spawnFfmpeg(opts) {
 		'-movflags',
 		'+faststart',
 		opts.output
-	];
+	);
 	// Capture stderr so we can show it only on failure (when not verbose).
 	const proc = spawn('ffmpeg', args, {
 		stdio: ['pipe', 'inherit', VERBOSE ? 'inherit' : 'pipe']
@@ -429,6 +452,11 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	// fades use `store.currentTime` (the animation timeline, not the system
 	// clock), and the camera is set with direct jumps, so wall-clock leakage
 	// has no visible effect on the captured frames.
+	// With motion blur, each output frame is built from `samples` sub-frames
+	// evenly spaced across one frame-duration of animation time. ffmpeg
+	// averages them back together (see `spawnFfmpeg`). samples=1 means a
+	// single instantaneous capture per output frame (current crisp default).
+	const samples = Math.max(1, opts.motionBlur);
 	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
 		// If ffmpeg has died, bail out instead of looping through all 700+
@@ -438,15 +466,23 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 			progress.finish();
 			throw new Error(`ffmpeg pipe closed early (after frame ${i})`);
 		}
-		const t = Math.min(duration, i / opts.fps);
-		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
-		try {
-			await waitForFrameReady(page, opts.frameTimeoutMs);
-		} catch (err) {
-			log(`! frame ${i + 1}/${total} timeout (t=${t.toFixed(3)}): ${err.message}`);
+		for (let j = 0; j < samples; j++) {
+			// Sub-frame offset within one output-frame duration. samples=1
+			// degenerates to t = i / fps (the original behaviour).
+			const t = Math.min(duration, (i + j / samples) / opts.fps);
+			await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
+			try {
+				await waitForFrameReady(page, opts.frameTimeoutMs);
+			} catch (err) {
+				const label =
+					samples > 1
+						? `frame ${i + 1}/${total} (sub ${j + 1}/${samples})`
+						: `frame ${i + 1}/${total}`;
+				log(`! ${label} timeout (t=${t.toFixed(3)}): ${err.message}`);
+			}
+			const png = await page.screenshot({ type: 'png' });
+			ffmpegStdin.write(png);
 		}
-		const png = await page.screenshot({ type: 'png' });
-		ffmpegStdin.write(png);
 		progress.update(i + 1);
 	}
 	progress.finish();
@@ -462,6 +498,9 @@ async function main() {
 	VERBOSE = !!opts.verbose;
 	if (!ALLOWED_WIDTHS.includes(opts.width)) {
 		throw new Error(`--width must be one of ${ALLOWED_WIDTHS.join('/')}, got ${opts.width}`);
+	}
+	if (!Number.isInteger(opts.motionBlur) || opts.motionBlur < 1 || opts.motionBlur > 32) {
+		throw new Error(`--motion-blur must be an integer in 1..32, got ${opts.motionBlur}`);
 	}
 	if (!opts.output) throw new Error('--output is required');
 	if (!opts.hash && !opts.url) throw new Error('--hash or --url is required');
@@ -498,6 +537,9 @@ async function main() {
 		const height = opts.height ?? Math.round((opts.width * 9) / 16);
 		log(
 			`  ${cappedDuration.toFixed(2)}s · ${totalFrames} frames at ${opts.fps} fps · ${opts.width}×${height}` +
+				(opts.motionBlur > 1
+					? ` · motion blur ${opts.motionBlur}× (${totalFrames * opts.motionBlur} sub-frames)`
+					: '') +
 				(opts.endTime != null ? ` (capped from ${duration.toFixed(2)}s)` : '')
 		);
 
