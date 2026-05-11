@@ -8,7 +8,7 @@
 	 * fades inside the window.
 	 */
 
-	import type { AnimationStore } from '../animation.svelte';
+	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 	import { haloAuto, makeOnNum, makeOnText } from '../annotation_panel_helpers';
 	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
@@ -16,22 +16,19 @@
 	import IconPicker from './IconPicker.svelte';
 	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
-	import {
-		ANNOTATION_FIELD_DEFAULTS,
-		DEFAULT_ANNOTATION_LABEL_COLOR,
-		DEFAULT_ANNOTATION_LABEL_FONT,
-		DEFAULT_ICON_HALO_COLOR,
-		DEFAULT_ICON_HALO_WIDTH,
-		DEFAULT_LABEL_DISTANCE,
-		DEFAULT_LABEL_HALO_WIDTH,
-		DEFAULT_LABEL_POSITION,
-		type Annotation
-	} from '../types';
+	import { ANNOTATION_FIELD_DEFAULTS, type Annotation } from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
 
 	const ann = $derived(store.selectedAnnotation);
 	const idx = $derived(store.selectedAnnotationIndex);
+	/**
+	 * Fully-resolved annotation view (per-annotation overrides ← per-animation
+	 * defaults ← hardcoded). Used for every read in the template so the inputs
+	 * show what the renderer actually draws. Per-annotation overrides are
+	 * written to `ann` (via `patch`), but reads always go through `resolved`.
+	 */
+	const resolved = $derived(ann ? resolveAnnotation(ann, store.defaultAnnotation) : null);
 
 	function patch(p: Partial<Annotation>): void {
 		if (idx !== null) store.updateAnnotation(idx, p);
@@ -41,21 +38,17 @@
 	const onNum = makeOnNum(patch);
 
 	/**
-	 * Resolve a field on reset: user-defined default → hardcoded baseline
-	 * (`ANNOTATION_FIELD_DEFAULTS`) → `undefined` (which `updateAnnotation`
-	 * treats as "delete the override"). For required fields like `icon` /
-	 * `iconColor` the table guarantees a real value; for present-only fields
-	 * like `labelHaloColor` it's `undefined`, so the field is removed and
-	 * the renderer's auto-flip kicks back in.
+	 * "Reset to default" means *clear the per-annotation override*: write
+	 * `undefined` for each named field, which `updateAnnotation` translates
+	 * into a delete. The renderer then resolves the field from
+	 * `defaultAnnotation` (or the hardcoded baseline if that's empty too) —
+	 * so flipping the per-animation default later automatically updates
+	 * every annotation that doesn't override the field.
 	 */
 	function resetAnnFields(...keys: (keyof Annotation)[]): void {
 		if (idx === null) return;
 		const p: Record<string, unknown> = {};
-		for (const k of keys) {
-			const fromDefault = (store.defaultAnnotation as Record<string, unknown>)[k];
-			const hardcoded = (ANNOTATION_FIELD_DEFAULTS as Record<string, unknown>)[k];
-			p[k] = fromDefault ?? hardcoded;
-		}
+		for (const k of keys) p[k] = undefined;
 		store.updateAnnotation(idx, p as Partial<Annotation>);
 	}
 	function isAnnSet(...keys: (keyof Annotation)[]): boolean {
@@ -165,7 +158,7 @@
 	}
 </script>
 
-{#if ann && idx !== null}
+{#if ann && resolved && idx !== null}
 	<div class="title-row">
 		<span class="title">Annotation #{idx + 1}</span>
 		<button
@@ -184,11 +177,12 @@
 
 	<div class="row">
 		<span class="lbl">Shape</span>
-		<IconPicker value={ann.icon} onChange={(icon) => patch({ icon })} />
+		<IconPicker value={resolved.icon} onChange={(icon) => patch({ icon })} />
 		<button
 			type="button"
 			class="mini reset"
 			onclick={() => resetAnnFields('icon')}
+			disabled={!isAnnSet('icon')}
 			title="Reset shape to the current default"
 			aria-label="Reset shape">⟲</button
 		>
@@ -196,18 +190,19 @@
 
 	<ColorRow
 		label="Color"
-		value={ann.iconColor}
+		value={resolved.iconColor}
 		onColorChange={onText('iconColor')}
 		onReset={() => resetAnnFields('iconColor')}
+		canReset={isAnnSet('iconColor')}
 		colorAriaLabel="Icon color"
 		resetTitle="Reset color to the current default"
 		resetAriaLabel="Reset icon color"
 	/>
 
 	<HaloRow
-		color={ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR}
+		color={resolved.iconHaloColor ?? ANNOTATION_FIELD_DEFAULTS.iconHaloColor}
 		onColorChange={onText('iconHaloColor')}
-		width={ann.iconHaloWidth ?? DEFAULT_ICON_HALO_WIDTH}
+		width={resolved.iconHaloWidth ?? ANNOTATION_FIELD_DEFAULTS.iconHaloWidth}
 		onWidthChange={onNum('iconHaloWidth')}
 		onReset={() => resetAnnFields('iconHaloColor', 'iconHaloWidth')}
 		canReset={isAnnSet('iconHaloColor', 'iconHaloWidth')}
@@ -221,7 +216,7 @@
 
 	<SliderRow
 		label="Size"
-		value={ann.iconSize ?? 1}
+		value={resolved.iconSize ?? 1}
 		min={0.4}
 		max={2.5}
 		step={0.05}
@@ -235,7 +230,7 @@
 
 	<SliderRow
 		label="Rotation"
-		value={ann.rotation ?? 0}
+		value={resolved.rotation ?? 0}
 		min={0}
 		max={359}
 		step={1}
@@ -265,7 +260,7 @@
 	<label class="row">
 		<span class="lbl">Font</span>
 		<FontSelect
-			value={ann.labelFont ?? DEFAULT_ANNOTATION_LABEL_FONT}
+			value={resolved.labelFont ?? ANNOTATION_FIELD_DEFAULTS.labelFont}
 			onChange={(font) => patch({ labelFont: font })}
 			title="Glyph font for this label. Drawn from the VersaTiles tileserver's bundled fonts."
 		/>
@@ -281,7 +276,7 @@
 
 	<ColorRow
 		label="Color"
-		value={ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}
+		value={resolved.labelColor ?? ANNOTATION_FIELD_DEFAULTS.labelColor}
 		onColorChange={onText('labelColor')}
 		onReset={() => resetAnnFields('labelColor')}
 		canReset={isAnnSet('labelColor')}
@@ -292,9 +287,10 @@
 	/>
 
 	<HaloRow
-		color={ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
+		color={resolved.labelHaloColor ??
+			haloAuto(resolved.labelColor ?? ANNOTATION_FIELD_DEFAULTS.labelColor)}
 		onColorChange={onText('labelHaloColor')}
-		width={ann.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH}
+		width={resolved.labelHaloWidth ?? ANNOTATION_FIELD_DEFAULTS.labelHaloWidth}
 		onWidthChange={onNum('labelHaloWidth')}
 		onReset={() => resetAnnFields('labelHaloColor', 'labelHaloWidth')}
 		canReset={isAnnSet('labelHaloColor', 'labelHaloWidth')}
@@ -308,7 +304,7 @@
 
 	<SliderRow
 		label="Size"
-		value={ann.labelSize ?? 1}
+		value={resolved.labelSize ?? 1}
 		min={0.4}
 		max={2.5}
 		step={0.05}
@@ -321,7 +317,7 @@
 	/>
 
 	<PositionGrid
-		value={ann.labelPosition ?? DEFAULT_LABEL_POSITION}
+		value={resolved.labelPosition ?? ANNOTATION_FIELD_DEFAULTS.labelPosition}
 		onChange={(labelPosition) => patch({ labelPosition })}
 		onReset={() => resetAnnFields('labelPosition')}
 		canReset={isAnnSet('labelPosition')}
@@ -331,7 +327,7 @@
 
 	<SliderRow
 		label="Gap"
-		value={ann.labelDistance ?? DEFAULT_LABEL_DISTANCE}
+		value={resolved.labelDistance ?? ANNOTATION_FIELD_DEFAULTS.labelDistance}
 		min={0}
 		max={5}
 		step={0.1}

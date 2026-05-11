@@ -3,7 +3,11 @@
 	import maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import { onDestroy, onMount, untrack } from 'svelte';
-	import { getAnnotationOpacity, type AnimationStore } from '../animation.svelte';
+	import {
+		getAnnotationOpacity,
+		resolveAnnotation,
+		type AnimationStore
+	} from '../animation.svelte';
 	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
@@ -154,20 +158,27 @@
 	}
 
 	function buildAnnotationFeatures(anns: Annotation[]): FeatureCollection {
+		const defaults = store.defaultAnnotation;
 		return {
 			type: 'FeatureCollection',
-			features: anns.map((a, i) => {
+			features: anns.map((raw, i) => {
+				// Merge per-annotation overrides over per-animation defaults over
+				// hardcoded baseline. The renderer reads from the fully-resolved
+				// view so the per-animation default style flows through to every
+				// annotation that doesn't override the field — see
+				// `resolveAnnotation`.
+				const a = resolveAnnotation(raw, defaults);
 				const pos = a.labelPosition ?? DEFAULT_LABEL_POSITION;
 				const dist = a.labelDistance ?? DEFAULT_LABEL_DISTANCE;
 				const unit = LABEL_OFFSET_UNIT[pos];
 				return {
 					type: 'Feature',
 					id: i,
-					geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+					geometry: { type: 'Point', coordinates: [raw.lng, raw.lat] },
 					properties: {
 						icon: a.icon,
 						color: a.iconColor,
-						label: a.label,
+						label: raw.label,
 						// Per-icon rotation offset puts the user's `rotation = 0`
 						// at "north up" for arrows; other icons have offset 0.
 						rotation: (a.rotation ?? 0) + ANNOTATION_ICON_ROTATION_OFFSETS[a.icon],
@@ -177,8 +188,8 @@
 						textAnchor: LABEL_TEXT_ANCHOR[pos],
 						textOffset: [unit[0] * dist, unit[1] * dist] as [number, number],
 						labelColor: a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR,
-						// Halo: per-annotation override if present, else auto-flip for
-						// labels (good legibility default) / off for icons.
+						// Halo: per-annotation/per-animation override if present, else
+						// auto-flip for labels (good legibility default) / off for icons.
 						labelHalo: a.labelHaloColor ?? haloFor(a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR),
 						labelHaloWidth: a.labelHaloWidth ?? DEFAULT_LABEL_HALO_WIDTH,
 						iconHalo: a.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR,
@@ -468,6 +479,11 @@
 	// still undefined).
 	$effect(() => {
 		const anns = store.annotations;
+		// Track `defaultAnnotation` too — `buildAnnotationFeatures` reads it
+		// via `resolveAnnotation`, so a change to the per-animation default
+		// style must trigger a re-push even when the annotations themselves
+		// are unchanged.
+		void store.defaultAnnotation;
 		const ready = annotationsReady;
 		if (!ready || !map) return;
 		const source = map.getSource(ANNOTATION_SOURCE) as maplibregl.GeoJSONSource | undefined;

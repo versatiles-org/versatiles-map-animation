@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { AnimationStore } from './animation.svelte';
-import type { Annotation, CameraState } from './types';
+import { AnimationStore, resolveAnnotation } from './animation.svelte';
+import {
+	DEFAULT_ANNOTATION_ICON,
+	DEFAULT_ANNOTATION_LABEL_FONT,
+	DEFAULT_LABEL_DISTANCE,
+	type Annotation,
+	type CameraState
+} from './types';
 
 const cam = (lng = 0, lat = 0): CameraState => ({
 	lng,
@@ -310,6 +316,40 @@ describe('AnimationStore - annotation CRUD', () => {
 		expect(s.sampledAnnotations.map((a) => a.label)).toEqual(['early']);
 		s.currentTime = 6;
 		expect(s.sampledAnnotations.map((a) => a.label)).toEqual(['late']);
+	});
+});
+
+describe('resolveAnnotation', () => {
+	it('fills missing fields from the per-animation defaults', () => {
+		const out = resolveAnnotation(ann({ label: 'X' }), {
+			labelFont: 'roboto_bold_italic',
+			labelDistance: 3
+		});
+		expect(out.labelFont).toBe('roboto_bold_italic');
+		expect(out.labelDistance).toBe(3);
+	});
+
+	it('per-annotation overrides win over per-animation defaults', () => {
+		const out = resolveAnnotation(ann({ labelFont: 'lato_bold' }), {
+			labelFont: 'roboto_bold_italic'
+		});
+		expect(out.labelFont).toBe('lato_bold');
+	});
+
+	it('fields absent from both layers fall back to hardcoded baseline', () => {
+		const out = resolveAnnotation(ann(), {});
+		expect(out.icon).toBe(DEFAULT_ANNOTATION_ICON);
+		expect(out.labelFont).toBe(DEFAULT_ANNOTATION_LABEL_FONT);
+		expect(out.labelDistance).toBe(DEFAULT_LABEL_DISTANCE);
+	});
+
+	it('explicit undefined on the annotation falls through to defaults', () => {
+		// Mirrors what the per-annotation editor's "reset to default" does:
+		// `updateAnnotation` deletes keys whose patch value is undefined,
+		// but the resolver should treat an explicit-undefined the same way.
+		const raw = { ...ann(), labelFont: undefined } as Annotation;
+		const out = resolveAnnotation(raw, { labelFont: 'roboto_bold' });
+		expect(out.labelFont).toBe('roboto_bold');
 	});
 });
 

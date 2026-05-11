@@ -1,6 +1,7 @@
 import { sampleAt } from './interpolate';
 import {
 	ANIMATION_DEFAULTS,
+	ANNOTATION_FIELD_DEFAULTS,
 	cameraOf,
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
@@ -74,6 +75,37 @@ export function getAnnotationOpacity(ann: Annotation, t: number): number {
  */
 export function isAnnotationVisible(ann: Annotation, t: number): boolean {
 	return getAnnotationOpacity(ann, t) > 0;
+}
+
+/**
+ * Resolve an annotation's style by merging the three layers of defaults in
+ * the correct order:
+ *
+ *   `ANNOTATION_FIELD_DEFAULTS` (hardcoded baseline)
+ *   ← `defaults` (per-animation template; `Animation.defaultAnnotation`)
+ *   ← `ann` (per-annotation overrides)
+ *
+ * Used wherever code needs the "what this annotation actually looks like"
+ * view — the renderer in `MapStage`, the annotation panel's display, etc.
+ * Storage formats (URL codec, JSON) keep the unmerged form so per-animation
+ * defaults can change without rewriting every annotation.
+ *
+ * Fields explicitly set to `undefined` on `ann` (or `defaults`) fall through
+ * to the next layer, matching `updateAnnotation`'s delete-on-undefined
+ * semantics — that's what lets the per-annotation reset button "clear an
+ * override" rather than "snapshot the current default".
+ */
+export function resolveAnnotation(ann: Annotation, defaults: Partial<AnnotationStyle>): Annotation {
+	const out: Record<string, unknown> = { ...ANNOTATION_FIELD_DEFAULTS };
+	for (const k in defaults) {
+		const v = (defaults as unknown as Record<string, unknown>)[k];
+		if (v !== undefined) out[k] = v;
+	}
+	for (const k in ann) {
+		const v = (ann as unknown as Record<string, unknown>)[k];
+		if (v !== undefined) out[k] = v;
+	}
+	return out as unknown as Annotation;
 }
 
 export class AnimationStore {
