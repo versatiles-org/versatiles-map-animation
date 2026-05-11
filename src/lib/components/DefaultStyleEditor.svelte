@@ -1,15 +1,11 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import {
-		haloAuto,
-		makeOnNum,
-		makeOnText,
-		normalizeHex,
-		POSITION_GRID
-	} from '../annotation_panel_helpers';
+	import { haloAuto, makeOnNum, makeOnText, POSITION_GRID } from '../annotation_panel_helpers';
+	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
 	import IconPicker from './IconPicker.svelte';
+	import SliderRow from './SliderRow.svelte';
 	import {
 		DEFAULT_ANNOTATION_COLOR,
 		DEFAULT_ANNOTATION_ICON,
@@ -78,24 +74,16 @@
 	>
 </div>
 
-<label class="row">
-	<span class="lbl">Color</span>
-	<input
-		type="color"
-		value={normalizeHex(defaults.iconColor ?? DEFAULT_ANNOTATION_COLOR)}
-		oninput={onText('iconColor')}
-		aria-label="Default icon color"
-	/>
-	<span class="hex">{defaults.iconColor ?? DEFAULT_ANNOTATION_COLOR}</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('iconColor')}
-		disabled={!isDefaultSet('iconColor')}
-		title="Reset icon color to the hardcoded default"
-		aria-label="Reset default icon color">⟲</button
-	>
-</label>
+<ColorRow
+	label="Color"
+	value={defaults.iconColor ?? DEFAULT_ANNOTATION_COLOR}
+	onColorChange={onText('iconColor')}
+	onReset={() => unsetDefaults('iconColor')}
+	canReset={isDefaultSet('iconColor')}
+	colorAriaLabel="Default icon color"
+	resetTitle="Reset icon color to the hardcoded default"
+	resetAriaLabel="Reset default icon color"
+/>
 
 <HaloRow
 	color={defaults.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR}
@@ -110,26 +98,19 @@
 	resetAriaLabel="Reset default icon halo"
 />
 
-<label class="row">
-	<span class="lbl">Size</span>
-	<input
-		type="range"
-		min="0.4"
-		max="2.5"
-		step="0.05"
-		value={defaults.iconSize ?? 1}
-		oninput={onNum('iconSize')}
-	/>
-	<span class="num">{(defaults.iconSize ?? 1).toFixed(2)}×</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('iconSize')}
-		disabled={!isDefaultSet('iconSize')}
-		title="Reset icon size to the hardcoded default"
-		aria-label="Reset default icon size">⟲</button
-	>
-</label>
+<SliderRow
+	label="Size"
+	value={defaults.iconSize ?? 1}
+	min={0.4}
+	max={2.5}
+	step={0.05}
+	onChange={onNum('iconSize')}
+	formatValue={(v) => `${v.toFixed(2)}×`}
+	onReset={() => unsetDefaults('iconSize')}
+	canReset={isDefaultSet('iconSize')}
+	resetTitle="Reset icon size to the hardcoded default"
+	resetAriaLabel="Reset default icon size"
+/>
 
 <!-- Label -->
 <h3 class="section">Default label</h3>
@@ -150,24 +131,16 @@
 	>
 </label>
 
-<label class="row">
-	<span class="lbl">Color</span>
-	<input
-		type="color"
-		value={normalizeHex(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
-		oninput={onText('labelColor')}
-		aria-label="Default label color"
-	/>
-	<span class="hex">{defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('labelColor')}
-		disabled={!isDefaultSet('labelColor')}
-		title="Reset label color to the hardcoded default"
-		aria-label="Reset default label color">⟲</button
-	>
-</label>
+<ColorRow
+	label="Color"
+	value={defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}
+	onColorChange={onText('labelColor')}
+	onReset={() => unsetDefaults('labelColor')}
+	canReset={isDefaultSet('labelColor')}
+	colorAriaLabel="Default label color"
+	resetTitle="Reset label color to the hardcoded default"
+	resetAriaLabel="Reset default label color"
+/>
 
 <HaloRow
 	color={defaults.labelHaloColor ?? haloAuto(defaults.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
@@ -182,26 +155,19 @@
 	resetAriaLabel="Reset default label halo"
 />
 
-<label class="row">
-	<span class="lbl">Size</span>
-	<input
-		type="range"
-		min="0.4"
-		max="2.5"
-		step="0.05"
-		value={defaults.labelSize ?? 1}
-		oninput={onNum('labelSize')}
-	/>
-	<span class="num">{(defaults.labelSize ?? 1).toFixed(2)}×</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('labelSize')}
-		disabled={!isDefaultSet('labelSize')}
-		title="Reset label size to the hardcoded default"
-		aria-label="Reset default label size">⟲</button
-	>
-</label>
+<SliderRow
+	label="Size"
+	value={defaults.labelSize ?? 1}
+	min={0.4}
+	max={2.5}
+	step={0.05}
+	onChange={onNum('labelSize')}
+	formatValue={(v) => `${v.toFixed(2)}×`}
+	onReset={() => unsetDefaults('labelSize')}
+	canReset={isDefaultSet('labelSize')}
+	resetTitle="Reset label size to the hardcoded default"
+	resetAriaLabel="Reset default label size"
+/>
 
 <div class="row">
 	<span class="lbl">Side</span>
@@ -228,26 +194,19 @@
 	>
 </div>
 
-<label class="row">
-	<span class="lbl">Gap</span>
-	<input
-		type="range"
-		min="0"
-		max="5"
-		step="0.1"
-		value={defaults.labelDistance ?? DEFAULT_LABEL_DISTANCE}
-		oninput={onNum('labelDistance')}
-	/>
-	<span class="num">{(defaults.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('labelDistance')}
-		disabled={!isDefaultSet('labelDistance')}
-		title="Reset gap to the hardcoded default"
-		aria-label="Reset default gap">⟲</button
-	>
-</label>
+<SliderRow
+	label="Gap"
+	value={defaults.labelDistance ?? DEFAULT_LABEL_DISTANCE}
+	min={0}
+	max={5}
+	step={0.1}
+	onChange={onNum('labelDistance')}
+	formatValue={(v) => v.toFixed(1)}
+	onReset={() => unsetDefaults('labelDistance')}
+	canReset={isDefaultSet('labelDistance')}
+	resetTitle="Reset gap to the hardcoded default"
+	resetAriaLabel="Reset default gap"
+/>
 
 <style>
 	.section {
@@ -295,30 +254,9 @@
 		}
 	}
 
-	input[type='color'] {
-		width: 36px;
-		height: 26px;
-		padding: 0;
-		background: transparent;
-		border: 1px solid #333;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-	input[type='range'] {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	/* `.font-select` styles live in FontSelect.svelte. */
-
-	.num,
-	.hex {
-		font-variant-numeric: tabular-nums;
-		color: #aaa;
-		font-size: 11px;
-	}
-
-	/* Icon-picker styles live in IconPicker.svelte; halo-row styles live in
-	   HaloRow.svelte. Both are scoped so nothing leaks back here. */
+	/* All field-row chrome (color/range inputs, .num/.hex readouts, the
+	   icon picker, the halo combo, the font select) lives in scoped
+	   sub-components: ColorRow / SliderRow / IconPicker / HaloRow / FontSelect. */
 	.pos-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 22px);

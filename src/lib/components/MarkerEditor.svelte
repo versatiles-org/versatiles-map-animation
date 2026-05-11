@@ -1,15 +1,11 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import {
-		haloAuto,
-		makeOnNum,
-		makeOnText,
-		normalizeHex,
-		POSITION_GRID
-	} from '../annotation_panel_helpers';
+	import { haloAuto, makeOnNum, makeOnText, POSITION_GRID } from '../annotation_panel_helpers';
+	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
 	import IconPicker from './IconPicker.svelte';
+	import SliderRow from './SliderRow.svelte';
 	import {
 		ANNOTATION_FIELD_DEFAULTS,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
@@ -185,23 +181,15 @@
 		>
 	</div>
 
-	<label class="row">
-		<span class="lbl">Color</span>
-		<input
-			type="color"
-			value={normalizeHex(ann.iconColor)}
-			oninput={onText('iconColor')}
-			aria-label="Icon color"
-		/>
-		<span class="hex">{ann.iconColor}</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('iconColor')}
-			title="Reset color to the current default"
-			aria-label="Reset icon color">⟲</button
-		>
-	</label>
+	<ColorRow
+		label="Color"
+		value={ann.iconColor}
+		onColorChange={onText('iconColor')}
+		onReset={() => resetAnnFields('iconColor')}
+		colorAriaLabel="Icon color"
+		resetTitle="Reset color to the current default"
+		resetAriaLabel="Reset icon color"
+	/>
 
 	<HaloRow
 		color={ann.iconHaloColor ?? DEFAULT_ICON_HALO_COLOR}
@@ -218,47 +206,33 @@
 		resetAriaLabel="Reset icon halo"
 	/>
 
-	<label class="row">
-		<span class="lbl">Size</span>
-		<input
-			type="range"
-			min="0.4"
-			max="2.5"
-			step="0.05"
-			value={ann.iconSize ?? 1}
-			oninput={onNum('iconSize')}
-		/>
-		<span class="num">{(ann.iconSize ?? 1).toFixed(2)}×</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('iconSize')}
-			disabled={!isAnnSet('iconSize')}
-			title="Reset size to the current default"
-			aria-label="Reset icon size">⟲</button
-		>
-	</label>
+	<SliderRow
+		label="Size"
+		value={ann.iconSize ?? 1}
+		min={0.4}
+		max={2.5}
+		step={0.05}
+		onChange={onNum('iconSize')}
+		formatValue={(v) => `${v.toFixed(2)}×`}
+		onReset={() => resetAnnFields('iconSize')}
+		canReset={isAnnSet('iconSize')}
+		resetTitle="Reset size to the current default"
+		resetAriaLabel="Reset icon size"
+	/>
 
-	<label class="row">
-		<span class="lbl">Rotation</span>
-		<input
-			type="range"
-			min="0"
-			max="359"
-			step="1"
-			value={ann.rotation ?? 0}
-			oninput={onNum('rotation')}
-		/>
-		<span class="num">{Math.round(ann.rotation ?? 0)}°</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('rotation')}
-			disabled={!isAnnSet('rotation')}
-			title="Reset rotation to 0"
-			aria-label="Reset rotation">⟲</button
-		>
-	</label>
+	<SliderRow
+		label="Rotation"
+		value={ann.rotation ?? 0}
+		min={0}
+		max={359}
+		step={1}
+		onChange={onNum('rotation')}
+		formatValue={(v) => `${Math.round(v)}°`}
+		onReset={() => resetAnnFields('rotation')}
+		canReset={isAnnSet('rotation')}
+		resetTitle="Reset rotation to 0"
+		resetAriaLabel="Reset rotation"
+	/>
 
 	<!-- Label section: text + appearance + placement -->
 	<h3 class="section">Label</h3>
@@ -292,25 +266,17 @@
 		>
 	</label>
 
-	<label class="row">
-		<span class="lbl">Color</span>
-		<input
-			type="color"
-			value={normalizeHex(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
-			oninput={onText('labelColor')}
-			aria-label="Label color"
-			title="Label text color. The halo defaults to a contrasting brightness; override below."
-		/>
-		<span class="hex">{ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('labelColor')}
-			disabled={!isAnnSet('labelColor')}
-			title="Reset label color to the current default"
-			aria-label="Reset label color">⟲</button
-		>
-	</label>
+	<ColorRow
+		label="Color"
+		value={ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR}
+		onColorChange={onText('labelColor')}
+		onReset={() => resetAnnFields('labelColor')}
+		canReset={isAnnSet('labelColor')}
+		colorAriaLabel="Label color"
+		colorTitle="Label text color. The halo defaults to a contrasting brightness; override below."
+		resetTitle="Reset label color to the current default"
+		resetAriaLabel="Reset label color"
+	/>
 
 	<HaloRow
 		color={ann.labelHaloColor ?? haloAuto(ann.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR)}
@@ -327,26 +293,19 @@
 		resetAriaLabel="Reset label halo"
 	/>
 
-	<label class="row">
-		<span class="lbl">Size</span>
-		<input
-			type="range"
-			min="0.4"
-			max="2.5"
-			step="0.05"
-			value={ann.labelSize ?? 1}
-			oninput={onNum('labelSize')}
-		/>
-		<span class="num">{(ann.labelSize ?? 1).toFixed(2)}×</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('labelSize')}
-			disabled={!isAnnSet('labelSize')}
-			title="Reset label size to the current default"
-			aria-label="Reset label size">⟲</button
-		>
-	</label>
+	<SliderRow
+		label="Size"
+		value={ann.labelSize ?? 1}
+		min={0.4}
+		max={2.5}
+		step={0.05}
+		onChange={onNum('labelSize')}
+		formatValue={(v) => `${v.toFixed(2)}×`}
+		onReset={() => resetAnnFields('labelSize')}
+		canReset={isAnnSet('labelSize')}
+		resetTitle="Reset label size to the current default"
+		resetAriaLabel="Reset label size"
+	/>
 
 	<div class="row">
 		<span class="lbl">Side</span>
@@ -373,26 +332,19 @@
 		>
 	</div>
 
-	<label class="row">
-		<span class="lbl">Gap</span>
-		<input
-			type="range"
-			min="0"
-			max="5"
-			step="0.1"
-			value={ann.labelDistance ?? DEFAULT_LABEL_DISTANCE}
-			oninput={onNum('labelDistance')}
-		/>
-		<span class="num">{(ann.labelDistance ?? DEFAULT_LABEL_DISTANCE).toFixed(1)}</span>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('labelDistance')}
-			disabled={!isAnnSet('labelDistance')}
-			title="Reset gap to the current default"
-			aria-label="Reset gap">⟲</button
-		>
-	</label>
+	<SliderRow
+		label="Gap"
+		value={ann.labelDistance ?? DEFAULT_LABEL_DISTANCE}
+		min={0}
+		max={5}
+		step={0.1}
+		onChange={onNum('labelDistance')}
+		formatValue={(v) => v.toFixed(1)}
+		onReset={() => resetAnnFields('labelDistance')}
+		canReset={isAnnSet('labelDistance')}
+		resetTitle="Reset gap to the current default"
+		resetAriaLabel="Reset gap"
+	/>
 
 	<!-- Visibility section: time window + fade tails -->
 	<h3 class="section">Visibility</h3>
@@ -589,28 +541,12 @@
 			padding-top: 0.4rem;
 		}
 	}
-	input[type='color'] {
-		width: 36px;
-		height: 26px;
-		padding: 0;
-		background: transparent;
-		border: 1px solid #333;
-		border-radius: 4px;
-		cursor: pointer;
-	}
-	input[type='range'] {
-		flex: 1 1 auto;
-		min-width: 0;
-	}
-	/* `.font-select` styles live in FontSelect.svelte. */
-	.num,
-	.hex,
+	/* Color/range/font-select/.num/.hex styles live in their respective
+	   sub-components (ColorRow, SliderRow, FontSelect, HaloRow). */
 	.coord {
 		font-variant-numeric: tabular-nums;
 		color: #aaa;
 		font-size: 11px;
-	}
-	.coord {
 		flex: 1 1 auto;
 	}
 
