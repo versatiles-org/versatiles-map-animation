@@ -58,18 +58,20 @@ export function normalizeHex(c: string): string {
  * Generic field binders parameterised by the patch target — the sub-component
  * supplies a `doPatch` (which may write to a selected annotation OR to the
  * default-style block) and the returned helpers produce per-field handlers.
+ * The patch type `P` flows through to the key constraint, so a
+ * `(p: Partial<AnnotationStyle>) => void` patcher only accepts style keys.
  */
-export function makeOnText(doPatch: (p: Partial<Annotation>) => void) {
-	return <K extends keyof Annotation>(key: K) =>
+export function makeOnText<P extends Partial<Annotation>>(doPatch: (p: P) => void) {
+	return <K extends keyof P & keyof Annotation>(key: K) =>
 		(e: Event) =>
-			doPatch({ [key]: (e.currentTarget as HTMLInputElement).value } as Partial<Annotation>);
+			doPatch({ [key]: (e.currentTarget as HTMLInputElement).value } as unknown as P);
 }
-export function makeOnNum(doPatch: (p: Partial<Annotation>) => void) {
-	return <K extends keyof Annotation>(key: K) =>
+export function makeOnNum<P extends Partial<Annotation>>(doPatch: (p: P) => void) {
+	return <K extends keyof P & keyof Annotation>(key: K) =>
 		(e: Event) =>
 			doPatch({
 				[key]: Number((e.currentTarget as HTMLInputElement).value)
-			} as Partial<Annotation>);
+			} as unknown as P);
 }
 
 /**

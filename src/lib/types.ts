@@ -285,6 +285,34 @@ export interface Annotation {
 export const DEFAULT_ANNOTATION_ICON_SIZE = 1;
 export const DEFAULT_ANNOTATION_LABEL_SIZE = 1;
 
+/**
+ * Style-only subset of `Annotation`: how a marker looks, without where it
+ * sits (lng/lat), what it says (label), how it's rotated, or when it's
+ * visible (visibleFrom/visibleUntil/fadeIn/fadeOut). This is what
+ * `Animation.defaultAnnotation` carries — a per-animation template applied
+ * to brand-new markers — and what the JSON validator returns for that block.
+ *
+ * Keep in sync with `ANNOTATION_FIELD_DEFAULTS` (every key in this Pick
+ * should also have a baseline value there) and with the `FIELD_SPECS` table
+ * in `url_state/annotation_codec.ts` for any field that round-trips through
+ * the wire codec.
+ */
+export type AnnotationStyle = Pick<
+	Annotation,
+	| 'icon'
+	| 'iconColor'
+	| 'iconSize'
+	| 'iconHaloColor'
+	| 'iconHaloWidth'
+	| 'labelColor'
+	| 'labelSize'
+	| 'labelPosition'
+	| 'labelDistance'
+	| 'labelFont'
+	| 'labelHaloColor'
+	| 'labelHaloWidth'
+>;
+
 // ---------------------------------------------------------------------------
 // Annotation label fonts
 //
@@ -595,9 +623,10 @@ export interface Animation {
 	 * baseline for new markers (Pin button) AND the codec's carry-forward
 	 * starting point, so annotations matching the defaults emit nothing on
 	 * the wire / in JSON. Position-specific fields (lng/lat/label/rotation)
-	 * are intentionally excluded from this object.
+	 * and time-specific fields (visibleFrom/visibleUntil/fadeIn/fadeOut)
+	 * are intentionally excluded — see `AnnotationStyle`.
 	 */
-	defaultAnnotation: Partial<Annotation>;
+	defaultAnnotation: Partial<AnnotationStyle>;
 }
 
 export const DEFAULT_INITIAL_VIEW: CameraState = {

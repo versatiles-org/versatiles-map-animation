@@ -9,6 +9,7 @@ import {
 import type {
 	Animation,
 	Annotation,
+	AnnotationStyle,
 	AspectRatio,
 	CameraState,
 	Keyframe,
@@ -101,7 +102,7 @@ export class AnimationStore {
 	 * URL/JSON codec uses them as the carry-forward baseline so annotations
 	 * matching the defaults emit no per-field bytes.
 	 */
-	defaultAnnotation = $state<Partial<Annotation>>({});
+	defaultAnnotation = $state<Partial<AnnotationStyle>>({});
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 

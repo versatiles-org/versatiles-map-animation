@@ -17,22 +17,22 @@
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
-		type Annotation
+		type AnnotationStyle
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
 
 	const defaults = $derived(store.defaultAnnotation);
 
-	function patchDefault(p: Partial<Annotation>): void {
+	function patchDefault(p: Partial<AnnotationStyle>): void {
 		store.defaultAnnotation = { ...store.defaultAnnotation, ...p };
 	}
-	function unsetDefaults(...keys: (keyof Annotation)[]): void {
+	function unsetDefaults(...keys: (keyof AnnotationStyle)[]): void {
 		const next = { ...store.defaultAnnotation };
 		for (const k of keys) delete next[k];
 		store.defaultAnnotation = next;
 	}
-	function isDefaultSet(...keys: (keyof Annotation)[]): boolean {
+	function isDefaultSet(...keys: (keyof AnnotationStyle)[]): boolean {
 		return keys.some((k) => k in store.defaultAnnotation);
 	}
 

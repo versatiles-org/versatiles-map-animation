@@ -11,6 +11,7 @@ import {
 	SCHEMA_VERSION,
 	type Animation,
 	type Annotation,
+	type AnnotationStyle,
 	type Keyframe,
 	type MapStyleId
 } from './types';
@@ -124,19 +125,23 @@ export function validateAnimation(input: unknown): Animation {
 }
 
 /**
- * Read a partial annotation — used for the `defaultAnnotation` style block,
- * where lng/lat/label are not meaningful (only style fields are). Each style
- * field flows through the same FIELD_SPECS table the per-annotation validator
- * uses, so they share parsing behaviour.
+ * Read the `defaultAnnotation` style block from JSON. Returns the
+ * style-only subset of `Annotation` — see `AnnotationStyle`. Each style
+ * field flows through the same FIELD_SPECS table the per-annotation
+ * validator uses, so parsing behaviour matches.
+ *
+ * We cast to `Annotation` internally because FIELD_SPECS is defined on
+ * the full Annotation shape; the cast is safe because we never read the
+ * non-style fields (lng/lat/label/etc.) from `out`.
  */
-function validatePartialAnnotation(o: Record<string, unknown>): Partial<Annotation> {
+function validatePartialAnnotation(o: Record<string, unknown>): Partial<AnnotationStyle> {
 	const out = {} as Annotation;
 	if (isAnnotationIcon(o.icon)) out.icon = o.icon;
 	if (typeof o.iconColor === 'string') out.iconColor = o.iconColor;
 	else if (typeof o.color === 'string') out.iconColor = o.color;
 	if (isLabelPosition(o.labelPosition)) out.labelPosition = o.labelPosition;
 	for (const f of FIELD_SPECS) f.fromJson(o, out, -1);
-	return out;
+	return out as Partial<AnnotationStyle>;
 }
 
 function validateAnnotation(raw: unknown, i: number): Annotation {
