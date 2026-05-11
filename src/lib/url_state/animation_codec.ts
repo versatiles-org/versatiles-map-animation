@@ -21,8 +21,8 @@
 
 import { bool, type Codec, enumOf, struct, uint, vuint } from '../codec';
 import { ASPECT_RATIOS, DEFAULT_ASPECT_RATIO, MAP_STYLE_IDS } from '../types';
-import type { AspectRatio, MapStyleId } from '../types';
-import { annotationsCodec } from './annotation_codec';
+import type { AnnotationStyle, AspectRatio, MapStyleId } from '../types';
+import { annotationsCodec, defaultAnnotationCodec } from './annotation_codec';
 import { keyframesCodec } from './keyframe_codec';
 
 export const FORMAT_TAG_BINARY_V1 = 0x01;
@@ -55,6 +55,7 @@ type WireAnimation = {
 	annotations: ReturnType<typeof annotationsCodec.decode>;
 	annotationScale?: number;
 	aspectRatio?: AspectRatio;
+	defaultAnnotation?: Partial<AnnotationStyle>;
 };
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,16 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => aspectRatioCodec.encode(v.aspectRatio!, w),
 		decode: (v, r) => {
 			v.aspectRatio = aspectRatioCodec.decode(r);
+		}
+	},
+	{
+		bit: 2,
+		label: 'defaultAnnotation',
+		shouldEmit: (v) =>
+			v.defaultAnnotation !== undefined && Object.keys(v.defaultAnnotation).length > 0,
+		encode: (v, w) => defaultAnnotationCodec.encode(v.defaultAnnotation!, w),
+		decode: (v, r) => {
+			v.defaultAnnotation = defaultAnnotationCodec.decode(r);
 		}
 	}
 ];

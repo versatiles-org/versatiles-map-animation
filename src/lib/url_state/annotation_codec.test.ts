@@ -48,15 +48,20 @@ describe('annotation codec - position', () => {
 
 describe('annotation codec - normalize fallbacks', () => {
 	it('falls back to default icon for unknown sprite ids', () => {
-		// Cast through unknown so we can pass an invalid icon ident.
+		// Invalid icon normalizes to the hardcoded default; since that matches
+		// the codec baseline, the field is omitted from the decoded annotation.
+		// The renderer's `resolveAnnotation` will fill it back from
+		// `ANNOTATION_FIELD_DEFAULTS`.
 		const out = roundTrip([baseAnn({ icon: 'mystery-icon' as Annotation['icon'] })]);
-		expect(out.annotations[0].icon).not.toBe('mystery-icon');
+		expect(out.annotations[0]).not.toHaveProperty('icon');
 	});
 
 	it('falls back to default color for malformed hex strings', () => {
 		const out = roundTrip([baseAnn({ iconColor: 'not-a-color' })]);
-		// Default color (#cc0000) — re-emitted as canonical lowercase hex.
-		expect(out.annotations[0].iconColor).toBe('#cc0000');
+		// Same thin-decode logic as `icon` above: malformed hex normalizes to
+		// the hardcoded default colour, which equals the codec baseline, so
+		// the field is omitted on the way out.
+		expect(out.annotations[0]).not.toHaveProperty('iconColor');
 	});
 
 	it('accepts 3-digit hex colors and emits 6-digit canonical form', () => {

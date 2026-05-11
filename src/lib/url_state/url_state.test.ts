@@ -105,7 +105,10 @@ describe('annotations round-trip', () => {
 		const a = decoded!.annotations[0];
 		expect(a.lng).toBeCloseTo(13.405, 4);
 		expect(a.lat).toBeCloseTo(52.52, 4);
-		expect(a.icon).toBe('symbol-marker');
+		// `icon` was 'symbol-marker' = the hardcoded baseline, so it's omitted
+		// from the decoded annotation — the renderer's `resolveAnnotation`
+		// fills it back from `ANNOTATION_FIELD_DEFAULTS` (= 'symbol-marker').
+		expect(a).not.toHaveProperty('icon');
 		expect(a.iconColor).toBe('#ff8800');
 		expect(a.label).toBe('Berlin');
 		// Optional fields default to undefined when they match defaults.
@@ -380,5 +383,73 @@ describe('aspectRatio option', () => {
 	it('default 16:9 decodes back even when omitted from the wire', () => {
 		const decoded = decodeAnimation(encodeAnimation({ ...example, aspectRatio: '16:9' }));
 		expect(decoded?.aspectRatio).toBe('16:9');
+	});
+});
+
+describe('defaultAnnotation option', () => {
+	it('round-trips every AnnotationStyle field', () => {
+		const defaultAnnotation = {
+			icon: 'symbol-star' as const,
+			iconColor: '#ff8800',
+			iconSize: 1.7,
+			iconHaloColor: '#222222',
+			iconHaloWidth: 0.5,
+			labelColor: '#003366',
+			labelSize: 1.3,
+			labelPosition: 'right' as const,
+			labelDistance: 2.1,
+			labelFont: 'roboto_bold_italic' as const,
+			labelHaloColor: '#ffffff',
+			labelHaloWidth: 1.5
+		};
+		const decoded = decodeAnimation(encodeAnimation({ ...example, defaultAnnotation }));
+		expect(decoded?.defaultAnnotation).toEqual(defaultAnnotation);
+	});
+
+	it('round-trips a partial defaultAnnotation (just the fields the user set)', () => {
+		const decoded = decodeAnimation(
+			encodeAnimation({
+				...example,
+				defaultAnnotation: { labelFont: 'lato_bold', labelHaloWidth: 2 }
+			})
+		);
+		expect(decoded?.defaultAnnotation).toEqual({
+			labelFont: 'lato_bold',
+			labelHaloWidth: 2
+		});
+	});
+
+	it('empty defaultAnnotation roundtrips as empty (option-mask bit not set)', () => {
+		const decoded = decodeAnimation(encodeAnimation({ ...example, defaultAnnotation: {} }));
+		expect(decoded?.defaultAnnotation).toEqual({});
+	});
+
+	it('omitting defaultAnnotation decodes back to empty (backwards-compatible)', () => {
+		// Animations encoded before the defaultAnnotation feature shipped just
+		// lack the option-mask bit; the decoder still has to produce `{}`.
+		const decoded = decodeAnimation(encodeAnimation(example));
+		expect(decoded?.defaultAnnotation).toEqual({});
+	});
+
+	it('per-annotation overrides still win over defaultAnnotation after round-trip', () => {
+		// The renderer's `resolveAnnotation` does the merge; here we just
+		// confirm both layers come back intact.
+		const decoded = decodeAnimation(
+			encodeAnimation({
+				...example,
+				annotations: [
+					{
+						lng: 1,
+						lat: 2,
+						icon: 'symbol-marker',
+						iconColor: '#aabbcc',
+						label: 'override'
+					}
+				],
+				defaultAnnotation: { iconColor: '#ffffff' }
+			})
+		);
+		expect(decoded?.annotations[0].iconColor).toBe('#aabbcc');
+		expect(decoded?.defaultAnnotation.iconColor).toBe('#ffffff');
 	});
 });

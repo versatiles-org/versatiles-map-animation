@@ -11,10 +11,19 @@
  * visibleFrom, visibleUntil.
  */
 
-import { type Codec, enumOf, stringCodec, uint, vuint } from '../codec';
+import {
+	type BitReader,
+	type BitWriter,
+	type Codec,
+	enumOf,
+	stringCodec,
+	uint,
+	vuint
+} from '../codec';
 import {
 	ANNOTATION_ICONS,
 	ANNOTATION_LABEL_FONTS,
+	ANNOTATION_STYLE_KEYS,
 	DEFAULT_ANNOTATION_COLOR,
 	DEFAULT_ANNOTATION_ICON,
 	DEFAULT_ANNOTATION_LABEL_COLOR,
@@ -24,7 +33,8 @@ import {
 	isAnnotationIcon,
 	isAnnotationLabelFont,
 	isLabelPosition,
-	LABEL_POSITIONS
+	LABEL_POSITIONS,
+	type AnnotationStyle
 } from '../types';
 
 // Halo width: ufixed at 0.1-px precision via 8-bit uint → 0..25.5 px range,
@@ -543,13 +553,15 @@ export function normalizeAnnotation(ann: Annotation): WireAnnotation {
 
 export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	const { lng, lat } = mercatorToLngLat(wire.mx, wire.my);
-	const out: Annotation = {
-		lng,
-		lat,
-		icon: wire.icon,
-		iconColor: formatHexColor(wire.color),
-		label: wire.label
-	};
+	const out: Annotation = { lng, lat, label: wire.label };
+	// Keep the in-memory annotation thin: only spell out icon/iconColor when
+	// they differ from the codec's hardcoded baseline. A thin annotation lets
+	// the renderer's `resolveAnnotation` pick up `Animation.defaultAnnotation`
+	// — which is also preserved on the wire — instead of the hardcoded
+	// fallback. Fattening the annotation here would shadow the user's
+	// per-animation default style.
+	if (wire.icon !== ANNOTATION_DEFAULTS.icon) out.icon = wire.icon;
+	if (wire.color !== ANNOTATION_DEFAULTS.color) out.iconColor = formatHexColor(wire.color);
 	if (wire.rotation !== 0) out.rotation = wire.rotation;
 	if (wire.labelPosition !== DEFAULT_LABEL_POSITION) out.labelPosition = wire.labelPosition;
 	// `<` not `!==` because the sentinel marks the upper bound.
@@ -557,3 +569,116 @@ export function denormalizeAnnotation(wire: WireAnnotation): Annotation {
 	for (const f of FIELD_SPECS) f.fromWire(wire, out);
 	return out;
 }
+
+// ---------------------------------------------------------------------------
+// Codec for the per-animation `defaultAnnotation` block — a
+// `Partial<AnnotationStyle>` carrying just the fields the user set as
+// per-animation defaults.
+//
+// Wire layout: a 12-bit presence mask (one bit per key in
+// `ANNOTATION_STYLE_KEYS` order) followed by the encoded value of each
+// present field. Each field uses the same per-value codec the
+// per-annotation codec uses for that field, so a font picked as the
+// default takes the same 8 bits whether it's the per-animation default or
+// a per-annotation override.
+//
+// Unlike per-annotation encoding, there's no carry-forward baseline: each
+// emitted field is encoded directly. The per-annotation codec keeps its
+// existing hardcoded carry-forward baseline (`ANNOTATION_DEFAULTS`), so
+// annotations matching the *hardcoded* default still emit nothing. The
+// renderer's `resolveAnnotation` merges the two at display time.
+// ---------------------------------------------------------------------------
+
+const ANNOTATION_STYLE_MASK_BITS = ANNOTATION_STYLE_KEYS.length; // 12
+
+/**
+ * Encode/decode a single style field's value to/from the wire. Each entry
+ * matches one `ANNOTATION_STYLE_KEYS` key in order, so the index lines up
+ * with the presence-mask bit.
+ */
+const STYLE_FIELD_CODECS: {
+	[K in (typeof ANNOTATION_STYLE_KEYS)[number]]: {
+		encode(v: NonNullable<AnnotationStyle[K]>, w: BitWriter): void;
+		decode(r: BitReader): NonNullable<AnnotationStyle[K]>;
+	};
+} = {
+	icon: {
+		encode: (v, w) => annotationIconCodec.encode(v, w),
+		decode: (r) => annotationIconCodec.decode(r)
+	},
+	iconColor: {
+		encode: (v, w) => annotationColorCodec.encode(parseHexColor(v), w),
+		decode: (r) => formatHexColor(annotationColorCodec.decode(r))
+	},
+	iconSize: {
+		encode: (v, w) => annotationSizeCodec.encode(v, w),
+		decode: (r) => annotationSizeCodec.decode(r)
+	},
+	iconHaloColor: {
+		encode: (v, w) => annotationColorCodec.encode(parseHexColor(v), w),
+		decode: (r) => formatHexColor(annotationColorCodec.decode(r))
+	},
+	iconHaloWidth: {
+		encode: (v, w) => haloWidthCodec.encode(Math.max(0, v), w),
+		decode: (r) => haloWidthCodec.decode(r)
+	},
+	labelColor: {
+		encode: (v, w) => annotationColorCodec.encode(parseHexColor(v), w),
+		decode: (r) => formatHexColor(annotationColorCodec.decode(r))
+	},
+	labelSize: {
+		encode: (v, w) => annotationSizeCodec.encode(v, w),
+		decode: (r) => annotationSizeCodec.decode(r)
+	},
+	labelPosition: {
+		encode: (v, w) => labelPositionCodec.encode(v, w),
+		decode: (r) => labelPositionCodec.decode(r)
+	},
+	labelDistance: {
+		encode: (v, w) => labelDistanceCodec.encode(v, w),
+		decode: (r) => labelDistanceCodec.decode(r)
+	},
+	labelFont: {
+		encode: (v, w) => labelFontCodec.encode(v, w),
+		decode: (r) => labelFontCodec.decode(r)
+	},
+	labelHaloColor: {
+		encode: (v, w) => annotationColorCodec.encode(parseHexColor(v), w),
+		decode: (r) => formatHexColor(annotationColorCodec.decode(r))
+	},
+	labelHaloWidth: {
+		encode: (v, w) => haloWidthCodec.encode(Math.max(0, v), w),
+		decode: (r) => haloWidthCodec.decode(r)
+	}
+};
+
+export const defaultAnnotationCodec: Codec<Partial<AnnotationStyle>> = {
+	encode(value, w) {
+		let mask = 0;
+		for (let i = 0; i < ANNOTATION_STYLE_KEYS.length; i++) {
+			const k = ANNOTATION_STYLE_KEYS[i];
+			if ((value as Record<string, unknown>)[k] !== undefined) mask |= 1 << i;
+		}
+		w.frame('[mask]', () => w.writeBits(mask, ANNOTATION_STYLE_MASK_BITS));
+		for (let i = 0; i < ANNOTATION_STYLE_KEYS.length; i++) {
+			if (!(mask & (1 << i))) continue;
+			const k = ANNOTATION_STYLE_KEYS[i];
+			const v = (value as Record<string, unknown>)[k];
+			w.frame(
+				k,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				() => (STYLE_FIELD_CODECS[k] as any).encode(v, w)
+			);
+		}
+	},
+	decode(r) {
+		const mask = r.readBits(ANNOTATION_STYLE_MASK_BITS);
+		const out: Record<string, unknown> = {};
+		for (let i = 0; i < ANNOTATION_STYLE_KEYS.length; i++) {
+			if (!(mask & (1 << i))) continue;
+			const k = ANNOTATION_STYLE_KEYS[i];
+			out[k] = STYLE_FIELD_CODECS[k].decode(r);
+		}
+		return out as Partial<AnnotationStyle>;
+	}
+};

@@ -41,7 +41,8 @@ function buildWire(anim: Animation): Wire {
 		keyframes: anim.keyframes.map(normalizeKeyframe),
 		annotations: anim.annotations.map(normalizeAnnotation),
 		annotationScale: anim.annotationScale,
-		aspectRatio: anim.aspectRatio
+		aspectRatio: anim.aspectRatio,
+		defaultAnnotation: anim.defaultAnnotation
 	};
 }
 
@@ -56,10 +57,10 @@ function fromWire(wire: Wire): Animation {
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
 		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,
-		// `defaultAnnotation` isn't on the wire yet (UX-only feature for now —
-		// the wire codec optimisation is a follow-up). Decoded animations
-		// always come back with empty defaults.
-		defaultAnnotation: {}
+		// Now preserved on the wire (V1 options-mask bit 2). Animations
+		// encoded before this feature shipped just lack the bit and come
+		// back with empty defaults — backwards-compatible by construction.
+		defaultAnnotation: wire.defaultAnnotation ?? {}
 	};
 }
 
