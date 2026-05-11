@@ -38,11 +38,16 @@ const DEFAULT_OPTS = {
 	prewarm: true,
 	endTime: null,
 	verbose: false,
-	// Motion blur: render `motionBlur` sub-frames per output frame, evenly
-	// spaced across one full frame duration (a 360° shutter), and let ffmpeg
-	// average them together. 1 = off (current crisp behaviour). 4–8 typical.
-	// Render time scales linearly: --motion-blur 8 is 8× slower.
-	motionBlur: 1
+	// Motion blur: render `motionBlur` sub-frames per output frame and let
+	// ffmpeg average them together. 1 = off (current crisp behaviour). 4–8
+	// typical. Render time scales linearly: --motion-blur 8 is 8× slower.
+	motionBlur: 1,
+	// Shutter angle in degrees: how much of one output-frame's duration
+	// the simulated shutter is open for. 180° is the classic cinematic
+	// shutter (sub-frames span half a frame interval; the other half is a
+	// dark inter-frame gap). 360° fills the entire frame interval (heavier
+	// blur). Only meaningful when motionBlur > 1.
+	shutterAngle: 180
 };
 
 // ---------------------------------------------------------------------------
@@ -152,6 +157,9 @@ function parseArgv(argv) {
 			case '--motion-blur':
 				out.motionBlur = parseInt(next(), 10);
 				break;
+			case '--shutter-angle':
+				out.shutterAngle = parseFloat(next());
+				break;
 			case '--end-time':
 				out.endTime = parseFloat(next());
 				break;
@@ -193,6 +201,9 @@ function usage() {
 		'  --motion-blur <n>      render N sub-frames per output frame and average them',
 		'                          for accumulation-buffer motion blur. 1 (default) = off,',
 		'                          4–8 typical. Render time scales N× per frame.',
+		'  --shutter-angle <deg>  shutter angle for motion blur (default 180 — cinematic).',
+		'                          180° spans half a frame duration; 360° spans the whole.',
+		'                          Only meaningful with --motion-blur > 1.',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
 		'  --output <path>        output MP4 (required)',
 		'  -v, --verbose          show ffmpeg output and page console messages',
@@ -296,9 +307,23 @@ function buildPageUrl(baseUrl, hash, render) {
 function spawnFfmpeg(opts) {
 	// With motion blur, we stream N sub-frames per output frame at
 	// `fps × N`. ffmpeg's `tmix=frames=N` averages every N consecutive
-	// frames into one; then `fps=fps=…` decimates the output back to the
-	// requested rate. Net: each output frame is the average of N sub-frames
-	// that span one output-frame's duration of animation time.
+	// frames; then `select=not(mod(n+1,N))` keeps only the *last* frame of
+	// each complete N-window. Net: each output frame is the average of N
+	// sub-frames that span one output-frame's duration of animation time.
+	//
+	// Why not `fps=fps=…` to decimate? `tmix` is a sliding window — it
+	// emits one frame per input, each being the average of the previous N
+	// inputs. A timestamp-based decimator like `fps` picks the input frame
+	// nearest each output time slot, which lands at tmix indices kN — but
+	// `tmix[kN]` averages frames in [kN-N+1 .. kN], i.e. the END of output
+	// frame k-1's sub-frames + the START of output frame k's. The result
+	// is a visible "doubled" motion-blur trail per output frame. Keeping
+	// the indices kN-1 instead gives the clean per-group average we want.
+	//
+	// `tpad=stop=1:stop_mode=clone` adds one trailing dummy frame so the
+	// stream-end machinery flushes the last complete tmix window through
+	// `select` (without it, the final group's frame at index totalN-1 gets
+	// dropped at EOS).
 	//
 	// The two `zscale` calls do the averaging in **linear light**: PNGs
 	// from Chromium are sRGB-encoded (perceptually uniform), but mixing
@@ -335,13 +360,20 @@ function spawnFfmpeg(opts) {
 		const outLinear = 't=linear:p=bt709:r=full:m=bt709';
 		const inLinear = 'tin=linear:pin=bt709:rin=full:min=bt709';
 		const outRGB = 't=bt709:p=bt709:r=full:m=bt709';
+		// `\,` escapes the comma inside the select expression so ffmpeg
+		// doesn't read it as a filter-chain separator.
 		const blurFilter = [
 			`zscale=${inRGB}:${outLinear}`,
+			`tpad=stop=1:stop_mode=clone`,
 			`tmix=frames=${samples}`,
-			`zscale=${inLinear}:${outRGB}`,
-			`fps=fps=${opts.fps}`
+			`select=not(mod(n+1\\,${samples}))`,
+			`zscale=${inLinear}:${outRGB}`
 		].join(',');
-		args.push('-vf', blurFilter);
+		// After select, the kept frames sit at PTS values offset by ~1/inputFps
+		// from a clean output-fps grid. `-r` on the output side re-times them
+		// to the requested output framerate so the encoded MP4 metadata is
+		// clean (otherwise it would be tagged at `inputFps`).
+		args.push('-vf', blurFilter, '-r', String(opts.fps));
 	}
 	args.push(
 		'-c:v',
@@ -464,7 +496,7 @@ async function prewarmPass(page, duration, opts) {
 }
 
 async function capturePass(page, duration, opts, ffmpegStdin) {
-	const total = Math.max(2, Math.ceil(duration * opts.fps) + 1);
+	const total = Math.max(2, Math.round(duration * opts.fps));
 
 	// No virtual clock here. Earlier versions installed `page.clock` to keep
 	// MapLibre's internal animations (label fades, tile fades) on animation
@@ -481,10 +513,16 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	// clock), and the camera is set with direct jumps, so wall-clock leakage
 	// has no visible effect on the captured frames.
 	// With motion blur, each output frame is built from `samples` sub-frames
-	// evenly spaced across one frame-duration of animation time. ffmpeg
-	// averages them back together (see `spawnFfmpeg`). samples=1 means a
-	// single instantaneous capture per output frame (current crisp default).
+	// evenly spaced across one shutter-open window. ffmpeg averages them
+	// back together (see `spawnFfmpeg`). samples=1 means a single
+	// instantaneous capture per output frame (current crisp default).
+	//
+	// `shutterRatio` is the fraction of one output-frame duration that the
+	// simulated shutter is open. 0.5 = 180° (classic cinematic, half-open
+	// half-closed); 1.0 = 360° (open the whole interval). Sub-frames are
+	// distributed across [t_i, t_i + shutterRatio/fps).
 	const samples = Math.max(1, opts.motionBlur);
+	const shutterRatio = opts.shutterAngle / 360;
 	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
 		// If ffmpeg has died, bail out instead of looping through all 700+
@@ -495,9 +533,9 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 			throw new Error(`ffmpeg pipe closed early (after frame ${i})`);
 		}
 		for (let j = 0; j < samples; j++) {
-			// Sub-frame offset within one output-frame duration. samples=1
+			// Sub-frame offset inside one shutter-open window. samples=1
 			// degenerates to t = i / fps (the original behaviour).
-			const t = Math.min(duration, (i + j / samples) / opts.fps);
+			const t = Math.min(duration, (i + (j * shutterRatio) / samples) / opts.fps);
 			await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 			try {
 				await waitForFrameReady(page, opts.frameTimeoutMs);
@@ -529,6 +567,9 @@ async function main() {
 	}
 	if (!Number.isInteger(opts.motionBlur) || opts.motionBlur < 1 || opts.motionBlur > 32) {
 		throw new Error(`--motion-blur must be an integer in 1..32, got ${opts.motionBlur}`);
+	}
+	if (!Number.isFinite(opts.shutterAngle) || opts.shutterAngle <= 0 || opts.shutterAngle > 360) {
+		throw new Error(`--shutter-angle must be a number in (0, 360], got ${opts.shutterAngle}`);
 	}
 	if (!opts.output) throw new Error('--output is required');
 	if (!opts.hash && !opts.url) throw new Error('--hash or --url is required');
@@ -566,7 +607,8 @@ async function main() {
 		log(
 			`  ${cappedDuration.toFixed(2)}s · ${totalFrames} frames at ${opts.fps} fps · ${opts.width}×${height}` +
 				(opts.motionBlur > 1
-					? ` · motion blur ${opts.motionBlur}× (${totalFrames * opts.motionBlur} sub-frames)`
+					? ` · motion blur ${opts.motionBlur}× @ ${opts.shutterAngle}° shutter ` +
+						`(${totalFrames * opts.motionBlur} sub-frames)`
 					: '') +
 				(opts.endTime != null ? ` (capped from ${duration.toFixed(2)}s)` : '')
 		);

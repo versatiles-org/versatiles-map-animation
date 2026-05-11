@@ -62,6 +62,7 @@ docker run --rm -it -v "$PWD:/out" \
 | `--preset <name>`      | `slow`            | x264 preset (`ultrafast`…`veryslow`)                  |
 | `--frame-timeout <ms>` | `30000`           | per-frame settle deadline                             |
 | `--motion-blur <n>`    | `1` (off)         | sub-frames per output frame; 4–8 typical; N× slower   |
+| `--shutter-angle <d>`  | `180`             | shutter angle in degrees (only with motion blur)      |
 | `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
 | `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |
