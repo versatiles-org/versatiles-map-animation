@@ -227,6 +227,14 @@
 					'icon-offset': ['get', 'offset'],
 					'icon-rotate': ['get', 'rotation'],
 					'icon-size': 1,
+					// Annotations must ALWAYS render — even if they collide with
+					// other annotations, or basemap labels, or sit behind terrain.
+					// `*-allow-overlap` + `*-ignore-placement` disables MapLibre's
+					// collision detection both for the symbol being drawn and for
+					// the placement budget it consumes for neighbours. `text-
+					// optional: false` means the icon and the label live or die
+					// together — important now that the label can carry its own
+					// halo/colour distinct from the icon.
 					'icon-allow-overlap': true,
 					'icon-ignore-placement': true,
 					'text-field': ['get', 'label'],
@@ -241,8 +249,9 @@
 					// em-distance from the icon at any annotationScale.
 					'text-anchor': ['get', 'textAnchor'],
 					'text-offset': ['get', 'textOffset'],
-					'text-allow-overlap': false,
-					'text-optional': true
+					'text-allow-overlap': true,
+					'text-ignore-placement': true,
+					'text-optional': false
 				},
 				paint: {
 					'icon-color': ['get', 'color'],
