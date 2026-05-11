@@ -46,7 +46,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - **Render to MP4** via the published Docker image (button in the editor copies the command):
 
   ```sh
-  docker run --rm --pull always -v "$PWD:/out" \
+  docker run --rm -it --pull always -v "$PWD:/out" \
     ghcr.io/versatiles-org/versatiles-map-animation:latest \
     --hash '<URL-hash payload>' --width 1920 --fps 30 --output animation.mp4
   ```
