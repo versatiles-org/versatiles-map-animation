@@ -27,6 +27,20 @@ function withMarkersSprite(style: StyleSpecification): StyleSpecification {
 }
 
 /**
+ * Ensure the style declares a `glyphs` URL pointing at the VersaTiles
+ * glyph bundle. The `colorful` style ships one by default, but `satellite`
+ * with `overlay: false` (labels off) does not — and without a `glyphs` URL
+ * MapLibre cannot fetch any new font's glyph stack at runtime, which breaks
+ * annotation label rendering when the user changes a font in the editor.
+ */
+function withGlyphs(style: StyleSpecification): StyleSpecification {
+	if (!style.glyphs) {
+		style.glyphs = `${TILES_BASE_URL}/assets/glyphs/{fontstack}/{range}.pbf`;
+	}
+	return style;
+}
+
+/**
  * MapLibre `sky` block — atmospheric scattering visible behind the horizon
  * when the camera is pitched. The upstream style builders don't include one,
  * so we attach it here when the user opts in.
@@ -65,13 +79,15 @@ export async function buildMapStyle(
 			// shields). For colorful that's the only "show labels" knob the
 			// upstream builder offers.
 			return withSky(
-				withMarkersSprite(
-					await colorful({
-						baseUrl: TILES_BASE_URL,
-						hideLabels: !labels,
-						terrain,
-						hillshade: terrain
-					})
+				withGlyphs(
+					withMarkersSprite(
+						await colorful({
+							baseUrl: TILES_BASE_URL,
+							hideLabels: !labels,
+							terrain,
+							hillshade: terrain
+						})
+					)
 				),
 				sky
 			);
@@ -80,7 +96,9 @@ export async function buildMapStyle(
 			// colorful basemap (roads, labels, etc.) on top — that's the
 			// satellite equivalent of "show labels".
 			return withSky(
-				withMarkersSprite(await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain })),
+				withGlyphs(
+					withMarkersSprite(await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain }))
+				),
 				sky
 			);
 	}
