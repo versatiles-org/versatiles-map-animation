@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { AnimationStore } from '../animation.svelte';
+	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -360,6 +360,8 @@
 		{/if}
 
 		{#if selAnn}
+			{@const resolvedSel = resolveAnnotation(selAnn, store.defaultAnnotation)}
+			{@const annColor = resolvedSel.iconColor}
 			{@const vFrom = selAnn.visibleFrom}
 			{@const vUntil = selAnn.visibleUntil}
 			{@const fIn = Math.max(0, selAnn.fadeIn ?? 0)}
@@ -373,7 +375,7 @@
 					<div
 						class="ann-fade-in"
 						style="left: {pct(vFrom - fIn)}%; width: {pct(vFrom) -
-							pct(vFrom - fIn)}%; background: {selAnn.iconColor};"
+							pct(vFrom - fIn)}%; background: {annColor};"
 						title="Fade in {fIn.toFixed(2)}s"
 						aria-hidden="true"
 					></div>
@@ -384,8 +386,7 @@
 				<div
 					class="ann-bar"
 					class:draggable={barDraggable}
-					style="left: {pct(barL)}%; width: {pct(barR) -
-						pct(barL)}%; background: {selAnn.iconColor};"
+					style="left: {pct(barL)}%; width: {pct(barR) - pct(barL)}%; background: {annColor};"
 					title={barDraggable
 						? `Drag to shift the visibility window (${fmt(vFrom)}s → ${fmt(vUntil)}s)`
 						: vFrom !== undefined || vUntil !== undefined
@@ -401,7 +402,7 @@
 					<div
 						class="ann-fade-out"
 						style="left: {pct(vUntil)}%; width: {pct(vUntil + fOut) -
-							pct(vUntil)}%; background: {selAnn.iconColor};"
+							pct(vUntil)}%; background: {annColor};"
 						title="Fade out {fOut.toFixed(2)}s"
 						aria-hidden="true"
 					></div>

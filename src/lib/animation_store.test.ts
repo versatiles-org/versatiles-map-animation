@@ -152,19 +152,38 @@ describe('AnimationStore - keyframe CRUD', () => {
 });
 
 describe('AnimationStore - annotation CRUD', () => {
-	it('addAnnotation applies the per-animation defaultAnnotation under caller fields', () => {
+	it('addAnnotation stores the annotation thin — no default-spread', () => {
 		const s = new AnimationStore();
 		s.defaultAnnotation = {
 			labelFont: 'roboto_bold_italic',
 			labelHaloWidth: 2.5
 		};
 		s.addAnnotation(ann({ label: 'X' }));
-		// Caller-provided fields (label, lng, lat, etc.) win; default-only
-		// fields (font, halo width) are inherited from store.defaultAnnotation.
+		// Annotation stores only what the caller supplied. Per-animation
+		// defaults are NOT baked in at creation; the renderer (and any
+		// consumer that calls `resolveAnnotation`) pulls them in dynamically.
 		const a = s.annotations[0];
 		expect(a.label).toBe('X');
-		expect(a.labelFont).toBe('roboto_bold_italic');
-		expect(a.labelHaloWidth).toBe(2.5);
+		expect(a).not.toHaveProperty('labelFont');
+		expect(a).not.toHaveProperty('labelHaloWidth');
+		// …but the resolved view does see the defaults.
+		const resolved = resolveAnnotation(a, s.defaultAnnotation);
+		expect(resolved.labelFont).toBe('roboto_bold_italic');
+		expect(resolved.labelHaloWidth).toBe(2.5);
+	});
+
+	it('addAnnotation accepts a position-only annotation (no style fields)', () => {
+		const s = new AnimationStore();
+		s.addAnnotation({ lng: 1, lat: 2, label: '' });
+		const a = s.annotations[0];
+		// Pin button passes only position + label; icon/iconColor are
+		// optional and absent on the raw annotation.
+		expect(a).not.toHaveProperty('icon');
+		expect(a).not.toHaveProperty('iconColor');
+		// Resolver fills them in from the hardcoded baseline.
+		const resolved = resolveAnnotation(a, s.defaultAnnotation);
+		expect(resolved.icon).toBeDefined();
+		expect(resolved.iconColor).toBeDefined();
 	});
 
 	it('addAnnotation appends, selects it, and clears keyframe selection', () => {

@@ -10,6 +10,7 @@ import {
 import type {
 	Animation,
 	Annotation,
+	AnnotationIcon,
 	AnnotationStyle,
 	AspectRatio,
 	CameraState,
@@ -17,6 +18,19 @@ import type {
 	MapStyleId,
 	PathStyle
 } from './types';
+
+/**
+ * An `Annotation` with the always-defaulted style fields (`icon`, `iconColor`)
+ * narrowed to non-optional. Returned by `resolveAnnotation`, which guarantees
+ * the merged result has both — the hardcoded `ANNOTATION_FIELD_DEFAULTS`
+ * fills them in when neither the per-annotation override nor the per-animation
+ * default provides one. Use this where you read style fields directly (the
+ * renderer, the list/timeline preview swatches, the editor inputs).
+ */
+export type ResolvedAnnotation = Annotation & {
+	icon: AnnotationIcon;
+	iconColor: string;
+};
 
 const MIN_TIME_GAP = 0.01;
 
@@ -95,7 +109,10 @@ export function isAnnotationVisible(ann: Annotation, t: number): boolean {
  * semantics — that's what lets the per-annotation reset button "clear an
  * override" rather than "snapshot the current default".
  */
-export function resolveAnnotation(ann: Annotation, defaults: Partial<AnnotationStyle>): Annotation {
+export function resolveAnnotation(
+	ann: Annotation,
+	defaults: Partial<AnnotationStyle>
+): ResolvedAnnotation {
 	const out: Record<string, unknown> = { ...ANNOTATION_FIELD_DEFAULTS };
 	for (const k in defaults) {
 		const v = (defaults as unknown as Record<string, unknown>)[k];
@@ -105,7 +122,7 @@ export function resolveAnnotation(ann: Annotation, defaults: Partial<AnnotationS
 		const v = (ann as unknown as Record<string, unknown>)[k];
 		if (v !== undefined) out[k] = v;
 	}
-	return out as unknown as Annotation;
+	return out as unknown as ResolvedAnnotation;
 }
 
 export class AnimationStore {
@@ -228,10 +245,12 @@ export class AnimationStore {
 	// -------------------------------------------------------------------------
 
 	addAnnotation(ann: Annotation): void {
-		// Apply per-animation marker defaults under the caller's fields, so the
-		// Pin button (which only knows lng/lat/icon/iconColor/label) inherits
-		// the user-tuned style (font, halo, sizes, etc.).
-		this.annotations = [...this.annotations, { ...this.defaultAnnotation, ...ann }];
+		// Store the annotation thin — only position/content fields the caller
+		// supplied. Style fields stay undefined so the renderer resolves them
+		// from `defaultAnnotation` (or the hardcoded baseline) via
+		// `resolveAnnotation`. That way, flipping a per-animation default
+		// after the marker exists automatically updates the marker.
+		this.annotations = [...this.annotations, ann];
 		this.selectedAnnotationIndex = this.annotations.length - 1;
 		this.selectedIndex = null;
 	}

@@ -214,9 +214,18 @@ export type CameraState = Omit<Keyframe, 't' | 'path'>;
 export interface Annotation {
 	lng: number;
 	lat: number;
-	icon: AnnotationIcon;
-	/** Icon colour. Any CSS hex; canonical wire form is `#RRGGBB`. */
-	iconColor: string;
+	/**
+	 * Sprite id. Optional: when omitted, the renderer resolves it via the
+	 * per-animation `defaultAnnotation`, falling back to the hardcoded
+	 * `DEFAULT_ANNOTATION_ICON`. Every style field is optional for the same
+	 * reason — see `resolveAnnotation` in `animation.svelte.ts`.
+	 */
+	icon?: AnnotationIcon;
+	/**
+	 * Icon colour. Any CSS hex; canonical wire form is `#RRGGBB`. Optional —
+	 * resolved like `icon`.
+	 */
+	iconColor?: string;
 	/**
 	 * Label text colour. Default `DEFAULT_ANNOTATION_LABEL_COLOR` (near-black);
 	 * the halo auto-flips to the contrasting brightness so the label stays

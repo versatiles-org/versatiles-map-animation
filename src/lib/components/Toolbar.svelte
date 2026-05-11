@@ -3,7 +3,6 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
 	import VideoDialog from './VideoDialog.svelte';
@@ -36,13 +35,11 @@
 	}
 	function onPinAnnotation() {
 		const cam = store.liveCamera;
-		store.addAnnotation({
-			lng: cam.lng,
-			lat: cam.lat,
-			icon: DEFAULT_ANNOTATION_ICON,
-			iconColor: DEFAULT_ANNOTATION_COLOR,
-			label: ''
-		});
+		// Thin annotation: only position + (empty) label. Icon, colour, and
+		// every other style field stay undefined so the renderer pulls them
+		// from `defaultAnnotation` — change a default later and the marker
+		// follows. The hardcoded baselines live in `ANNOTATION_FIELD_DEFAULTS`.
+		store.addAnnotation({ lng: cam.lng, lat: cam.lat, label: '' });
 	}
 	function onUpdate() {
 		store.updateSelectedFromCamera(store.liveCamera);

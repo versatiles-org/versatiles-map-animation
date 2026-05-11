@@ -7,7 +7,7 @@
 	 * `DefaultStyleEditor` in the no-selection panel.
 	 */
 
-	import type { AnimationStore } from '../animation.svelte';
+	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 	import { spritePreviewStyle } from '../sprite_meta';
 	import { DEFAULT_ANNOTATION_LABEL_COLOR } from '../types';
 
@@ -61,6 +61,7 @@
 {:else}
 	<ul class="annotation-list" role="list">
 		{#each store.annotations as a, i (i)}
+			{@const r = resolveAnnotation(a, store.defaultAnnotation)}
 			<li
 				class:dragging={dragFrom === i}
 				class:drop-above={dropAt === i && dragFrom !== i && dragFrom !== i - 1}
@@ -81,11 +82,11 @@
 					title="Click to edit, drag to reorder"
 				>
 					<span class="grip" aria-hidden="true">⋮⋮</span>
-					<span class="icon-prev" style={spritePreviewStyle(a.icon, 18)}></span>
+					<span class="icon-prev" style={spritePreviewStyle(r.icon, 18)}></span>
 					<span
 						class="annotation-label"
 						class:empty={!a.label}
-						style="color: {a.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR};"
+						style="color: {r.labelColor ?? DEFAULT_ANNOTATION_LABEL_COLOR};"
 					>
 						{a.label || '(no label)'}
 					</span>
