@@ -15,7 +15,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Drop keyframes on a timeline that capture the current camera (lng, lat, zoom, pitch, bearing, roll).
 - Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
 - Per-segment trajectory style: **arc** (default, smooth great-circle path) or **linear**.
-- Scrub anywhere on the timeline; click a keyframe to jump to its view; drag markers to retime.
+- Scrub anywhere on the timeline; click a keyframe to jump to its view; drag markers along the track to retime — and past their neighbours to **reorder** the sequence. Timestamps snap to 1/100 s.
 - Timeline zoom & pan: vertical scroll / Ctrl-wheel / pinch zooms; horizontal scroll pans; drag the pan-bar thumb to scroll, drag its edges to zoom; the playhead can be moved past the last keyframe to add a new one there.
 - Insert keyframes at the current playhead (compose a shot, then **+ Add** in the Keyframe group).
 
@@ -30,15 +30,16 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 ### Annotations
 
 - Drop pin / arrow / circle / star / outline / icon markers anywhere on the map.
-- Per-annotation editable label, label position (9-way grid: top-left … bottom-right), label distance, label colour, font size.
-- Per-annotation icon colour, icon size, rotation.
+- Per-annotation editable label, font (187 SDF fonts bundled by the VersaTiles tile server), label position (9-way grid: top-left … bottom-right), label distance, label colour, label size.
+- Per-annotation icon, icon colour, icon size, rotation.
 - Per-annotation halo colour & width for both label text and the icon outline (auto-flipping default for legibility on any basemap).
 - Visibility window with optional fade-in / fade-out tails — set on the timeline by dragging the four-handle bar that appears for the selected annotation.
-- Drag annotations directly on the map.
+- Drag annotations directly on the map; reorder them in the sidebar's **Markers** list by drag-and-drop.
+- **Per-animation default style** — set a template in the sidebar's _Default annotation style_ panel; every marker that doesn't override a field follows the template. Change the template later and every still-thin marker updates automatically. The same template is used as the starting state for newly-pinned markers.
 
 ### Sharing & rendering
 
-- **Share by URL** — the entire animation (style, terrain, sky, annotations, scale) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
+- **Share by URL** — the entire animation (style, terrain, sky, annotations, per-animation default style, scale, aspect ratio) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
 - **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animation/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
 - **Local persistence** — the latest animation is mirrored to `localStorage`, so a reload without a hash restores it.
 - **Export / import as JSON** for archival or hand-off.
@@ -87,7 +88,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"aspectRatio": "16:9", // "16:9" | "21:9" | "4:3" | "3:2" | "1:1" | "4:5" | "9:16"
 	"keyframes": [
 		{
-			"t": 0.0, // seconds
+			"t": 0.0, // seconds, snapped to 1/100 s in the editor
 			"lng": 13.405,
 			"lat": 52.52,
 			"zoom": 10,
@@ -98,28 +99,48 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 		}
 	],
 	"annotations": [
+		// Only `lng`, `lat`, and `label` are required. Every style field is
+		// optional; the renderer fills missing ones from `defaultAnnotation`
+		// below, then from the hardcoded baseline (`symbol-marker`, red, etc.).
 		{
 			"lng": 13.405,
 			"lat": 52.52,
-			"icon": "symbol-marker",
-			"color": "#cc0000",
 			"label": "Berlin",
+			"icon": "symbol-marker", // optional; legacy "color" key also accepted for iconColor
+			"iconColor": "#cc0000", // optional
+			"iconSize": 1, // optional
+			"iconHaloColor": "#ffffff", // optional
+			"iconHaloWidth": 0, // optional
 			"labelColor": "#111111", // optional
+			"labelSize": 1, // optional
+			"labelFont": "noto_sans_bold", // optional; see ANNOTATION_LABEL_FONTS in src/lib/types.ts
 			"labelPosition": "bottom", // optional: top-left … bottom-right
 			"labelDistance": 1.5, // optional: em from the geo point
-			"iconSize": 1, // optional
-			"labelSize": 1, // optional
+			"labelHaloColor": "#ffffff", // optional: explicit override (else auto-flip for legibility)
+			"labelHaloWidth": 1.5, // optional
 			"rotation": 0, // optional, degrees clockwise (mainly for arrow icons)
 			"visibleFrom": 0, // optional: hide before this time
 			"visibleUntil": 5, // optional: hide at/after this time
 			"fadeIn": 0.5, // optional: seconds; ramp 0→1 before visibleFrom
-			"fadeOut": 0.5, // optional: seconds; ramp 1→0 after visibleUntil
-			"labelHaloColor": "#ffffff", // optional: explicit override (else auto-flip for legibility)
-			"labelHaloWidth": 1.5,
-			"iconHaloColor": "#ffffff",
-			"iconHaloWidth": 0
+			"fadeOut": 0.5 // optional: seconds; ramp 1→0 after visibleUntil
 		}
-	]
+	],
+	// Per-animation style template. Any annotation that omits a field below
+	// inherits it from here. Position/content/time fields (lng/lat/label/
+	// rotation/visibleFrom/visibleUntil/fadeIn/fadeOut) are never inherited
+	// — those are per-annotation by definition.
+	"defaultAnnotation": {
+		"icon": "symbol-arrow1",
+		"iconColor": "#ffffff",
+		"iconHaloColor": "#000000",
+		"iconHaloWidth": 1,
+		"labelColor": "#ffffff",
+		"labelHaloColor": "#000000",
+		"labelHaloWidth": 1,
+		"labelFont": "noto_sans_bold",
+		"labelPosition": "top",
+		"labelDistance": 1.8
+	}
 }
 ```
 
