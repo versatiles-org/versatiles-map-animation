@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import { haloAuto, makeOnNum, makeOnText, POSITION_GRID } from '../annotation_panel_helpers';
+	import { haloAuto, makeOnNum, makeOnText } from '../annotation_panel_helpers';
 	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
 	import IconPicker from './IconPicker.svelte';
+	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
 	import {
 		ANNOTATION_FIELD_DEFAULTS,
@@ -307,30 +308,14 @@
 		resetAriaLabel="Reset label size"
 	/>
 
-	<div class="row">
-		<span class="lbl">Side</span>
-		<div class="pos-grid">
-			{#each POSITION_GRID as p (p.value)}
-				<button
-					type="button"
-					class:active={(ann.labelPosition ?? DEFAULT_LABEL_POSITION) === p.value}
-					onclick={() => patch({ labelPosition: p.value })}
-					title={p.value}
-					aria-label={`Place label ${p.value}`}
-				>
-					{p.label}
-				</button>
-			{/each}
-		</div>
-		<button
-			type="button"
-			class="mini reset"
-			onclick={() => resetAnnFields('labelPosition')}
-			disabled={!isAnnSet('labelPosition')}
-			title="Reset label position to the current default"
-			aria-label="Reset label position">⟲</button
-		>
-	</div>
+	<PositionGrid
+		value={ann.labelPosition ?? DEFAULT_LABEL_POSITION}
+		onChange={(labelPosition) => patch({ labelPosition })}
+		onReset={() => resetAnnFields('labelPosition')}
+		canReset={isAnnSet('labelPosition')}
+		resetTitle="Reset label position to the current default"
+		resetAriaLabel="Reset label position"
+	/>
 
 	<SliderRow
 		label="Gap"
@@ -552,34 +537,7 @@
 
 	/* Icon-picker styles live in IconPicker.svelte; halo-row styles live in
 	   HaloRow.svelte. Both are scoped, so nothing leaks back here. */
-	.pos-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 22px);
-		grid-template-rows: repeat(3, 22px);
-		gap: 2px;
-
-		button {
-			padding: 0;
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid #2a2f37;
-			border-radius: 3px;
-			color: #888;
-			font:
-				14px/1 ui-monospace,
-				monospace;
-			cursor: pointer;
-
-			&:hover {
-				border-color: #4a9eff;
-				color: #ddd;
-			}
-			&.active {
-				background: rgba(74, 158, 255, 0.18);
-				border-color: #4a9eff;
-				color: #fff;
-			}
-		}
-	}
+	/* `.pos-grid` styles live in PositionGrid.svelte. */
 	.visibility-grid {
 		flex: 1 1 auto;
 		display: grid;

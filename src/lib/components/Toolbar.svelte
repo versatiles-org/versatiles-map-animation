@@ -1,62 +1,30 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
+	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { aspectRatioValue, DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
+	import { DEFAULT_ANNOTATION_COLOR, DEFAULT_ANNOTATION_ICON } from '../types';
 	import { encodeAnimation } from '../url_state';
+	import EmbedDialog from './EmbedDialog.svelte';
+	import VideoDialog from './VideoDialog.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
-	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation:latest';
-	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
-	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
-	const VIDEO_FPS = [24, 25, 30, 50, 60] as const;
-	type VideoFps = (typeof VIDEO_FPS)[number];
-
 	let fileInput: HTMLInputElement;
-	let embedInput = $state<HTMLInputElement | undefined>(undefined);
-	let videoInput = $state<HTMLInputElement | undefined>(undefined);
 	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
 	let importError = $state<string | null>(null);
 	let embedOpen = $state(false);
 	let videoOpen = $state(false);
-	let videoWidth = $state<VideoWidth>(1920);
-	let videoFps = $state<VideoFps>(30);
 
-	/**
-	 * Reactive transient value that auto-clears after `timeoutMs`. Used for the
-	 * status flash chip and the "✓ Copied" button states — set on action, then
-	 * the value reverts to null on its own. Calling `.set` again before the
-	 * timer fires resets the countdown.
-	 */
-	function flashState<T>(timeoutMs: number) {
-		let value = $state<T | null>(null);
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		return {
-			get value() {
-				return value;
-			},
-			set(v: T) {
-				value = v;
-				if (timer) clearTimeout(timer);
-				timer = setTimeout(() => {
-					value = null;
-				}, timeoutMs);
-			},
-			clear() {
-				if (timer) clearTimeout(timer);
-				timer = undefined;
-				value = null;
-			}
-		};
-	}
-
-	const status = flashState<{ tone: 'ok' | 'err'; text: string }>(1800);
-	const embedCopied = flashState<true>(1800);
-	const videoCopied = flashState<true>(1800);
-
+	// Status flash for the share-URL copy result. The two dialogs each have
+	// their own internal "✓ Copied" badge state; this one is just for the
+	// transient ok/err toast above the ⋯ menu.
+	let status = $state<{ tone: 'ok' | 'err'; text: string } | null>(null);
+	let statusTimer: ReturnType<typeof setTimeout> | undefined;
 	function flash(tone: 'ok' | 'err', text: string) {
-		status.set({ tone, text });
+		status = { tone, text };
+		if (statusTimer) clearTimeout(statusTimer);
+		statusTimer = setTimeout(() => (status = null), 1800);
 	}
 
 	function closeMenu() {
@@ -131,229 +99,20 @@
 		store.reset();
 	}
 
-	function buildEmbedSnippet(): string {
-		const encoded = encodeAnimation(store.toAnimation());
-		const url = `${window.location.origin}${base}/view#kf=${encoded}`;
-		// `aspect-ratio` mirrors the composition aspect so the iframe stays
-		// the right shape in any container width (the viewer letterboxes
-		// internally too, but matching here avoids visible bars).
-		const aspect = store.aspectRatio.replace(':', '/');
-		return `<iframe src="${url}" style="width:100%;aspect-ratio:${aspect};border:0" loading="lazy" allowfullscreen></iframe>`;
-	}
-
 	function onToggleEmbed() {
 		closeMenu();
 		if (store.keyframes.length === 0) return;
 		embedOpen = !embedOpen;
-		embedCopied.clear();
-		if (embedOpen) {
-			queueMicrotask(() => embedInput?.select());
-		}
 	}
-
-	async function onCopyEmbed() {
-		if (!embedInput) return;
-		try {
-			await navigator.clipboard.writeText(embedInput.value);
-		} catch {
-			embedInput.select();
-			document.execCommand?.('copy');
-		}
-		embedCopied.set(true);
-	}
-
-	const videoHeight = $derived(Math.round(videoWidth / aspectRatioValue(store.aspectRatio)));
-
-	function buildVideoCommand(): string {
-		const hash = encodeAnimation(store.toAnimation());
-		// Single-line so users can paste-and-run; --pull always keeps the image
-		// fresh; the working directory is mounted at /out so the MP4 lands next
-		// to where the user invoked the command. `--height` is derived from
-		// `--width` and the composition aspect ratio chosen in the editor.
-		return `docker run --rm --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps} --output /out/animation.mp4`;
-	}
-
 	function onToggleVideo() {
 		closeMenu();
 		if (store.keyframes.length === 0) return;
 		videoOpen = !videoOpen;
-		videoCopied.clear();
-		if (videoOpen) {
-			queueMicrotask(() => videoInput?.select());
-		}
-	}
-
-	async function onCopyVideo() {
-		if (!videoInput) return;
-		try {
-			await navigator.clipboard.writeText(videoInput.value);
-		} catch {
-			videoInput.select();
-			document.execCommand?.('copy');
-		}
-		videoCopied.set(true);
 	}
 
 	function onLoadExample() {
 		closeMenu();
-		store.loadFromAnimation({
-			version: 1,
-			style: 'satellite',
-			labels: false,
-			terrain: true,
-			sky: true,
-			// 10-second flight around Germany's Zugspitze (2962 m) and the
-			// surrounding Wetterstein massif. Starts as a wide aerial north of
-			// Garmisch-Partenkirchen, descends toward the Eibsee at the foot of
-			// the Zugspitze, then pulls into a high-pitch panorama that reveals
-			// the whole massif from west to east.
-			keyframes: [
-				{
-					t: 0,
-					lng: 11.05,
-					lat: 47.62,
-					zoom: 10,
-					pitch: 30,
-					bearing: 200,
-					roll: 0
-				},
-				{
-					t: 3,
-					lng: 10.99,
-					lat: 47.52,
-					zoom: 11.5,
-					pitch: 55,
-					bearing: 200,
-					roll: 0
-				},
-				{
-					t: 6.5,
-					lng: 10.96,
-					lat: 47.5,
-					zoom: 11.8,
-					pitch: 72,
-					bearing: 220,
-					roll: 0,
-					path: 'linear'
-				},
-				{
-					t: 10,
-					lng: 11.05,
-					lat: 47.52,
-					zoom: 11.3,
-					pitch: 78,
-					bearing: 245,
-					roll: 0
-				}
-			],
-			annotations: [
-				// Zugspitze — the headliner: Germany's highest peak. Larger
-				// icon and bolder colour to stand out from the supporting peaks.
-				{
-					lng: 10.985278,
-					lat: 47.421111,
-					icon: 'symbol-arrow1',
-					label: 'Zugspitze\n2962 m',
-					labelPosition: 'top',
-					visibleFrom: 0,
-					labelDistance: 2.5,
-					fadeIn: 1,
-
-					iconColor: '#660000',
-					iconHaloColor: '#ffffff',
-					iconHaloWidth: 1,
-					iconSize: 2.5,
-					labelColor: '#660000',
-					labelHaloColor: '#ffffff',
-					labelHaloWidth: 1,
-					labelSize: 1.75
-				},
-				// Supporting peaks of the Wetterstein massif, fanned out so the
-				// labels don't collide at the panoramic shot. Coordinates from
-				// each peak's Wikipedia summit page.
-				{
-					lng: 10.971944,
-					lat: 47.412917,
-					icon: 'symbol-arrow1',
-					iconColor: '#7a3030',
-					label: 'Schneefernerkopf\n2875 m',
-					labelPosition: 'bottom-left',
-					visibleFrom: 2,
-					iconSize: 1.8,
-					labelSize: 1.3,
-					labelDistance: 2.2,
-					fadeIn: 1,
-					labelColor: '#7a3030',
-					labelHaloWidth: 1
-				},
-				{
-					lng: 11.0375,
-					lat: 47.4525,
-					icon: 'symbol-arrow1',
-					iconColor: '#7a3030',
-					label: 'Alpspitze\n2628 m',
-					labelPosition: 'top-right',
-					visibleFrom: 2,
-					iconSize: 1.8,
-					labelSize: 1.3,
-					labelDistance: 2.2,
-					fadeIn: 1,
-					labelColor: '#7a3030',
-					labelHaloWidth: 1
-				},
-				{
-					lng: 11.082222,
-					lat: 47.413056,
-					icon: 'symbol-arrow1',
-					iconColor: '#7a3030',
-					label: 'Hochwanner\n2744 m',
-					labelPosition: 'bottom-right',
-					visibleFrom: 2,
-					iconSize: 1.8,
-					labelSize: 1.3,
-					labelDistance: 2.2,
-					fadeIn: 1,
-					labelColor: '#7a3030',
-					labelHaloWidth: 1
-				},
-				{
-					lng: 11.013333,
-					lat: 47.430278,
-					icon: 'symbol-arrow1',
-					iconColor: '#7a3030',
-					label: 'Höllentalspitze\n2743 m',
-					labelPosition: 'right',
-					visibleFrom: 2,
-					iconSize: 1.8,
-					labelSize: 1.3,
-					labelDistance: 2.2,
-					fadeIn: 1,
-					labelColor: '#7a3030',
-					labelHaloWidth: 1
-				},
-				// Eibsee — the turquoise alpine lake at the foot of the Zugspitze.
-				// Different icon (marker pin) so it reads as a point of interest
-				// rather than another peak.
-				{
-					lng: 10.9783,
-					lat: 47.4581,
-					icon: 'symbol-marker',
-					iconColor: '#1a6fa8',
-					label: 'Eibsee\n973 m',
-					labelPosition: 'top-left',
-					visibleFrom: 2,
-					iconSize: 1.6,
-					labelSize: 1.2,
-					labelDistance: 1.8,
-					fadeIn: 1,
-					labelColor: '#1a6fa8',
-					labelHaloWidth: 1
-				}
-			],
-			annotationScale: 1,
-			aspectRatio: '16:9',
-			defaultAnnotation: {}
-		});
+		store.loadFromAnimation(EXAMPLE_ANIMATION);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -381,11 +140,6 @@
 	const hasSelection = $derived(store.selectedIndex !== null);
 	const hasKeyframes = $derived(store.keyframes.length > 0);
 	const canPlay = $derived(store.keyframes.length >= 2);
-	const embedSnippet = $derived(embedOpen && hasKeyframes ? buildEmbedSnippet() : '');
-	const videoCommand = $derived(
-		videoOpen && hasKeyframes ? buildVideoCommand() : ''
-		// videoCommand re-derives when keyframes/style/terrain or videoWidth change.
-	);
 </script>
 
 <div class="toolbar">
@@ -472,13 +226,9 @@
 
 	<div class="spacer"></div>
 
-	{#if status.value}
-		<span
-			class="status"
-			class:ok={status.value.tone === 'ok'}
-			class:err={status.value.tone === 'err'}
-		>
-			{status.value.text}
+	{#if status}
+		<span class="status" class:ok={status.tone === 'ok'} class:err={status.tone === 'err'}>
+			{status.text}
 		</span>
 	{/if}
 
@@ -523,75 +273,11 @@
 {/if}
 
 {#if embedOpen}
-	<div class="embed-panel" role="region" aria-label="Embed snippet">
-		<label for="embed-input">Paste this into your page:</label>
-		<div class="embed-row">
-			<input
-				id="embed-input"
-				bind:this={embedInput}
-				type="text"
-				readonly
-				value={embedSnippet}
-				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
-			/>
-			<button
-				type="button"
-				onclick={onCopyEmbed}
-				class:copied={embedCopied.value}
-				title="Copy snippet"
-			>
-				{embedCopied.value ? '✓ Copied' : '⧉ Copy'}
-			</button>
-			<button type="button" onclick={onToggleEmbed} aria-label="Close" title="Close">✕</button>
-		</div>
-		<p class="hint">The iframe scales to its container at a fixed 16:9 aspect ratio.</p>
-	</div>
+	<EmbedDialog {store} onClose={() => (embedOpen = false)} />
 {/if}
 
 {#if videoOpen}
-	<div class="embed-panel" role="region" aria-label="Render to video">
-		<div class="video-row-1">
-			<label for="video-width" class="control-label">
-				<span class="lbl">Resolution</span>
-				<select id="video-width" bind:value={videoWidth}>
-					{#each VIDEO_WIDTHS as w (w)}
-						<option value={w}>{w} × {Math.round(w / aspectRatioValue(store.aspectRatio))}</option>
-					{/each}
-				</select>
-			</label>
-			<label for="video-fps" class="control-label">
-				<span class="lbl">FPS</span>
-				<select id="video-fps" bind:value={videoFps}>
-					{#each VIDEO_FPS as f (f)}
-						<option value={f}>{f}</option>
-					{/each}
-				</select>
-			</label>
-			<span class="hint">
-				Renders this animation as MP4. Requires <strong>Docker</strong>; the file lands in the
-				directory you run the command from as <code>animation.mp4</code>.
-			</span>
-		</div>
-		<div class="embed-row">
-			<input
-				id="video-input"
-				bind:this={videoInput}
-				type="text"
-				readonly
-				value={videoCommand}
-				onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
-			/>
-			<button
-				type="button"
-				onclick={onCopyVideo}
-				class:copied={videoCopied.value}
-				title="Copy command"
-			>
-				{videoCopied.value ? '✓ Copied' : '⧉ Copy'}
-			</button>
-			<button type="button" onclick={onToggleVideo} aria-label="Close" title="Close">✕</button>
-		</div>
-	</div>
+	<VideoDialog {store} onClose={() => (videoOpen = false)} />
 {/if}
 
 <style>
@@ -800,68 +486,5 @@
 		font-size: 13px;
 	}
 
-	.embed-panel {
-		margin-top: 0.5rem;
-		padding: 0.6rem 0.75rem;
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid #333;
-		border-radius: 4px;
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-
-		label {
-			font-size: 12px;
-			color: #aaa;
-		}
-		.hint {
-			margin: 0;
-			font-size: 11px;
-			color: #888;
-		}
-		code {
-			font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-			font-size: 11px;
-			background: rgba(255, 255, 255, 0.06);
-			padding: 0 0.25rem;
-			border-radius: 3px;
-		}
-	}
-	.embed-row {
-		display: flex;
-		gap: 0.4rem;
-		align-items: stretch;
-
-		input {
-			flex: 1 1 auto;
-			min-width: 0;
-			padding: 0.4rem 0.6rem;
-			background: #0d1117;
-			border: 1px solid #333;
-			border-radius: 4px;
-			color: #ddd;
-			font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-			font-size: 12px;
-
-			&:focus {
-				outline: none;
-				border-color: #4a9eff;
-			}
-		}
-		button.copied {
-			background: rgba(80, 200, 120, 0.18);
-			border-color: #4ac888;
-			color: #b6f0c9;
-		}
-	}
-	.video-row-1 {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-
-		.hint {
-			flex: 1 1 16rem;
-		}
-	}
+	/* Embed/Video dialog chrome lives in EmbedDialog.svelte / VideoDialog.svelte. */
 </style>

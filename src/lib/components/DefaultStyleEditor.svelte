@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import { haloAuto, makeOnNum, makeOnText, POSITION_GRID } from '../annotation_panel_helpers';
+	import { haloAuto, makeOnNum, makeOnText } from '../annotation_panel_helpers';
 	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
 	import IconPicker from './IconPicker.svelte';
+	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
 	import {
 		DEFAULT_ANNOTATION_COLOR,
@@ -169,30 +170,15 @@
 	resetAriaLabel="Reset default label size"
 />
 
-<div class="row">
-	<span class="lbl">Side</span>
-	<div class="pos-grid">
-		{#each POSITION_GRID as p (p.value)}
-			<button
-				type="button"
-				class:active={(defaults.labelPosition ?? DEFAULT_LABEL_POSITION) === p.value}
-				onclick={() => patchDefault({ labelPosition: p.value })}
-				title={p.value}
-				aria-label={`Default label position ${p.value}`}
-			>
-				{p.label}
-			</button>
-		{/each}
-	</div>
-	<button
-		type="button"
-		class="mini reset"
-		onclick={() => unsetDefaults('labelPosition')}
-		disabled={!isDefaultSet('labelPosition')}
-		title="Reset label position to the hardcoded default"
-		aria-label="Reset default label position">⟲</button
-	>
-</div>
+<PositionGrid
+	value={defaults.labelPosition ?? DEFAULT_LABEL_POSITION}
+	onChange={(labelPosition) => patchDefault({ labelPosition })}
+	onReset={() => unsetDefaults('labelPosition')}
+	canReset={isDefaultSet('labelPosition')}
+	ariaPrefix="Default label position"
+	resetTitle="Reset label position to the hardcoded default"
+	resetAriaLabel="Reset default label position"
+/>
 
 <SliderRow
 	label="Gap"
@@ -255,36 +241,9 @@
 	}
 
 	/* All field-row chrome (color/range inputs, .num/.hex readouts, the
-	   icon picker, the halo combo, the font select) lives in scoped
-	   sub-components: ColorRow / SliderRow / IconPicker / HaloRow / FontSelect. */
-	.pos-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 22px);
-		grid-template-rows: repeat(3, 22px);
-		gap: 2px;
-
-		button {
-			padding: 0;
-			background: rgba(255, 255, 255, 0.04);
-			border: 1px solid #2a2f37;
-			border-radius: 3px;
-			color: #888;
-			font:
-				14px/1 ui-monospace,
-				monospace;
-			cursor: pointer;
-
-			&:hover {
-				border-color: #4a9eff;
-				color: #ddd;
-			}
-			&.active {
-				background: rgba(74, 158, 255, 0.18);
-				border-color: #4a9eff;
-				color: #fff;
-			}
-		}
-	}
+	   icon picker, the halo combo, the font select, the position grid)
+	   lives in scoped sub-components: ColorRow / SliderRow / IconPicker /
+	   HaloRow / FontSelect / PositionGrid. */
 
 	.mini {
 		padding: 0.2rem 0.4rem;
