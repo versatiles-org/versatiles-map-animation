@@ -311,6 +311,13 @@ function spawnFfmpeg(opts) {
 	});
 	let stderrBuf = '';
 	if (proc.stderr) proc.stderr.on('data', (chunk) => (stderrBuf += chunk.toString()));
+	// Suppress the unhandled `error` event on stdin so that EPIPE (which
+	// fires when ffmpeg has already died before consuming all PNG frames)
+	// doesn't crash the renderer with a stack trace. We surface the real
+	// cause — ffmpeg's exit code + captured stderr — via the exit promise
+	// instead. Without this listener Node throws synchronously on the first
+	// `.write()` after ffmpeg goes away, masking the underlying ffmpeg error.
+	proc.stdin.on('error', () => {});
 	const exit = new Promise((res, rej) => {
 		proc.on('exit', (code) => {
 			if (code === 0) return res(undefined);
@@ -424,6 +431,13 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	// has no visible effect on the captured frames.
 	const progress = new Progress(total, 'rendering frames');
 	for (let i = 0; i < total; i++) {
+		// If ffmpeg has died, bail out instead of looping through all 700+
+		// remaining frames writing PNGs into a dead pipe. The exit promise
+		// (awaited just below in main) will surface the real ffmpeg error.
+		if (!ffmpegStdin.writable || ffmpegStdin.destroyed) {
+			progress.finish();
+			throw new Error(`ffmpeg pipe closed early (after frame ${i})`);
+		}
 		const t = Math.min(duration, i / opts.fps);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 		try {
