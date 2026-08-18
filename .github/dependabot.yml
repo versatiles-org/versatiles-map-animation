@@ -9,6 +9,10 @@ updates:
       npm:
         patterns:
           - '*'
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
 
   - package-ecosystem: github-actions
     directory: '/'
@@ -16,5 +20,9 @@ updates:
       interval: weekly
     groups:
       github-actions:
+        patterns:
+          - '*'
+      security:
+        applies-to: security-updates
         patterns:
           - '*'
