@@ -2,6 +2,7 @@
 	import type { FeatureCollection } from 'geojson';
 	import * as maplibregl from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
+	import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import {
 		getAnnotationOpacity,
@@ -27,6 +28,16 @@
 		type CameraState,
 		type LabelPosition
 	} from '../types';
+
+	/**
+	 * MapLibre 6 loads its worker from a sibling file resolved at runtime via
+	 * `new URL('./maplibre-gl-worker.mjs', import.meta.url)`. The filename is
+	 * picked by a ternary, so Vite cannot analyse it statically and never emits
+	 * the worker (nor its `maplibre-gl-shared.mjs` dependency) — the request
+	 * 404s and the map silently never loads a style or a tile. Handing MapLibre
+	 * a URL Vite *did* emit (via `?worker&url`) restores it in dev and build.
+	 */
+	maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 	/**
 	 * `text-font` is one of the few MapLibre properties that requires *literal*
