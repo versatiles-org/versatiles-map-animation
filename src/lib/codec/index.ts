@@ -1,6 +1,6 @@
 /**
  * Tiny, dependency-free, bit-level binary codec library. Re-exports every
- * piece of the public API so callers can `import { ... } from '$lib/codec'`
+ * piece of the public API so callers can `import { ... } from '#lib/codec/index.ts'`
  * without caring how the internals are split across files.
  *
  * Topology:

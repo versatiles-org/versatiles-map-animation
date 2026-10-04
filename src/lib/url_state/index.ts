@@ -132,7 +132,7 @@ export function readAnimationFromUrl(): Animation | null {
 
 /**
  * Return a bit-cost tree for the current encoding of `anim`. Useful for
- * debugging URL-hash size — pair with `formatInspection()` from `$lib/codec`
+ * debugging URL-hash size — pair with `formatInspection()` from `#lib/codec/index.ts`
  * to print a "lat: 28 bits, zoom: 20 bits, …" tree.
  */
 export function inspectAnimation(anim: Animation): InspectionNode {

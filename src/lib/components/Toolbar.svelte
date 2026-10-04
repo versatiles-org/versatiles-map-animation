@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
@@ -79,7 +79,7 @@
 	async function onShare() {
 		closeMenu();
 		if (store.keyframes.length === 0) return;
-		const url = `${window.location.origin}${base}/#kf=${encodeAnimation(store.toAnimation())}`;
+		const url = `${window.location.origin}${resolve('/')}#kf=${encodeAnimation(store.toAnimation())}`;
 		try {
 			await navigator.clipboard.writeText(url);
 			flash('ok', '✓ Share URL copied');

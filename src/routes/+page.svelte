@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { AnimationStore } from '$lib/animation.svelte';
-	import { aspectRatioValue } from '$lib/types';
+	import { AnimationStore } from '#lib/animation.svelte.ts';
+	import { aspectRatioValue } from '#lib/types.ts';
 	import {
 		clearUrlHash,
 		readAnimationFromStorage,
 		readAnimationFromUrl,
 		writeAnimationToStorage,
 		writeAnimationToUrl
-	} from '$lib/url_state';
-	import MapStage from '$lib/components/MapStage.svelte';
-	import Sidebar from '$lib/components/Sidebar.svelte';
-	import Timeline from '$lib/components/Timeline.svelte';
-	import Toolbar from '$lib/components/Toolbar.svelte';
+	} from '#lib/url_state/index.ts';
+	import MapStage from '#lib/components/MapStage.svelte';
+	import Sidebar from '#lib/components/Sidebar.svelte';
+	import Timeline from '#lib/components/Timeline.svelte';
+	import Toolbar from '#lib/components/Toolbar.svelte';
 
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);

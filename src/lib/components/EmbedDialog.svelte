@@ -7,7 +7,7 @@
 	 * editor preview does.
 	 */
 
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { encodeAnimation } from '../url_state';
 
@@ -25,7 +25,7 @@
 
 	function buildSnippet(): string {
 		const encoded = encodeAnimation(store.toAnimation());
-		const url = `${window.location.origin}${base}/view#kf=${encoded}`;
+		const url = `${window.location.origin}${resolve('/view')}#kf=${encoded}`;
 		// `aspect-ratio` mirrors the composition aspect so the iframe stays
 		// the right shape in any container width (the viewer letterboxes
 		// internally too, but matching here avoids visible bars).
