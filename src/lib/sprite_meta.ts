@@ -1,34 +1,46 @@
 /**
- * Static metadata for the markers sprite atlas. Pulled from the live
- * `sprites.json` once and pinned here so we can render icon previews in the
- * UI without depending on a runtime fetch. The atlas dimensions and per-icon
- * pixel positions are stable across atlas rebuilds (we'd rather catch a
- * version drift in code review than leave the picker silently broken).
+ * Static metadata for the sprite atlases that hold the annotation icons.
+ * Pulled from the live `<sheet>.json` once and pinned here so we can render
+ * icon previews in the UI without depending on a runtime fetch. A sheet
+ * rebuild can move icons around, so re-pin these when the sprites are
+ * updated (we'd rather catch a version drift in code review than leave the
+ * picker silently broken).
  */
 
 import { ANNOTATION_ICON_ROTATION_OFFSETS, type AnnotationIcon } from './types';
 
-export const ANNOTATION_SPRITE_PNG_URL =
-	'https://tiles.versatiles.org/assets/sprites/markers/sprites.png';
+const SPRITE_BASE_URL = 'https://tiles.versatiles.org/assets/sprites';
 
-export const ANNOTATION_SPRITE_ATLAS_W = 224;
-export const ANNOTATION_SPRITE_ATLAS_H = 192;
-export const ANNOTATION_SPRITE_PX = 32;
+type SpriteSheet = 'extras' | 'icons' | 'base';
 
-/** Top-left pixel of each icon in the atlas (all icons are 32×32). */
-export const ANNOTATION_SPRITE_POS: Record<AnnotationIcon, [number, number]> = {
-	'symbol-marker': [160, 96],
-	'symbol-marker_outline': [160, 128],
-	'symbol-circle': [0, 128],
-	'symbol-circle_outline': [32, 128],
-	'symbol-star': [64, 160],
-	'symbol-star_outline': [96, 160],
-	'symbol-arrow': [128, 32],
-	'symbol-arrow1': [128, 64],
-	'symbol-arrow2': [128, 96],
-	'icon-home': [0, 64],
-	'icon-mountain': [96, 0],
-	'icon-information': [32, 64]
+/** Atlas dimensions (px, at pixelRatio 1) of each sheet. */
+const ANNOTATION_SPRITE_ATLAS: Record<SpriteSheet, [number, number]> = {
+	extras: [352, 306],
+	icons: [384, 384],
+	base: [384, 352]
+};
+
+export function annotationSpritePngUrl(sheet: SpriteSheet): string {
+	return `${SPRITE_BASE_URL}/${sheet}.png`;
+}
+
+/** Sheet plus `[x, y, width, height]` of each icon in its atlas. */
+export const ANNOTATION_SPRITE_POS: Record<
+	AnnotationIcon,
+	[SpriteSheet, number, number, number, number]
+> = {
+	'symbol-marker': ['extras', 64, 0, 32, 38],
+	'symbol-marker_outline': ['extras', 128, 76, 32, 38],
+	'symbol-circle': ['extras', 0, 178, 32, 32],
+	'symbol-circle_outline': ['extras', 32, 178, 32, 32],
+	'symbol-star': ['extras', 256, 32, 32, 32],
+	'symbol-star_outline': ['extras', 256, 192, 32, 32],
+	'symbol-arrow': ['extras', 128, 242, 32, 32],
+	'symbol-arrow1': ['extras', 160, 242, 32, 32],
+	'symbol-arrow2': ['extras', 192, 242, 32, 32],
+	'icon-home': ['icons', 256, 32, 32, 32],
+	'icon-mountain': ['icons', 192, 256, 32, 32],
+	'icon-information': ['base', 320, 320, 32, 32]
 };
 
 /**
@@ -40,17 +52,23 @@ export const ANNOTATION_SPRITE_POS: Record<AnnotationIcon, [number, number]> = {
  * inverting the surrounding "white on black" chip.
  */
 export function spritePreviewStyle(icon: AnnotationIcon, displayPx: number): string {
-	const [sx, sy] = ANNOTATION_SPRITE_POS[icon];
-	const scale = displayPx / ANNOTATION_SPRITE_PX;
+	const [sheet, sx, sy, sw, sh] = ANNOTATION_SPRITE_POS[icon];
+	const [atlasW, atlasH] = ANNOTATION_SPRITE_ATLAS[sheet];
+	// Fit the icon's longer side into the chip and centre the shorter one;
+	// the neighbours that peek in beside a non-square icon are transparent
+	// SDF padding.
+	const scale = displayPx / Math.max(sw, sh);
+	const px = (displayPx - sw * scale) / 2 - sx * scale;
+	const py = (displayPx - sh * scale) / 2 - sy * scale;
 	// Apply the same per-icon rotation offset the map uses, so what the user
 	// sees in the dropdown matches what they'll get on the map at rotation 0.
 	const offsetDeg = ANNOTATION_ICON_ROTATION_OFFSETS[icon];
 	return [
 		`width: ${displayPx}px`,
 		`height: ${displayPx}px`,
-		`--sprite-bg: url('${ANNOTATION_SPRITE_PNG_URL}')`,
-		`--sprite-pos: -${sx * scale}px -${sy * scale}px`,
-		`--sprite-size: ${ANNOTATION_SPRITE_ATLAS_W * scale}px ${ANNOTATION_SPRITE_ATLAS_H * scale}px`,
+		`--sprite-bg: url('${annotationSpritePngUrl(sheet)}')`,
+		`--sprite-pos: ${px}px ${py}px`,
+		`--sprite-size: ${atlasW * scale}px ${atlasH * scale}px`,
 		`--sprite-rotate: ${offsetDeg}deg`
 	].join('; ');
 }

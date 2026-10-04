@@ -56,10 +56,13 @@ export const MAP_STYLE_IDS = ['colorful', 'satellite'] as const;
 export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
 
 /**
- * Curated subset of the VersaTiles markers sprite sheet that we expose in the
- * annotation icon picker. All entries are SDF sprites, so `icon-color` recolours
- * them to any value at runtime. See:
- *   https://tiles.versatiles.org/assets/sprites/markers/sprites.json
+ * Curated set of VersaTiles sprites that we expose in the annotation icon
+ * picker. All entries are SDF sprites, so `icon-color` recolours them to any
+ * value at runtime.
+ *
+ * These ids are persisted (JSON export, URL state), so they keep the names of
+ * the v5 `markers` sheet they were first taken from. `ANNOTATION_ICON_SPRITES`
+ * maps each one to the sprite that draws it today.
  *
  * Order matters: the first entry is the codec carry-forward default and the
  * icon picker default for new annotations.
@@ -79,6 +82,26 @@ export const ANNOTATION_ICONS = [
 	'icon-information'
 ] as const;
 export type AnnotationIcon = (typeof ANNOTATION_ICONS)[number];
+
+/**
+ * Namespaced sprite id (`<sheet>:<name>`) for each annotation icon. See:
+ *   https://tiles.versatiles.org/assets/sprites/extras.json
+ *   https://tiles.versatiles.org/assets/sprites/icons.json
+ */
+export const ANNOTATION_ICON_SPRITES: Record<AnnotationIcon, string> = {
+	'symbol-marker': 'extras:pin-teardrop',
+	'symbol-marker_outline': 'extras:pin-teardrop_outline',
+	'symbol-circle': 'extras:shape-circle',
+	'symbol-circle_outline': 'extras:shape-circle_outline',
+	'symbol-star': 'extras:shape-star',
+	'symbol-star_outline': 'extras:shape-star_outline',
+	'symbol-arrow': 'extras:symbol-arrow',
+	'symbol-arrow1': 'extras:symbol-arrow2',
+	'symbol-arrow2': 'extras:symbol-arrow3',
+	'icon-home': 'icons:house',
+	'icon-mountain': 'icons:mountain',
+	'icon-information': 'base:transport-information'
+};
 
 export function isAnnotationIcon(value: unknown): value is AnnotationIcon {
 	return typeof value === 'string' && (ANNOTATION_ICONS as readonly string[]).includes(value);
@@ -114,18 +137,18 @@ export const ANNOTATION_ICON_ROTATION_OFFSETS: Record<AnnotationIcon, number> = 
  * tips stay planted, arrow tips stay glued to the location, etc.
  */
 export const ANNOTATION_ICON_OFFSETS: Record<AnnotationIcon, [number, number]> = {
-	'symbol-marker': [0, -11],
-	'symbol-marker_outline': [0, -11],
+	'symbol-marker': [0, -14],
+	'symbol-marker_outline': [0, -14],
 	'symbol-circle': [0, 0],
 	'symbol-circle_outline': [0, 0],
 	'symbol-star': [0, -1],
 	'symbol-star_outline': [0, -1],
-	'symbol-arrow': [-11, 0],
-	'symbol-arrow1': [-10, 0],
+	'symbol-arrow': [-10, 0],
+	'symbol-arrow1': [-9, 0],
 	'symbol-arrow2': [-9, 0],
 	'icon-home': [0, 0],
 	'icon-mountain': [0, 0],
-	'icon-information': [0, -8]
+	'icon-information': [0, 0]
 };
 
 export const DEFAULT_ANNOTATION_ICON: AnnotationIcon = 'symbol-marker';

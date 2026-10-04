@@ -9,10 +9,11 @@
 		resolveAnnotation,
 		type AnimationStore
 	} from '../animation.svelte';
-	import { ANNOTATION_SPRITE_ID, buildMapStyle } from '../map_style';
+	import { buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
+		ANNOTATION_ICON_SPRITES,
 		ANNOTATION_LABEL_FONTS,
 		aspectRatioValue,
 		DEFAULT_ANNOTATION_LABEL_COLOR,
@@ -187,7 +188,7 @@
 					id: i,
 					geometry: { type: 'Point', coordinates: [raw.lng, raw.lat] },
 					properties: {
-						icon: a.icon,
+						sprite: ANNOTATION_ICON_SPRITES[a.icon],
 						color: a.iconColor,
 						label: raw.label,
 						// Per-icon rotation offset puts the user's `rotation = 0`
@@ -229,7 +230,7 @@
 				type: 'symbol',
 				source: ANNOTATION_SOURCE,
 				layout: {
-					'icon-image': ['concat', `${ANNOTATION_SPRITE_ID}:`, ['get', 'icon']],
+					'icon-image': ['get', 'sprite'],
 					// Anchor at the geo point; the per-feature `offset` shifts the
 					// icon so that its tuned pivot pixel sits exactly on the anchor.
 					// `icon-rotate` then pivots around that pixel, which is what we

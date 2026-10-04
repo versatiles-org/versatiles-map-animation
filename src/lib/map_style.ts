@@ -1,49 +1,36 @@
-import { colorful, satellite } from '@versatiles/style';
+import { osm, satellite } from '@versatiles/style';
 import type { SpriteSpecification, StyleSpecification } from 'maplibre-gl';
 import type { MapStyleId } from './types';
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
 
 /**
- * Sprite sheet that backs annotation icons. Referenced from the symbol layer
- * via the `markers:` namespace (e.g. `markers:symbol-marker`). Loaded as an
- * additional sprite alongside the base style's own sprite.
+ * Sprite sheets that back annotation icons, loaded alongside the base style's
+ * own `base` sheet. Annotation icons reference them by namespace (e.g.
+ * `extras:pin-teardrop`, `icons:house`) — see `ANNOTATION_ICON_SPRITES`.
  */
-export const ANNOTATION_SPRITE_ID = 'markers';
-const ANNOTATION_SPRITE_URL = `${TILES_BASE_URL}/assets/sprites/markers/sprites`;
+const ANNOTATION_SPRITE_SHEETS = ['extras', 'icons'].map((id) => ({
+	id,
+	url: `${TILES_BASE_URL}/assets/sprites/${id}`
+}));
 
-function withMarkersSprite(style: StyleSpecification): StyleSpecification {
+function withAnnotationSprites(style: StyleSpecification): StyleSpecification {
 	const existing: SpriteSpecification | undefined = style.sprite;
-	const markers = { id: ANNOTATION_SPRITE_ID, url: ANNOTATION_SPRITE_URL };
 	if (Array.isArray(existing)) {
-		style.sprite = [...existing, markers];
+		style.sprite = [...existing, ...ANNOTATION_SPRITE_SHEETS];
 	} else if (typeof existing === 'string') {
 		// Older string form — promote to the array form so we can append.
-		style.sprite = [{ id: 'default', url: existing }, markers];
+		style.sprite = [{ id: 'default', url: existing }, ...ANNOTATION_SPRITE_SHEETS];
 	} else {
-		style.sprite = [markers];
-	}
-	return style;
-}
-
-/**
- * Ensure the style declares a `glyphs` URL pointing at the VersaTiles
- * glyph bundle. The `colorful` style ships one by default, but `satellite`
- * with `overlay: false` (labels off) does not — and without a `glyphs` URL
- * MapLibre cannot fetch any new font's glyph stack at runtime, which breaks
- * annotation label rendering when the user changes a font in the editor.
- */
-function withGlyphs(style: StyleSpecification): StyleSpecification {
-	if (!style.glyphs) {
-		style.glyphs = `${TILES_BASE_URL}/assets/glyphs/{fontstack}/{range}.pbf`;
+		style.sprite = [...ANNOTATION_SPRITE_SHEETS];
 	}
 	return style;
 }
 
 /**
  * MapLibre `sky` block — atmospheric scattering visible behind the horizon
- * when the camera is pitched. The upstream style builders don't include one,
- * so we attach it here when the user opts in.
+ * when the camera is pitched. We ask the upstream builders for `sky: false`
+ * and attach our own here when the user opts in.
  *
  * `atmosphere-blend` is interpolated from full at flat to off past zoom 12,
  * so the sky doesn't bleed into close-up tiles. Cast through `unknown` because
@@ -73,32 +60,30 @@ export async function buildMapStyle(
 	terrain: boolean,
 	sky: boolean
 ): Promise<StyleSpecification> {
+	// The builders default to the `globe` projection; our camera maths, URL
+	// state and renderer all assume Web Mercator, so pin it explicitly.
+	const common = { urls: { base: TILES_BASE_URL }, sky: false, projection: 'mercator' } as const;
 	switch (id) {
 		case 'colorful':
-			// `hideLabels: true` strips every symbol layer (place names, POIs,
-			// shields). For colorful that's the only "show labels" knob the
-			// upstream builder offers.
+			// "Labels off" strips every symbol layer (place names, POIs,
+			// shields, one-way markings) — `labels` alone only covers text.
 			return withSky(
-				withGlyphs(
-					withMarkersSprite(
-						await colorful({
-							baseUrl: TILES_BASE_URL,
-							hideLabels: !labels,
-							terrain,
-							hillshade: terrain
-						})
-					)
+				withAnnotationSprites(
+					osm({
+						...common,
+						theme: 'colorful',
+						layers: labels ? true : { labels: false, icons: false, pois: false },
+						features: { terrain, hillshade: terrain }
+					})
 				),
 				sky
 			);
 		case 'satellite':
-			// Satellite imagery is always rendered. The `overlay` flag adds the
-			// colorful basemap (roads, labels, etc.) on top — that's the
+			// Satellite imagery is always rendered. The `osmOverlay` flag adds
+			// the OSM basemap (roads, labels, etc.) on top — that's the
 			// satellite equivalent of "show labels".
 			return withSky(
-				withGlyphs(
-					withMarkersSprite(await satellite({ baseUrl: TILES_BASE_URL, overlay: labels, terrain }))
-				),
+				withAnnotationSprites(satellite({ ...common, osmOverlay: labels, features: { terrain } })),
 				sky
 			);
 	}
