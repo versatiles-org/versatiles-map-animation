@@ -8,17 +8,25 @@
  *   clearUrlHash()               → void
  *   inspectAnimation(anim)       → InspectionNode     (debug bit-cost tree)
  *
- * The on-the-wire format is a single tag byte followed by the V1 struct
- * defined in `./animation_codec`. Future *additive* features extend the
- * options mask inside V1; the format-tag bumps to V2 only on a genuinely
- * breaking change (see the rule documented at the top of `animation_codec.ts`).
+ * The on-the-wire format is a single tag byte followed by the struct defined
+ * in `./animation_codec`. The encoder writes V2 (tag 0x02); V1 (tag 0x01) is
+ * still decoded. Future *additive* features extend the options mask; the
+ * format tag bumps only on a genuinely breaking change (see the rule
+ * documented at the top of `animation_codec.ts`).
  */
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
 import { ANIMATION_DEFAULTS, SCHEMA_VERSION } from '../types';
 import type { Animation } from '../types';
-import { AnimationCodec, FORMAT_TAG_BINARY_V1 } from './animation_codec';
+import {
+	AnimationCodec,
+	AnimationCodecV1,
+	AnimationCodecV2,
+	FORMAT_TAG_BINARY,
+	FORMAT_TAG_BINARY_V1,
+	FORMAT_TAG_BINARY_V2
+} from './animation_codec';
 import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
 import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
 
@@ -57,7 +65,7 @@ function fromWire(wire: Wire): Animation {
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
 		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,
-		// Now preserved on the wire (V1 options-mask bit 2). Animations
+		// Now preserved on the wire (options-mask bit 2). Animations
 		// encoded before this feature shipped just lack the bit and come
 		// back with empty defaults — backwards-compatible by construction.
 		defaultAnnotation: wire.defaultAnnotation ?? {}
@@ -70,12 +78,12 @@ function fromWire(wire: Wire): Animation {
 
 /**
  * Encode an animation to a base64-url string suitable for URL hashes.
- * Uses the bit-packed binary codec; the first byte is a format tag (0x01)
- * followed by the V1 struct.
+ * Uses the bit-packed binary codec; the first byte is a format tag (0x02)
+ * followed by the V2 struct.
  */
 export function encodeAnimation(anim: Animation): string {
 	const w = new BitWriter();
-	w.writeBits(FORMAT_TAG_BINARY_V1, 8);
+	w.writeBits(FORMAT_TAG_BINARY, 8);
 	AnimationCodec.encode(buildWire(anim), w);
 	return bytesToBase64Url(w.finish());
 }
@@ -96,15 +104,21 @@ function decodeOrThrow(encoded: string): Animation {
 	const bytes = base64UrlToBytes(encoded);
 	if (bytes.length === 0) throw new Error('Empty payload');
 	const tag = bytes[0];
-	if (tag !== FORMAT_TAG_BINARY_V1) {
+	const codec = DECODERS[tag];
+	if (!codec) {
 		throw new Error(`Unknown URL hash format (tag=0x${tag.toString(16)})`);
 	}
 	const r = new BitReader(bytes);
 	r.readBits(8); // consume tag
-	const wire = AnimationCodec.decode(r);
+	const wire = codec.decode(r);
 	assertVersion(wire.version);
 	return fromWire(wire);
 }
+
+const DECODERS: Record<number, typeof AnimationCodec | undefined> = {
+	[FORMAT_TAG_BINARY_V1]: AnimationCodecV1,
+	[FORMAT_TAG_BINARY_V2]: AnimationCodecV2
+};
 
 function assertVersion(v: number): void {
 	if (v > SCHEMA_VERSION) {

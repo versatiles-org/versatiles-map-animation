@@ -1,6 +1,13 @@
 import { osm, satellite } from '@versatiles/style';
 import type { SpriteSpecification, StyleSpecification } from 'maplibre-gl';
-import type { MapStyleId } from './types';
+import type { Animation } from './types';
+
+/**
+ * The animation-level fields that decide what the base map style looks like.
+ * `AnimationStore.mapStyleOptions` bundles them, so a new style setting is
+ * added here and there, and MapStage rebuilds the style without changes.
+ */
+export type MapStyleOptions = Pick<Animation, 'style' | 'labels' | 'terrain' | 'sky'>;
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
 
@@ -54,12 +61,8 @@ function withSky(style: StyleSpecification, sky: boolean): StyleSpecification {
 	return style;
 }
 
-export async function buildMapStyle(
-	id: MapStyleId,
-	labels: boolean,
-	terrain: boolean,
-	sky: boolean
-): Promise<StyleSpecification> {
+export async function buildMapStyle(options: MapStyleOptions): Promise<StyleSpecification> {
+	const { style: id, labels, terrain, sky } = options;
 	// The builders default to the `globe` projection; our camera maths, URL
 	// state and renderer all assume Web Mercator, so pin it explicitly.
 	const common = { urls: { base: TILES_BASE_URL }, sky: false, projection: 'mercator' } as const;

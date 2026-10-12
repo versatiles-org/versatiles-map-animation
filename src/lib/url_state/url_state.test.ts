@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { decodeAnimation, encodeAnimation } from '.';
+import { base64UrlToBytes } from '../codec';
 import { ASPECT_RATIOS, SCHEMA_VERSION, type Animation } from '../types';
 
 const example: Animation = {
@@ -451,5 +452,53 @@ describe('defaultAnnotation option', () => {
 		);
 		expect(decoded?.annotations[0].iconColor).toBe('#aabbcc');
 		expect(decoded?.defaultAnnotation.iconColor).toBe('#ffffff');
+	});
+});
+
+describe('format versions', () => {
+	// Hashes written by the V1 encoder (tag 0x01), before V2 existed.
+	const V1_FLAT = 'ARQQdjw4mITU_TcBxiYQAAA';
+	const V1_FLAT_4_3 = 'ARQQdjw4mITU_TcBxiYQASA';
+	const V1_ANNOTATED =
+		'ARsh_gMZEhN5cto_FxU4_nxc8ElyItRDWKrf5vcNbkjCoYZkG3dzf8vMXZkjkdJxFvP-CAr6_CcKfrZ9wD2QAAKTW9udCBCbGFuY8bXp_1Dp-PDsgAACgAA';
+
+	it('writes the V2 format tag', () => {
+		expect(base64UrlToBytes(encodeAnimation(example))[0]).toBe(0x02);
+	});
+
+	it('still decodes V1 hashes', () => {
+		const flat = decodeAnimation(V1_FLAT);
+		expect(flat?.keyframes.length).toBe(2);
+		expect(flat?.aspectRatio).toBe('16:9');
+		expect(decodeAnimation(V1_FLAT_4_3)?.aspectRatio).toBe('4:3');
+
+		const annotated = decodeAnimation(V1_ANNOTATED);
+		expect(annotated?.keyframes.length).toBe(4);
+		expect(annotated?.annotations.length).toBe(1);
+	});
+
+	it('re-encodes a V1 hash as V2 without changing the animation', () => {
+		for (const hash of [V1_FLAT, V1_FLAT_4_3, V1_ANNOTATED]) {
+			const fromV1 = decodeAnimation(hash)!;
+			const reencoded = encodeAnimation(fromV1);
+			expect(base64UrlToBytes(hash)[0]).toBe(0x01);
+			expect(base64UrlToBytes(reencoded)[0]).toBe(0x02);
+			expect(decodeAnimation(reencoded)).toEqual(fromV1);
+		}
+	});
+
+	it('keeps the linear path of a V1 keyframe', () => {
+		// V1 stores `path` in 1 bit, V2 in 2 — the value must survive both.
+		const withPath: Animation = {
+			...example,
+			keyframes: example.keyframes.map((kf, i) => (i === 0 ? { ...kf, path: 'linear' } : kf))
+		};
+		const decoded = decodeAnimation(encodeAnimation(withPath));
+		expect(decoded?.keyframes[0].path).toBe('linear');
+		expect(decoded?.keyframes[1].path).toBeUndefined();
+	});
+
+	it('rejects an unknown format tag', () => {
+		expect(decodeAnimation('AxQQdjw4mITU_TcBxiYQAAA')).toBeNull();
 	});
 });

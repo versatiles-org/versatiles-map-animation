@@ -328,12 +328,8 @@
 	let initialStyleApplied = false;
 
 	onMount(async () => {
-		const initialId = untrack(() => store.style);
-		const initialLabels = untrack(() => store.labels);
-		const initialTerrain = untrack(() => store.terrain);
-		const initialSky = untrack(() => store.sky);
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
-		const style = await buildMapStyle(initialId, initialLabels, initialTerrain, initialSky);
+		const style = await buildMapStyle(untrack(() => store.mapStyleOptions));
 		// Compute the zoom offset from the container directly — `zoomOffset()`
 		// can't run yet because `map` doesn't exist.
 		const initialOffset =
@@ -465,18 +461,15 @@
 		applyCamera(cam);
 	});
 
-	// effect: rebuild the map style on style/labels/terrain/sky changes.
+	// effect: rebuild the map style whenever one of its options changes.
 	// `setStyle({ diff: false })` wipes our custom annotation source/layer
 	// along with everything else, so we re-install them via `setupAnnotationLayer`
 	// once the new style has finished loading.
 	$effect(() => {
-		const id = store.style;
-		const labels = store.labels;
-		const terrain = store.terrain;
-		const sky = store.sky;
+		const options = store.mapStyleOptions;
 		if (!map || !initialStyleApplied) return;
 		let cancelled = false;
-		buildMapStyle(id, labels, terrain, sky).then((newStyle) => {
+		buildMapStyle(options).then((newStyle) => {
 			if (cancelled || !map) return;
 			// setStyle({ diff: false }) wipes our custom source/layer along with
 			// the rest. Re-install once the new style has finished loading.

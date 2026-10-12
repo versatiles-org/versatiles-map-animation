@@ -1,4 +1,5 @@
 import { sampleAt } from './interpolate';
+import type { MapStyleOptions } from './map_style';
 import {
 	ANIMATION_DEFAULTS,
 	ANNOTATION_FIELD_DEFAULTS,
@@ -174,6 +175,16 @@ export class AnimationStore {
 			: null
 	);
 	sampledCamera = $derived(sampleAt(this.keyframes, this.currentTime));
+	/**
+	 * Everything `buildMapStyle` needs. A new object whenever one of the
+	 * fields changes, which is what makes MapStage rebuild the style.
+	 */
+	mapStyleOptions = $derived<MapStyleOptions>({
+		style: this.style,
+		labels: this.labels,
+		terrain: this.terrain,
+		sky: this.sky
+	});
 	/**
 	 * Annotations whose visibility window contains `currentTime`. Used by
 	 * MapStage to drive the symbol-layer feature state per frame, and by the

@@ -9,7 +9,7 @@
  * the example changes, re-run this script and paste the new hash into the
  * demo file.
  *
- * `Animation.defaultAnnotation` is now preserved on the wire (V1 options
+ * `Animation.defaultAnnotation` is now preserved on the wire (options
  * bit 2), so the encoded hash carries the per-animation style template
  * alongside thin annotations — no pre-baking needed.
  */

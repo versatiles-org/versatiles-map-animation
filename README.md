@@ -146,7 +146,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 
 `version` is the JSON-format compat marker; new optional fields are added without bumping it. Files written before a feature was added still load — every additional field is optional and falls back to a sensible default.
 
-The URL hash uses a separate compact binary format (single tag, `V1`). New optional features extend an in-struct options mask without bumping the format tag, so simple animations stay short and adding a feature doesn't invalidate previously-shared links. The format tag bumps to `V2` only on a genuinely-breaking change — see the rule documented at the top of `src/lib/url_state/animation_codec.ts`.
+The URL hash uses a separate compact binary format that starts with a format tag. The editor writes `V2`; links in the older `V1` format still open. New optional features extend an in-struct options mask without bumping the format tag, so simple animations stay short and adding a feature doesn't invalidate previously-shared links. The format tag bumps only on a genuinely-breaking change — see the rule documented at the top of `src/lib/url_state/animation_codec.ts`.
 
 ## License
 
