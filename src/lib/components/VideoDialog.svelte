@@ -16,16 +16,23 @@
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
 	const VIDEO_FPS = [24, 25, 30, 50, 60] as const;
 	type VideoFps = (typeof VIDEO_FPS)[number];
-	// Motion-blur sample counts. 1 = off (crisp), 4/8 = typical cinematic
-	// motion-blur strengths. Render time scales linearly with the sample
-	// count; we mention that in the option labels so users go in
-	// eyes-open.
-	const MOTION_BLUR_OPTS = [
-		{ value: 1, label: 'Off (crisp)' },
-		{ value: 4, label: '4× — light (4× render time)' },
-		{ value: 8, label: '8× — strong (8× render time)' }
-	] as const;
-	type MotionBlur = (typeof MOTION_BLUR_OPTS)[number]['value'];
+	// Motion blur: number of sub-frames rendered and averaged per output
+	// frame. 1 = off (crisp), 4–8 = typical cinematic strengths. Render time
+	// scales linearly with the sample count. The shutter angle sets how much
+	// of a frame's duration those sub-frames span (180° = half, 360° = all).
+	// Ranges and defaults mirror `--motion-blur` / `--shutter-angle` in
+	// render/render.mjs.
+	const MOTION_BLUR_MIN = 1;
+	const MOTION_BLUR_MAX = 32;
+	const SHUTTER_ANGLE_MIN = 1;
+	const SHUTTER_ANGLE_MAX = 360;
+	const DEFAULT_SHUTTER_ANGLE = 180;
+
+	/** Round and clamp a number-input value; an empty or invalid field falls back. */
+	function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+		if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+		return Math.max(min, Math.min(max, Math.round(value)));
+	}
 
 	let {
 		store,
@@ -41,7 +48,15 @@
 
 	let videoWidth = $state<VideoWidth>(1920);
 	let videoFps = $state<VideoFps>(30);
-	let motionBlur = $state<MotionBlur>(1);
+	// Bound to number inputs, so they are `null` while a field is empty.
+	let motionBlurInput = $state<number | null>(MOTION_BLUR_MIN);
+	let shutterAngleInput = $state<number | null>(DEFAULT_SHUTTER_ANGLE);
+	const motionBlur = $derived(
+		clampInt(motionBlurInput, MOTION_BLUR_MIN, MOTION_BLUR_MAX, MOTION_BLUR_MIN)
+	);
+	const shutterAngle = $derived(
+		clampInt(shutterAngleInput, SHUTTER_ANGLE_MIN, SHUTTER_ANGLE_MAX, DEFAULT_SHUTTER_ANGLE)
+	);
 	const videoHeight = $derived(Math.round(videoWidth / aspectRatioValue(store.aspectRatio)));
 
 	function buildCommand(): string {
@@ -52,9 +67,14 @@
 		// `--width` and the composition aspect ratio chosen in the editor.
 		// `-it` allocates a pseudo-TTY (line-buffered progress bars, colour) and
 		// keeps stdin open so the user can `Ctrl-C` to abort the render.
-		// `--motion-blur` is only emitted when the user picked > 1, so the
-		// default snippet stays as short as before.
-		const blurFlag = motionBlur > 1 ? ` --motion-blur ${motionBlur}` : '';
+		// `--motion-blur` is only emitted when the user picked > 1, and
+		// `--shutter-angle` only when it differs from the renderer's default,
+		// so the default snippet stays as short as before.
+		let blurFlag = '';
+		if (motionBlur > 1) {
+			blurFlag = ` --motion-blur ${motionBlur}`;
+			if (shutterAngle !== DEFAULT_SHUTTER_ANGLE) blurFlag += ` --shutter-angle ${shutterAngle}`;
+		}
 		return `docker run --rm -it --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps}${blurFlag} --output animation.mp4`;
 	}
 	const command = $derived(buildCommand());
@@ -98,17 +118,46 @@
 				{/each}
 			</select>
 		</label>
-		<label for="video-blur" class="control-label">
+		<label
+			for="video-blur"
+			class="control-label"
+			title="Sub-frames averaged per output frame. 1 = off (crisp), 4–8 typical. Render time grows by the same factor."
+		>
 			<span class="lbl">Motion blur</span>
-			<select id="video-blur" bind:value={motionBlur}>
-				{#each MOTION_BLUR_OPTS as opt (opt.value)}
-					<option value={opt.value}>{opt.label}</option>
-				{/each}
-			</select>
+			<input
+				id="video-blur"
+				type="number"
+				min={MOTION_BLUR_MIN}
+				max={MOTION_BLUR_MAX}
+				step="1"
+				bind:value={motionBlurInput}
+			/>
+			<span class="unit">×</span>
 		</label>
+		{#if motionBlur > 1}
+			<label
+				for="video-shutter"
+				class="control-label"
+				title="Share of each frame's duration the simulated shutter is open. 180° = cinematic, 360° = strongest blur."
+			>
+				<span class="lbl">Shutter</span>
+				<input
+					id="video-shutter"
+					type="number"
+					min={SHUTTER_ANGLE_MIN}
+					max={SHUTTER_ANGLE_MAX}
+					step="1"
+					bind:value={shutterAngleInput}
+				/>
+				<span class="unit">°</span>
+			</label>
+		{/if}
 		<span class="hint">
 			Renders this animation as MP4. Requires <strong>Docker</strong>; the file lands in the
 			directory you run the command from as <code>animation.mp4</code>.
+			{#if motionBlur > 1}
+				Motion blur makes the render take {motionBlur}× as long.
+			{/if}
 		</span>
 	</div>
 	<div class="embed-row">
@@ -174,7 +223,8 @@
 			letter-spacing: 0.06em;
 			color: #777;
 		}
-		select {
+		select,
+		input {
 			padding: 0.3rem 0.45rem;
 			background: rgba(255, 255, 255, 0.06);
 			border: 1px solid #333;
@@ -182,11 +232,16 @@
 			color: #ddd;
 			font-size: 13px;
 			font-family: inherit;
-			cursor: pointer;
 
 			&:hover {
 				border-color: #4a9eff;
 			}
+		}
+		select {
+			cursor: pointer;
+		}
+		input {
+			width: 3.5rem;
 		}
 	}
 	.embed-row {
