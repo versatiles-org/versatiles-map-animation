@@ -29,8 +29,8 @@
  */
 
 import { bool, type Codec, enumOf, struct, uint, vuint } from '../codec';
-import { ASPECT_RATIOS, DEFAULT_ASPECT_RATIO, MAP_STYLE_IDS } from '../types';
-import type { AnnotationStyle, AspectRatio, MapStyleId } from '../types';
+import { ASPECT_RATIOS, DEFAULT_ASPECT_RATIO, MAP_STYLE_IDS, MAP_THEMES } from '../types';
+import type { AnnotationStyle, AspectRatio, MapStyleId, MapTheme } from '../types';
 import { annotationsCodec, defaultAnnotationCodec } from './annotation_codec';
 import { keyframesCodecV1, keyframesCodecV2 } from './keyframe_codec';
 
@@ -39,6 +39,8 @@ export const FORMAT_TAG_BINARY_V2 = 0x02;
 
 const styleCodec = enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]]);
 const aspectRatioCodec = enumOf(ASPECT_RATIOS as readonly [AspectRatio, ...AspectRatio[]]);
+// 5 bits: room for 32 themes, so appending to MAP_THEMES keeps old links valid.
+const themeCodec = enumOf(MAP_THEMES as readonly [MapTheme, ...MapTheme[]], 5);
 
 /** Animation-level scale: vuint of round(scale*100). Default 1.0 → 100. */
 const annotationScaleCodec: Codec<number> = {
@@ -66,6 +68,7 @@ type WireAnimation = {
 	annotationScale?: number;
 	aspectRatio?: AspectRatio;
 	defaultAnnotation?: Partial<AnnotationStyle>;
+	theme?: MapTheme;
 };
 
 // ---------------------------------------------------------------------------
@@ -107,6 +110,15 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => defaultAnnotationCodec.encode(v.defaultAnnotation!, w),
 		decode: (v, r) => {
 			v.defaultAnnotation = defaultAnnotationCodec.decode(r);
+		}
+	},
+	{
+		bit: 3,
+		label: 'theme',
+		shouldEmit: (v) => v.theme !== undefined,
+		encode: (v, w) => themeCodec.encode(v.theme!, w),
+		decode: (v, r) => {
+			v.theme = themeCodec.decode(r);
 		}
 	}
 ];

@@ -21,8 +21,9 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
 ### Map style
 
-- Style: `colorful` or `satellite`.
-- Toggle place-name / road-shield labels (or, for satellite, the colorful overlay on top).
+- Style: OSM vector map or `satellite`.
+- Theme: 24 colour themes for the OSM map — `colorful` (default), `natural`, `muted`, `gray`, `toner`, each with a `-dark` variant, plus lookalikes of other well-known maps. On satellite the theme colours the overlay.
+- Toggle place-name / road-shield labels (or, for satellite, the OSM overlay on top).
 - Optional 3D terrain (with hillshade).
 - Optional atmospheric sky (visible when the camera is pitched).
 - Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
@@ -39,7 +40,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
 ### Sharing & rendering
 
-- **Share by URL** — the entire animation (style, terrain, sky, annotations, per-animation default style, scale, aspect ratio) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
+- **Share by URL** — the entire animation (style, theme, terrain, sky, annotations, per-animation default style, scale, aspect ratio) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
 - **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animation/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
 - **Local persistence** — the latest animation is mirrored to `localStorage`, so a reload without a hash restores it.
 - **Export / import as JSON** for archival or hand-off.
@@ -80,8 +81,9 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 ```jsonc
 {
 	"version": 1,
-	"style": "colorful", // "colorful" | "satellite"
-	"labels": true, // place names (colorful) or overlay (satellite)
+	"style": "colorful", // "colorful" (the OSM map) | "satellite"
+	"theme": "colorful", // optional: colour theme, see MAP_THEMES in src/lib/types.ts
+	"labels": true, // place names (OSM map) or overlay (satellite)
 	"terrain": false,
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize

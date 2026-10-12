@@ -1,7 +1,63 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
+import { osm } from '@versatiles/style';
 import { buildBaseStyle, buildMapStyle, type MapStyleOptions } from './map_style';
+import { MAP_THEME_LOOKALIKES_START, MAP_THEMES, mapThemeLabel } from './types';
 
 const base: MapStyleOptions = { style: 'colorful', labels: true, terrain: false, sky: false };
+
+describe('MAP_THEMES', () => {
+	it('lists exactly the palettes @versatiles/style offers', () => {
+		// A failure here means the library gained or lost a palette: append new
+		// ones to MAP_THEMES (never reorder — the URL codec stores the index).
+		expect([...MAP_THEMES].sort()).toEqual([...osm.palettes].sort());
+	});
+
+	it('keeps the VersaTiles themes in front of the lookalikes', () => {
+		expect(MAP_THEMES.slice(0, MAP_THEME_LOOKALIKES_START)).toEqual([
+			'colorful',
+			'colorful-dark',
+			'natural',
+			'natural-dark',
+			'muted',
+			'muted-dark',
+			'gray',
+			'gray-dark',
+			'toner',
+			'toner-dark'
+		]);
+	});
+
+	it('labels themes for the picker', () => {
+		expect(mapThemeLabel('colorful')).toBe('Colorful');
+		expect(mapThemeLabel('colorful-dark')).toBe('Colorful dark');
+	});
+});
+
+describe('buildBaseStyle theme', () => {
+	it('draws the OSM map in colorful when no theme is set', () => {
+		expect(buildBaseStyle(base)).toEqual(buildBaseStyle({ ...base, theme: 'colorful' }));
+	});
+
+	it('draws the satellite overlay in gray when no theme is set', () => {
+		const sat: MapStyleOptions = { ...base, style: 'satellite' };
+		expect(buildBaseStyle(sat)).toEqual(buildBaseStyle({ ...sat, theme: 'gray' }));
+	});
+
+	it('builds a different style for every theme', () => {
+		const seen = new Set<string>();
+		for (const theme of MAP_THEMES) {
+			seen.add(JSON.stringify(buildBaseStyle({ ...base, theme }).layers));
+		}
+		expect(seen.size).toBe(MAP_THEMES.length);
+	});
+
+	it('themes the satellite overlay, and ignores the theme without overlay', () => {
+		const sat: MapStyleOptions = { ...base, style: 'satellite' };
+		expect(buildBaseStyle({ ...sat, theme: 'toner' })).not.toEqual(buildBaseStyle(sat));
+		const bare: MapStyleOptions = { ...sat, labels: false };
+		expect(buildBaseStyle({ ...bare, theme: 'toner' })).toEqual(buildBaseStyle(bare));
+	});
+});
 
 describe('buildMapStyle', () => {
 	const tileJson = (path: string) => ({
@@ -37,7 +93,7 @@ describe('buildMapStyle', () => {
 
 		// A rebuild reuses the TileJSON it already has.
 		const before = requested.length;
-		await buildMapStyle({ ...base, terrain: true, labels: false });
+		await buildMapStyle({ ...base, terrain: true, theme: 'toner' });
 		expect(requested.length).toBe(before);
 	});
 

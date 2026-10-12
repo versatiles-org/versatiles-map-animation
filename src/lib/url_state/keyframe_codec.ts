@@ -66,19 +66,7 @@ const pathCodecV1 = enumOf(['arc', 'linear']);
 
 // V2 stores `path` as a fixed 2-bit index into `PATH_STYLES`, so the list
 // can grow to four entries without changing the encoding.
-const PATH_BITS_V2 = 2;
-const pathCodecV2: Codec<PathStyle> = {
-	encode: (v, w) => {
-		const idx = PATH_STYLES.indexOf(v);
-		if (idx === -1) throw new Error(`path: unknown value '${v}'`);
-		uint(PATH_BITS_V2).encode(idx, w);
-	},
-	decode: (r) => {
-		const idx = uint(PATH_BITS_V2).decode(r);
-		if (idx >= PATH_STYLES.length) throw new Error(`path: invalid index ${idx}`);
-		return PATH_STYLES[idx];
-	}
-};
+const pathCodecV2 = enumOf(PATH_STYLES as readonly [PathStyle, ...PathStyle[]], 2);
 
 // ---------------------------------------------------------------------------
 // Wire format

@@ -45,16 +45,12 @@
 
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
-		void store.keyframes;
-		void store.annotations;
-		void store.annotationScale;
-		void store.style;
-		void store.labels;
-		void store.terrain;
-		void store.sky;
+		// Serialising here (not inside the timer) is what makes the effect track
+		// every field that is part of the saved animation, so a newly added
+		// field can't be forgotten.
+		const anim = store.toAnimation();
 		if (urlTimer) clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
-			const anim = store.toAnimation();
 			writeAnimationToUrl(anim);
 			writeAnimationToStorage(anim);
 		}, 250);

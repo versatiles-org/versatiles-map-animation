@@ -69,6 +69,12 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(a.sky).toBe(DEFAULT_SKY);
 	});
 
+	it('keeps a known theme and drops an unknown one', () => {
+		expect(validateAnimation({ ...minimalAnim, theme: 'toner-dark' }).theme).toBe('toner-dark');
+		expect(validateAnimation({ ...minimalAnim, theme: 'nope' })).not.toHaveProperty('theme');
+		expect(validateAnimation(minimalAnim)).not.toHaveProperty('theme');
+	});
+
 	it('falls back to default annotationScale when missing or invalid', () => {
 		const a = validateAnimation({ ...minimalAnim, annotationScale: undefined });
 		expect(a.annotationScale).toBe(DEFAULT_ANNOTATION_SCALE);

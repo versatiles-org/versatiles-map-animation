@@ -138,15 +138,23 @@ export const stringCodec: Codec<string> = {
 	}
 };
 
-/** A string union codec. Costs `⌈log₂(values.length)⌉` bits. */
+/**
+ * A string union codec. Costs `⌈log₂(values.length)⌉` bits — or exactly
+ * `fixedBits` when given, which leaves room for the list to grow without
+ * changing the encoding of the values already in it.
+ */
 export function enumOf<const T extends readonly [string, ...string[]]>(
-	values: T
+	values: T,
+	fixedBits?: number
 ): Codec<T[number]> {
-	if (values.length === 1) {
+	if (fixedBits !== undefined && values.length > 2 ** fixedBits) {
+		throw new Error(`enumOf: ${values.length} values do not fit ${fixedBits} bits`);
+	}
+	if (values.length === 1 && fixedBits === undefined) {
 		const only = values[0];
 		return { encode: () => {}, decode: () => only };
 	}
-	const bits = Math.ceil(Math.log2(values.length));
+	const bits = fixedBits ?? Math.ceil(Math.log2(values.length));
 	const inner = uint(bits);
 	return {
 		encode: (v, w) => {

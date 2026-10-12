@@ -50,7 +50,8 @@ function buildWire(anim: Animation): Wire {
 		annotations: anim.annotations.map(normalizeAnnotation),
 		annotationScale: anim.annotationScale,
 		aspectRatio: anim.aspectRatio,
-		defaultAnnotation: anim.defaultAnnotation
+		defaultAnnotation: anim.defaultAnnotation,
+		theme: anim.theme
 	};
 }
 
@@ -58,6 +59,7 @@ function fromWire(wire: Wire): Animation {
 	return {
 		version: SCHEMA_VERSION,
 		style: wire.style,
+		...(wire.theme !== undefined && { theme: wire.theme }),
 		labels: wire.labels,
 		terrain: wire.terrain,
 		sky: wire.sky,

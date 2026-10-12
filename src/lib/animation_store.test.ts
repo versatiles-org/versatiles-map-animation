@@ -511,6 +511,19 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.annotations).toEqual(s.annotations);
 	});
 
+	it('serialises the theme only when one is set, and reset clears it', () => {
+		const s = new AnimationStore();
+		expect(s.toAnimation()).not.toHaveProperty('theme');
+		s.theme = 'toner';
+		expect(s.toAnimation().theme).toBe('toner');
+		expect(s.mapStyleOptions.theme).toBe('toner');
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.theme).toBe('toner');
+		s2.reset();
+		expect(s2.theme).toBeUndefined();
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

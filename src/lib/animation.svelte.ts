@@ -17,6 +17,7 @@ import type {
 	CameraState,
 	Keyframe,
 	MapStyleId,
+	MapTheme,
 	PathStyle
 } from './types';
 
@@ -149,6 +150,8 @@ export class AnimationStore {
 	selectedIndex = $state<number | null>(null);
 	selectedAnnotationIndex = $state<number | null>(null);
 	style = $state<MapStyleId>(ANIMATION_DEFAULTS.style);
+	/** Unset = the style's default theme, see `DEFAULT_MAP_THEMES`. */
+	theme = $state<MapTheme | undefined>(undefined);
 	labels = $state(ANIMATION_DEFAULTS.labels);
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
@@ -181,6 +184,7 @@ export class AnimationStore {
 	 */
 	mapStyleOptions = $derived<MapStyleOptions>({
 		style: this.style,
+		theme: this.theme,
 		labels: this.labels,
 		terrain: this.terrain,
 		sky: this.sky
@@ -414,6 +418,7 @@ export class AnimationStore {
 		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
 		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
 		this.style = anim.style ?? ANIMATION_DEFAULTS.style;
+		this.theme = anim.theme;
 		this.labels = anim.labels ?? ANIMATION_DEFAULTS.labels;
 		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
@@ -430,6 +435,8 @@ export class AnimationStore {
 		return {
 			version: SCHEMA_VERSION,
 			style: this.style,
+			// Left out while unset, so the JSON and the URL stay as they were.
+			...(this.theme !== undefined && { theme: this.theme }),
 			labels: this.labels,
 			terrain: this.terrain,
 			sky: this.sky,

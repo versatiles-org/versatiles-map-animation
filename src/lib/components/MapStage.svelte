@@ -9,6 +9,7 @@
 		resolveAnnotation,
 		type AnimationStore
 	} from '../animation.svelte';
+	import { isDarkPalette } from '@versatiles/style';
 	import { buildMapStyle } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
@@ -24,6 +25,7 @@
 		DEFAULT_LABEL_DISTANCE,
 		DEFAULT_LABEL_HALO_WIDTH,
 		DEFAULT_LABEL_POSITION,
+		DEFAULT_MAP_THEMES,
 		MAP_REFERENCE_WIDTH,
 		type Annotation,
 		type CameraState,
@@ -570,8 +572,11 @@
 	});
 
 	// Watermark colours flip with the base map: dark text + light outline reads
-	// best on the colourful style, light text + dark outline on satellite imagery.
-	const onSatellite = $derived(store.style === 'satellite');
+	// best on a light map, light text + dark outline on satellite imagery and
+	// on the dark themes of the OSM map.
+	const onDarkMap = $derived(
+		store.style === 'satellite' || isDarkPalette(store.theme ?? DEFAULT_MAP_THEMES[store.style])
+	);
 
 	// Composition aspect ratio drives the letterbox CSS — see `.map-stage-frame`.
 	const aspectNum = $derived(aspectRatioValue(store.aspectRatio));
@@ -586,7 +591,7 @@
 		<div bind:this={container} class="map-canvas"></div>
 		<a
 			class="watermark"
-			class:on-satellite={onSatellite}
+			class:on-dark-map={onDarkMap}
 			href="https://versatiles.org/sources"
 			target="_blank"
 			rel="noopener noreferrer">VersaTiles</a
@@ -652,11 +657,11 @@
 		letter-spacing: 0.02em;
 		/* Stroke width grows with the font (em-relative). */
 		-webkit-text-stroke-width: 0.18em;
-		/* Default: colourful style — dark glyphs on a light halo. */
+		/* Default: light map — dark glyphs on a light halo. */
 		color: #000;
 		-webkit-text-stroke-color: #fff;
 
-		&.on-satellite {
+		&.on-dark-map {
 			color: #fff;
 			-webkit-text-stroke-color: #000;
 		}

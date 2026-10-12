@@ -6,6 +6,7 @@ import {
 	isAspectRatio,
 	isLabelPosition,
 	isMapStyleId,
+	isMapTheme,
 	isPathStyle,
 	SCHEMA_VERSION,
 	type Animation,
@@ -112,6 +113,7 @@ export function validateAnimation(input: unknown): Animation {
 	return {
 		version: SCHEMA_VERSION,
 		style,
+		...(isMapTheme(obj.theme) && { theme: obj.theme }),
 		labels,
 		terrain,
 		sky,

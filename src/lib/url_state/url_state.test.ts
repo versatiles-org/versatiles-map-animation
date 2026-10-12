@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { decodeAnimation, encodeAnimation } from '.';
 import { base64UrlToBytes } from '../codec';
-import { ASPECT_RATIOS, SCHEMA_VERSION, type Animation } from '../types';
+import { ASPECT_RATIOS, MAP_THEMES, SCHEMA_VERSION, type Animation } from '../types';
 
 const example: Animation = {
 	version: SCHEMA_VERSION,
@@ -500,5 +500,27 @@ describe('format versions', () => {
 
 	it('rejects an unknown format tag', () => {
 		expect(decodeAnimation('AxQQdjw4mITU_TcBxiYQAAA')).toBeNull();
+	});
+});
+
+describe('theme option', () => {
+	it('adds nothing to the payload while unset', () => {
+		const decoded = decodeAnimation(encodeAnimation(example));
+		expect(decoded).not.toBeNull();
+		expect(decoded && 'theme' in decoded).toBe(false);
+	});
+
+	it('round-trips every theme', () => {
+		for (const theme of MAP_THEMES) {
+			expect(decodeAnimation(encodeAnimation({ ...example, theme }))?.theme).toBe(theme);
+		}
+	});
+
+	it('keeps an explicit theme that equals the style default', () => {
+		// `colorful` on satellite is a real choice (the default there is gray).
+		const decoded = decodeAnimation(
+			encodeAnimation({ ...example, style: 'satellite', theme: 'colorful' })
+		);
+		expect(decoded?.theme).toBe('colorful');
 	});
 });

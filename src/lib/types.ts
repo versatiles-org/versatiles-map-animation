@@ -52,8 +52,74 @@ export function isPathStyle(value: unknown): value is PathStyle {
 	return typeof value === 'string' && (PATH_STYLES as readonly string[]).includes(value);
 }
 
+/**
+ * Base map kinds. `colorful` is the OSM vector map — the id predates the
+ * theme picker and is persisted (JSON export, URL state), so it stays even
+ * though the map's colours now come from `Animation.theme`.
+ */
 export const MAP_STYLE_IDS = ['colorful', 'satellite'] as const;
 export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
+
+/**
+ * Colour themes of the OSM map (the palettes of `@versatiles/style`). On
+ * `satellite` the theme colours the OSM overlay drawn on top of the imagery.
+ *
+ * Pinned in code because the URL codec stores a theme as its index in this
+ * list: only ever append, never reorder or remove. A unit test compares the
+ * list with what the installed `@versatiles/style` offers.
+ */
+export const MAP_THEMES = [
+	'colorful',
+	'colorful-dark',
+	'natural',
+	'natural-dark',
+	'muted',
+	'muted-dark',
+	'gray',
+	'gray-dark',
+	'toner',
+	'toner-dark',
+	'positrino',
+	'positrino-dark',
+	'fnord',
+	'protocol',
+	'protocol-dark',
+	'protostar',
+	'protostar-dark',
+	'protozoa',
+	'classic',
+	'googol',
+	'freedom',
+	'macbob',
+	'mactaylor',
+	'bingo'
+] as const;
+export type MapTheme = (typeof MAP_THEMES)[number];
+
+export function isMapTheme(value: unknown): value is MapTheme {
+	return typeof value === 'string' && (MAP_THEMES as readonly string[]).includes(value);
+}
+
+/**
+ * The theme a map style is drawn in when `Animation.theme` is unset. These
+ * are the looks both styles had before themes were selectable.
+ */
+export const DEFAULT_MAP_THEMES: Record<MapStyleId, MapTheme> = {
+	colorful: 'colorful',
+	satellite: 'gray'
+};
+
+/**
+ * The first ten themes are VersaTiles' own; the rest resemble other
+ * projects' maps. The theme picker groups them accordingly.
+ */
+export const MAP_THEME_LOOKALIKES_START = 10;
+
+/** Human label for the theme picker: `colorful-dark` → `Colorful dark`. */
+export function mapThemeLabel(theme: MapTheme): string {
+	const words = theme.replace(/-/g, ' ');
+	return words[0].toUpperCase() + words.slice(1);
+}
 
 /**
  * Curated set of VersaTiles sprites that we expose in the annotation icon
@@ -174,7 +240,7 @@ export const DEFAULT_ICON_HALO_COLOR = '#ffffff';
 export const DEFAULT_ANNOTATION_SCALE = 1;
 
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
-	colorful: 'Colorful',
+	colorful: 'OSM',
 	satellite: 'Satellite'
 };
 
@@ -658,8 +724,13 @@ export interface Animation {
 	version: number;
 	style: MapStyleId;
 	/**
+	 * Colour theme of the OSM map, or of the OSM overlay on `satellite`.
+	 * Unset means the style's own default — see `DEFAULT_MAP_THEMES`.
+	 */
+	theme?: MapTheme;
+	/**
 	 * For `colorful`: show / hide place names, road names, POIs, etc.
-	 * For `satellite`: show the colorful overlay (roads + labels) on top of
+	 * For `satellite`: show the OSM overlay (roads + labels) on top of
 	 * the imagery, or just the raw imagery on its own.
 	 */
 	labels: boolean;

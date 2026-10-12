@@ -1,8 +1,29 @@
 <script lang="ts">
 	import type { AnimationStore } from '../animation.svelte';
-	import { ASPECT_RATIOS, MAP_STYLE_IDS, MAP_STYLE_LABELS } from '../types';
+	import {
+		ASPECT_RATIOS,
+		DEFAULT_MAP_THEMES,
+		MAP_STYLE_IDS,
+		MAP_STYLE_LABELS,
+		MAP_THEME_LOOKALIKES_START,
+		MAP_THEMES,
+		mapThemeLabel,
+		type MapTheme
+	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
+
+	const OWN_THEMES = MAP_THEMES.slice(0, MAP_THEME_LOOKALIKES_START);
+	const LOOKALIKE_THEMES = MAP_THEMES.slice(MAP_THEME_LOOKALIKES_START);
+
+	// The picker shows the theme the map is drawn in. Picking the style's own
+	// default clears `store.theme` again, so an untouched animation stays as
+	// short as before and keeps following the style's default.
+	const defaultTheme = $derived(DEFAULT_MAP_THEMES[store.style]);
+	function onThemeChange(e: Event): void {
+		const theme = (e.currentTarget as HTMLSelectElement).value as MapTheme;
+		store.theme = theme === defaultTheme ? undefined : theme;
+	}
 </script>
 
 <div class="map-style-control" role="group" aria-label="Map style">
@@ -23,10 +44,34 @@
 		</select>
 	</label>
 	<label
+		class="row"
+		title={store.style === 'satellite'
+			? 'Colour theme of the OSM overlay drawn on top of the satellite imagery'
+			: 'Colour theme of the OSM map'}
+	>
+		<span class="lbl">Theme</span>
+		<select
+			value={store.theme ?? defaultTheme}
+			onchange={onThemeChange}
+			disabled={store.style === 'satellite' && !store.labels}
+		>
+			<optgroup label="VersaTiles">
+				{#each OWN_THEMES as theme (theme)}
+					<option value={theme}>{mapThemeLabel(theme)}</option>
+				{/each}
+			</optgroup>
+			<optgroup label="Lookalikes">
+				{#each LOOKALIKE_THEMES as theme (theme)}
+					<option value={theme}>{mapThemeLabel(theme)}</option>
+				{/each}
+			</optgroup>
+		</select>
+	</label>
+	<label
 		class="row checkbox"
 		title={store.style === 'satellite'
-			? 'Show the colorful overlay (roads + place names) on top of the satellite imagery'
-			: 'Show place names, road names, and POIs on the colorful basemap'}
+			? 'Show the OSM overlay (roads + place names) on top of the satellite imagery'
+			: 'Show place names, road names, and POIs on the OSM map'}
 	>
 		<input type="checkbox" bind:checked={store.labels} />
 		<span>Labels</span>
@@ -78,8 +123,12 @@
 		font-family: inherit;
 		cursor: pointer;
 
-		&:hover {
+		&:hover:not(:disabled) {
 			border-color: #4a9eff;
+		}
+		&:disabled {
+			opacity: 0.5;
+			cursor: default;
 		}
 	}
 </style>
