@@ -239,6 +239,74 @@ export const DEFAULT_ICON_HALO_COLOR = '#ffffff';
  */
 export const DEFAULT_ANNOTATION_SCALE = 1;
 
+/**
+ * Layer groups of the OSM map that can be switched off one by one (the
+ * top-level groups of `@versatiles/style`'s `layers` option).
+ *
+ * Pinned in code because the URL codec stores the hidden groups as a
+ * bitmask with one bit per position in this list: only ever append, never
+ * reorder or remove. A unit test compares the list with what the installed
+ * `@versatiles/style` offers.
+ */
+export const MAP_LAYER_GROUPS = [
+	'land',
+	'water',
+	'roads',
+	'transit',
+	'buildings',
+	'sites',
+	'airport',
+	'boundaries',
+	'labels',
+	'pois',
+	'markings'
+] as const;
+export type MapLayerGroup = (typeof MAP_LAYER_GROUPS)[number];
+
+export function isMapLayerGroup(value: unknown): value is MapLayerGroup {
+	return typeof value === 'string' && (MAP_LAYER_GROUPS as readonly string[]).includes(value);
+}
+
+/** Label and tooltip of each group in the editor's layer list. */
+export const MAP_LAYER_GROUP_LABELS: Record<MapLayerGroup, [label: string, title: string]> = {
+	land: ['Land cover', 'Forests, grass, farmland, residential and industrial areas, glaciers'],
+	water: ['Water', 'Ocean, lakes, rivers, piers'],
+	roads: ['Roads', 'Motorways, streets, tracks, paths and steps'],
+	transit: ['Transit', 'Railways, cable cars, ferries, stations and stops'],
+	buildings: ['Buildings', 'Building footprints'],
+	sites: ['Sites', 'Schools, hospitals, parking, sports and construction sites'],
+	airport: ['Airports', 'Runways and taxiways'],
+	boundaries: ['Boundaries', 'Country and state borders'],
+	labels: ['Names', 'Names of places, streets, waters, countries, and house numbers'],
+	pois: ['POIs', 'Symbols for points of interest'],
+	markings: ['Markings', 'One-way arrows on roads']
+};
+
+/**
+ * The groups the OSM overlay on `satellite` draws. The others (land cover,
+ * water, …) are filled areas that would hide the imagery, so the overlay
+ * has none of them and switching them does nothing there.
+ */
+export const SATELLITE_OVERLAY_LAYER_GROUPS: readonly MapLayerGroup[] = [
+	'roads',
+	'transit',
+	'boundaries',
+	'labels',
+	'pois',
+	'markings'
+];
+
+/**
+ * The groups the `labels` master switch of the OSM map hides on its own
+ * (it also hides the stop symbols of `transit`).
+ */
+export const LABEL_SWITCH_LAYER_GROUPS: readonly MapLayerGroup[] = ['labels', 'pois', 'markings'];
+
+/** Filter to known groups, drop duplicates, and sort into `MAP_LAYER_GROUPS` order. */
+export function normalizeLayerGroups(groups: readonly unknown[]): MapLayerGroup[] {
+	return MAP_LAYER_GROUPS.filter((g) => groups.includes(g));
+}
+
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'OSM',
 	satellite: 'Satellite'
@@ -734,6 +802,12 @@ export interface Animation {
 	 * the imagery, or just the raw imagery on its own.
 	 */
 	labels: boolean;
+	/**
+	 * Layer groups switched off, in `MAP_LAYER_GROUPS` order. Unset or empty
+	 * means every group is drawn. On `satellite` only the groups in
+	 * `SATELLITE_OVERLAY_LAYER_GROUPS` have an effect.
+	 */
+	hiddenLayers?: MapLayerGroup[];
 	terrain: boolean;
 	/** Renders the maplibre atmospheric sky behind the horizon (visible at pitch). */
 	sky: boolean;

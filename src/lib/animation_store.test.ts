@@ -524,6 +524,27 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.theme).toBeUndefined();
 	});
 
+	it('hides and shows layer groups, and serialises them only when some are hidden', () => {
+		const s = new AnimationStore();
+		expect(s.toAnimation()).not.toHaveProperty('hiddenLayers');
+		s.setLayerGroupVisible('pois', false);
+		s.setLayerGroupVisible('land', false);
+		s.setLayerGroupVisible('pois', false); // no duplicate
+		expect(s.hiddenLayers).toEqual(['land', 'pois']);
+		expect(s.mapStyleOptions.hiddenLayers).toEqual(['land', 'pois']);
+		expect(s.toAnimation().hiddenLayers).toEqual(['land', 'pois']);
+
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.hiddenLayers).toEqual(['land', 'pois']);
+
+		s.setLayerGroupVisible('land', true);
+		s.setLayerGroupVisible('pois', true);
+		expect(s.toAnimation()).not.toHaveProperty('hiddenLayers');
+		s2.reset();
+		expect(s2.hiddenLayers).toEqual([]);
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

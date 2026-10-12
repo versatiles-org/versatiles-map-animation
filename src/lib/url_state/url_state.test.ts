@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { decodeAnimation, encodeAnimation } from '.';
 import { base64UrlToBytes } from '../codec';
-import { ASPECT_RATIOS, MAP_THEMES, SCHEMA_VERSION, type Animation } from '../types';
+import {
+	ASPECT_RATIOS,
+	MAP_LAYER_GROUPS,
+	MAP_THEMES,
+	SCHEMA_VERSION,
+	type Animation
+} from '../types';
 
 const example: Animation = {
 	version: SCHEMA_VERSION,
@@ -522,5 +528,39 @@ describe('theme option', () => {
 			encodeAnimation({ ...example, style: 'satellite', theme: 'colorful' })
 		);
 		expect(decoded?.theme).toBe('colorful');
+	});
+});
+
+describe('hiddenLayers option', () => {
+	it('adds nothing to the payload while no group is hidden', () => {
+		const plain = encodeAnimation(example);
+		expect(encodeAnimation({ ...example, hiddenLayers: [] })).toBe(plain);
+		expect(decodeAnimation(plain)).not.toHaveProperty('hiddenLayers');
+	});
+
+	it('round-trips every single group and all groups together', () => {
+		for (const group of MAP_LAYER_GROUPS) {
+			const decoded = decodeAnimation(encodeAnimation({ ...example, hiddenLayers: [group] }));
+			expect(decoded?.hiddenLayers).toEqual([group]);
+		}
+		const all = decodeAnimation(
+			encodeAnimation({ ...example, hiddenLayers: [...MAP_LAYER_GROUPS] })
+		);
+		expect(all?.hiddenLayers).toEqual([...MAP_LAYER_GROUPS]);
+	});
+
+	it('returns the groups in canonical order', () => {
+		const decoded = decodeAnimation(
+			encodeAnimation({ ...example, hiddenLayers: ['pois', 'land', 'roads'] })
+		);
+		expect(decoded?.hiddenLayers).toEqual(['land', 'roads', 'pois']);
+	});
+
+	it('combines with the theme option', () => {
+		const decoded = decodeAnimation(
+			encodeAnimation({ ...example, theme: 'toner', hiddenLayers: ['buildings'] })
+		);
+		expect(decoded?.theme).toBe('toner');
+		expect(decoded?.hiddenLayers).toEqual(['buildings']);
 	});
 });

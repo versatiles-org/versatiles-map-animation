@@ -75,6 +75,21 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(validateAnimation(minimalAnim)).not.toHaveProperty('theme');
 	});
 
+	it('keeps known hidden layer groups, in canonical order, and drops the rest', () => {
+		const a = validateAnimation({
+			...minimalAnim,
+			hiddenLayers: ['pois', 'nope', 'land', 'pois', 7]
+		});
+		expect(a.hiddenLayers).toEqual(['land', 'pois']);
+		expect(validateAnimation({ ...minimalAnim, hiddenLayers: [] })).not.toHaveProperty(
+			'hiddenLayers'
+		);
+		expect(validateAnimation({ ...minimalAnim, hiddenLayers: 'land' })).not.toHaveProperty(
+			'hiddenLayers'
+		);
+		expect(validateAnimation(minimalAnim)).not.toHaveProperty('hiddenLayers');
+	});
+
 	it('falls back to default annotationScale when missing or invalid', () => {
 		const a = validateAnimation({ ...minimalAnim, annotationScale: undefined });
 		expect(a.annotationScale).toBe(DEFAULT_ANNOTATION_SCALE);

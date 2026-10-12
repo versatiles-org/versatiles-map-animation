@@ -3,11 +3,16 @@
 	import {
 		ASPECT_RATIOS,
 		DEFAULT_MAP_THEMES,
+		LABEL_SWITCH_LAYER_GROUPS,
+		MAP_LAYER_GROUP_LABELS,
+		MAP_LAYER_GROUPS,
 		MAP_STYLE_IDS,
 		MAP_STYLE_LABELS,
 		MAP_THEME_LOOKALIKES_START,
 		MAP_THEMES,
 		mapThemeLabel,
+		SATELLITE_OVERLAY_LAYER_GROUPS,
+		type MapLayerGroup,
 		type MapTheme
 	} from '../types';
 
@@ -23,6 +28,25 @@
 	function onThemeChange(e: Event): void {
 		const theme = (e.currentTarget as HTMLSelectElement).value as MapTheme;
 		store.theme = theme === defaultTheme ? undefined : theme;
+	}
+
+	const onSatellite = $derived(store.style === 'satellite');
+
+	/**
+	 * Why a layer group's checkbox has no effect right now, or `null` when it
+	 * does. Such a group keeps its stored state and only greys out, so
+	 * switching the map or the master switch back restores what was set.
+	 */
+	function layerGroupBlocked(group: MapLayerGroup): string | null {
+		if (onSatellite) {
+			if (!store.labels) return 'The overlay is switched off';
+			if (!SATELLITE_OVERLAY_LAYER_GROUPS.includes(group)) {
+				return 'Not part of the satellite overlay';
+			}
+		} else if (!store.labels && LABEL_SWITCH_LAYER_GROUPS.includes(group)) {
+			return 'Hidden by “Labels & icons”';
+		}
+		return null;
 	}
 </script>
 
@@ -45,7 +69,7 @@
 	</label>
 	<label
 		class="row"
-		title={store.style === 'satellite'
+		title={onSatellite
 			? 'Colour theme of the OSM overlay drawn on top of the satellite imagery'
 			: 'Colour theme of the OSM map'}
 	>
@@ -53,7 +77,7 @@
 		<select
 			value={store.theme ?? defaultTheme}
 			onchange={onThemeChange}
-			disabled={store.style === 'satellite' && !store.labels}
+			disabled={onSatellite && !store.labels}
 		>
 			<optgroup label="VersaTiles">
 				{#each OWN_THEMES as theme (theme)}
@@ -69,13 +93,39 @@
 	</label>
 	<label
 		class="row checkbox"
-		title={store.style === 'satellite'
+		title={onSatellite
 			? 'Show the OSM overlay (roads + place names) on top of the satellite imagery'
-			: 'Show place names, road names, and POIs on the OSM map'}
+			: 'Show all names and symbols (places, roads, POIs, stops, one-way arrows) on the OSM map'}
 	>
 		<input type="checkbox" bind:checked={store.labels} />
-		<span>Labels</span>
+		<span>{onSatellite ? 'Overlay' : 'Labels & icons'}</span>
 	</label>
+	<details class="layers">
+		<summary title="Show or hide individual groups of map layers">
+			Layers
+			{#if store.hiddenLayers.length > 0}
+				<span class="count">{store.hiddenLayers.length} hidden</span>
+			{/if}
+		</summary>
+		<div class="layer-grid">
+			{#each MAP_LAYER_GROUPS as group (group)}
+				{@const blocked = layerGroupBlocked(group)}
+				<label
+					class="row checkbox"
+					class:blocked={blocked !== null}
+					title={blocked ?? MAP_LAYER_GROUP_LABELS[group][1]}
+				>
+					<input
+						type="checkbox"
+						checked={!store.hiddenLayers.includes(group)}
+						disabled={blocked !== null}
+						onchange={(e) => store.setLayerGroupVisible(group, e.currentTarget.checked)}
+					/>
+					<span>{MAP_LAYER_GROUP_LABELS[group][0]}</span>
+				</label>
+			{/each}
+		</div>
+	</details>
 	<label class="row checkbox" title="Toggle 3D terrain">
 		<input type="checkbox" bind:checked={store.terrain} />
 		<span>Terrain</span>
@@ -112,6 +162,33 @@
 	}
 	.lbl {
 		color: #888;
+	}
+	.layers {
+		summary {
+			cursor: pointer;
+			user-select: none;
+			color: #888;
+
+			&:hover {
+				color: #ddd;
+			}
+		}
+		.count {
+			margin-left: 0.3rem;
+			color: #4a9eff;
+		}
+	}
+	.layer-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.3rem 0.6rem;
+		margin-top: 0.4rem;
+		padding-left: 0.2rem;
+
+		.blocked {
+			opacity: 0.45;
+			cursor: default;
+		}
 	}
 	select {
 		padding: 0.2rem 0.4rem;

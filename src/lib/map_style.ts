@@ -7,7 +7,10 @@ import { DEFAULT_MAP_THEMES, type Animation } from './types';
  * `AnimationStore.mapStyleOptions` bundles them, so a new style setting is
  * added here and there, and MapStage rebuilds the style without changes.
  */
-export type MapStyleOptions = Pick<Animation, 'style' | 'theme' | 'labels' | 'terrain' | 'sky'>;
+export type MapStyleOptions = Pick<
+	Animation,
+	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'terrain' | 'sky'
+>;
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
 
@@ -108,6 +111,8 @@ export async function buildMapStyle(options: MapStyleOptions): Promise<StyleSpec
 export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 	const { style: id, labels, terrain, sky } = options;
 	const theme = options.theme ?? DEFAULT_MAP_THEMES[id];
+	// `layers` option of the builders: every hidden group set to `false`.
+	const hidden = Object.fromEntries((options.hiddenLayers ?? []).map((group) => [group, false]));
 	// The builders default to the `globe` projection; our camera maths, URL
 	// state and renderer all assume Web Mercator, so pin it explicitly.
 	const common = { urls: { base: TILES_BASE_URL }, sky: false, projection: 'mercator' } as const;
@@ -120,7 +125,7 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 					osm({
 						...common,
 						theme,
-						layers: labels ? true : { labels: false, icons: false, pois: false },
+						layers: labels ? hidden : { ...hidden, labels: false, icons: false, pois: false },
 						features: { terrain, hillshade: terrain }
 					})
 				),
@@ -132,7 +137,11 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 			// satellite equivalent of "show labels".
 			return withSky(
 				withAnnotationSprites(
-					satellite({ ...common, osmOverlay: labels ? { theme } : false, features: { terrain } })
+					satellite({
+						...common,
+						osmOverlay: labels ? { theme, layers: hidden } : false,
+						features: { terrain }
+					})
 				),
 				sky
 			);

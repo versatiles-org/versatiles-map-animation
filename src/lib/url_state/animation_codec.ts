@@ -29,8 +29,14 @@
  */
 
 import { bool, type Codec, enumOf, struct, uint, vuint } from '../codec';
-import { ASPECT_RATIOS, DEFAULT_ASPECT_RATIO, MAP_STYLE_IDS, MAP_THEMES } from '../types';
-import type { AnnotationStyle, AspectRatio, MapStyleId, MapTheme } from '../types';
+import {
+	ASPECT_RATIOS,
+	DEFAULT_ASPECT_RATIO,
+	MAP_LAYER_GROUPS,
+	MAP_STYLE_IDS,
+	MAP_THEMES
+} from '../types';
+import type { AnnotationStyle, AspectRatio, MapLayerGroup, MapStyleId, MapTheme } from '../types';
 import { annotationsCodec, defaultAnnotationCodec } from './annotation_codec';
 import { keyframesCodecV1, keyframesCodecV2 } from './keyframe_codec';
 
@@ -41,6 +47,24 @@ const styleCodec = enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]
 const aspectRatioCodec = enumOf(ASPECT_RATIOS as readonly [AspectRatio, ...AspectRatio[]]);
 // 5 bits: room for 32 themes, so appending to MAP_THEMES keeps old links valid.
 const themeCodec = enumOf(MAP_THEMES as readonly [MapTheme, ...MapTheme[]], 5);
+
+/**
+ * Hidden layer groups as a bitmask: bit i set = `MAP_LAYER_GROUPS[i]` is
+ * hidden. 16 bits, so the list can grow by five groups without changing the
+ * encoding. Bits of groups this build does not know are ignored.
+ */
+const HIDDEN_LAYERS_BITS = 16;
+const hiddenLayersCodec: Codec<MapLayerGroup[]> = {
+	encode: (groups, w) => {
+		let mask = 0;
+		for (const g of groups) mask |= 1 << MAP_LAYER_GROUPS.indexOf(g);
+		w.writeBits(mask, HIDDEN_LAYERS_BITS);
+	},
+	decode: (r) => {
+		const mask = r.readBits(HIDDEN_LAYERS_BITS);
+		return MAP_LAYER_GROUPS.filter((_, i) => mask & (1 << i));
+	}
+};
 
 /** Animation-level scale: vuint of round(scale*100). Default 1.0 → 100. */
 const annotationScaleCodec: Codec<number> = {
@@ -69,6 +93,7 @@ type WireAnimation = {
 	aspectRatio?: AspectRatio;
 	defaultAnnotation?: Partial<AnnotationStyle>;
 	theme?: MapTheme;
+	hiddenLayers?: MapLayerGroup[];
 };
 
 // ---------------------------------------------------------------------------
@@ -119,6 +144,15 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => themeCodec.encode(v.theme!, w),
 		decode: (v, r) => {
 			v.theme = themeCodec.decode(r);
+		}
+	},
+	{
+		bit: 4,
+		label: 'hiddenLayers',
+		shouldEmit: (v) => v.hiddenLayers !== undefined && v.hiddenLayers.length > 0,
+		encode: (v, w) => hiddenLayersCodec.encode(v.hiddenLayers!, w),
+		decode: (v, r) => {
+			v.hiddenLayers = hiddenLayersCodec.decode(r);
 		}
 	}
 ];

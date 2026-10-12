@@ -6,6 +6,7 @@ import {
 	cameraOf,
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
+	normalizeLayerGroups,
 	SCHEMA_VERSION
 } from './types';
 import type {
@@ -16,6 +17,7 @@ import type {
 	AspectRatio,
 	CameraState,
 	Keyframe,
+	MapLayerGroup,
 	MapStyleId,
 	MapTheme,
 	PathStyle
@@ -153,6 +155,8 @@ export class AnimationStore {
 	/** Unset = the style's default theme, see `DEFAULT_MAP_THEMES`. */
 	theme = $state<MapTheme | undefined>(undefined);
 	labels = $state(ANIMATION_DEFAULTS.labels);
+	/** Layer groups switched off, kept in `MAP_LAYER_GROUPS` order. */
+	hiddenLayers = $state<MapLayerGroup[]>([]);
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
@@ -186,6 +190,7 @@ export class AnimationStore {
 		style: this.style,
 		theme: this.theme,
 		labels: this.labels,
+		hiddenLayers: this.hiddenLayers,
 		terrain: this.terrain,
 		sky: this.sky
 	});
@@ -275,6 +280,12 @@ export class AnimationStore {
 			else if (index > sel && newIndex <= sel) this.selectedIndex = sel + 1;
 		}
 		this.keyframes = sorted;
+	}
+
+	/** Show or hide one layer group of the base map. */
+	setLayerGroupVisible(group: MapLayerGroup, visible: boolean): void {
+		const others = this.hiddenLayers.filter((g) => g !== group);
+		this.hiddenLayers = normalizeLayerGroups(visible ? others : [...others, group]);
 	}
 
 	selectAt(index: number): void {
@@ -420,6 +431,7 @@ export class AnimationStore {
 		this.style = anim.style ?? ANIMATION_DEFAULTS.style;
 		this.theme = anim.theme;
 		this.labels = anim.labels ?? ANIMATION_DEFAULTS.labels;
+		this.hiddenLayers = normalizeLayerGroups(anim.hiddenLayers ?? []);
 		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
 		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
@@ -438,6 +450,7 @@ export class AnimationStore {
 			// Left out while unset, so the JSON and the URL stay as they were.
 			...(this.theme !== undefined && { theme: this.theme }),
 			labels: this.labels,
+			...(this.hiddenLayers.length > 0 && { hiddenLayers: [...this.hiddenLayers] }),
 			terrain: this.terrain,
 			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),

@@ -8,6 +8,7 @@ import {
 	isMapStyleId,
 	isMapTheme,
 	isPathStyle,
+	normalizeLayerGroups,
 	SCHEMA_VERSION,
 	type Animation,
 	type Annotation,
@@ -73,6 +74,10 @@ export function validateAnimation(input: unknown): Animation {
 	}
 	const style: MapStyleId = isMapStyleId(obj.style) ? obj.style : ANIMATION_DEFAULTS.style;
 	const labels = typeof obj.labels === 'boolean' ? obj.labels : ANIMATION_DEFAULTS.labels;
+	// Unknown group names are dropped, so a file from a newer version still loads.
+	const hiddenLayers = Array.isArray(obj.hiddenLayers)
+		? normalizeLayerGroups(obj.hiddenLayers)
+		: [];
 	const terrain = typeof obj.terrain === 'boolean' ? obj.terrain : ANIMATION_DEFAULTS.terrain;
 	const sky = typeof obj.sky === 'boolean' ? obj.sky : ANIMATION_DEFAULTS.sky;
 	if (!Array.isArray(obj.keyframes)) {
@@ -115,6 +120,7 @@ export function validateAnimation(input: unknown): Animation {
 		style,
 		...(isMapTheme(obj.theme) && { theme: obj.theme }),
 		labels,
+		...(hiddenLayers.length > 0 && { hiddenLayers }),
 		terrain,
 		sky,
 		keyframes,

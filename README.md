@@ -23,7 +23,8 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
 - Style: OSM vector map or `satellite`.
 - Theme: 24 colour themes for the OSM map — `colorful` (default), `natural`, `muted`, `gray`, `toner`, each with a `-dark` variant, plus lookalikes of other well-known maps. On satellite the theme colours the overlay.
-- Toggle place-name / road-shield labels (or, for satellite, the OSM overlay on top).
+- Toggle all labels and icons (or, for satellite, the OSM overlay on top).
+- Switch individual layer groups on and off: land cover, water, roads, transit, buildings, sites, airports, boundaries, names, POIs, road markings.
 - Optional 3D terrain (with hillshade).
 - Optional atmospheric sky (visible when the camera is pitched).
 - Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
@@ -83,7 +84,8 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"version": 1,
 	"style": "colorful", // "colorful" (the OSM map) | "satellite"
 	"theme": "colorful", // optional: colour theme, see MAP_THEMES in src/lib/types.ts
-	"labels": true, // place names (OSM map) or overlay (satellite)
+	"labels": true, // all names and symbols (OSM map) or overlay (satellite)
+	"hiddenLayers": ["buildings", "pois"], // optional: layer groups switched off, see MAP_LAYER_GROUPS in src/lib/types.ts
 	"terrain": false,
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize
