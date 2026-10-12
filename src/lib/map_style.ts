@@ -1,4 +1,4 @@
-import { osm, satellite } from '@versatiles/style';
+import { inlineSources, osm, satellite } from '@versatiles/style';
 import type { SpriteSpecification, StyleSpecification } from 'maplibre-gl';
 import type { Animation } from './types';
 
@@ -61,7 +61,51 @@ function withSky(style: StyleSpecification, sky: boolean): StyleSpecification {
 	return style;
 }
 
+/**
+ * TileJSON responses, kept for the lifetime of the page: every style rebuild
+ * (a theme switch, a toggled checkbox) resolves the same two or three
+ * documents again. A failed request is dropped so the next rebuild retries.
+ */
+const tileJsonCache = new Map<string, Promise<Response>>();
+
+const cachedFetch: typeof fetch = async (input, init) => {
+	const key = String(input instanceof Request ? input.url : input);
+	let pending = tileJsonCache.get(key);
+	if (!pending) {
+		pending = fetch(input, init);
+		tileJsonCache.set(key, pending);
+		pending.then(
+			(res) => {
+				if (!res.ok) tileJsonCache.delete(key);
+			},
+			() => tileJsonCache.delete(key)
+		);
+	}
+	return (await pending).clone();
+};
+
+/**
+ * Build the style for MapLibre. The tile server's TileJSON lists its tiles
+ * as origin-relative paths (`/tiles/osm/{z}/{x}/{y}`), which MapLibre
+ * resolves against the *page*, not against the TileJSON it came from — on
+ * any other host than the tile server every tile request 404s and the map
+ * stays blank. `inlineSources` fetches each TileJSON and writes absolute
+ * tile URLs into the style instead.
+ */
 export async function buildMapStyle(options: MapStyleOptions): Promise<StyleSpecification> {
+	const style = buildBaseStyle(options);
+	try {
+		return await inlineSources(style, { fetch: cachedFetch });
+	} catch (err) {
+		// Without the TileJSON there are no tiles either way; hand MapLibre the
+		// unresolved style so it at least reports the failing source itself.
+		console.warn('Could not resolve the tile sources of the map style:', err);
+		return style;
+	}
+}
+
+/** The style as the builders write it, with no I/O: sources are TileJSON references. */
+export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 	const { style: id, labels, terrain, sky } = options;
 	// The builders default to the `globe` projection; our camera maths, URL
 	// state and renderer all assume Web Mercator, so pin it explicitly.
