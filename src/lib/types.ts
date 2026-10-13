@@ -1035,7 +1035,7 @@ export interface Animation {
 	anchor?: ScreenAnchor;
 	/**
 	 * Per-animation marker style defaults — fields set here become the
-	 * baseline for new markers (Pin button) AND the codec's carry-forward
+	 * baseline for new markers (+ Marker button) AND the codec's carry-forward
 	 * starting point, so annotations matching the defaults emit nothing on
 	 * the wire / in JSON. Position-specific fields (lng/lat/label/rotation)
 	 * and time-specific fields (visibleFrom/visibleUntil/fadeIn/fadeOut)

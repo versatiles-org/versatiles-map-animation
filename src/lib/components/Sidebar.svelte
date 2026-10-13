@@ -1,16 +1,16 @@
 <script lang="ts">
 	/**
-	 * Editor sidebar. Six collapsible panels, each driven by an independent
-	 * `open` state — except for "Annotation style", which is forced open when
+	 * Editor sidebar. Five collapsible panels, each driven by an independent
+	 * `open` state — except for "Marker style", which is forced open when
 	 * an annotation is selected and forced closed (disabled) otherwise, since
 	 * it has nothing to style without a selection.
 	 *
 	 *   1. Frame                  — closed by default; shows the aspect ratio
 	 *   2. Map                    — open by default; shows the base map
 	 *   3. 3D & light             — open by default
-	 *   4. Annotation style       — open when a marker is selected, disabled otherwise
-	 *   5. Default annotation     — closed by default
-	 *   6. Markers (list)         — open by default
+	 *   4. Marker style           — open when a marker is selected, disabled otherwise
+	 *   5. Markers                — open by default: the list, and the default
+	 *                               style folded away below it
 	 *
 	 * The previous `AnnotationPanel` router (which switched between
 	 * editor/list/defaults based on selection) is replaced by these
@@ -59,7 +59,7 @@
 		</div>
 	</details>
 
-	<!-- 4. Annotation style — derived from selection. Force-open when a
+	<!-- 4. Marker style — derived from selection. Force-open when a
 	     marker is selected, force-closed (and visually disabled) when none.
 	     Using `open={hasSelection}` rather than `bind:open` means clicks on
 	     a disabled summary can't open it. -->
@@ -72,26 +72,32 @@
 				if (!hasSelection) e.preventDefault();
 			}}
 		>
-			Annotation style
+			Marker style
 		</summary>
 		<div class="sub-body">
 			<AnnotationEditor {store} />
 		</div>
 	</details>
 
-	<!-- 5. Default annotation style — always available; closed by default -->
-	<details class="sub-panel" bind:open={defaultStyleOpen}>
-		<summary>Default annotation style</summary>
-		<div class="sub-body">
-			<DefaultStyleEditor {store} />
-		</div>
-	</details>
-
-	<!-- 6. Marker list — always available; open by default -->
+	<!-- 5. Markers — the list, and below it the style a marker has until it
+	     is given its own. Open by default, the default style folded away. -->
 	<details class="sub-panel" bind:open={listOpen}>
-		<summary>Markers</summary>
+		<summary>
+			Markers
+			{#if store.annotations.length > 0}
+				<span class="value">{store.annotations.length}</span>
+			{/if}
+		</summary>
 		<div class="sub-body">
 			<AnnotationList {store} />
+			<details class="nested" bind:open={defaultStyleOpen}>
+				<summary title="The style of every marker that has not been given its own">
+					Default style
+				</summary>
+				<div class="nested-body">
+					<DefaultStyleEditor {store} />
+				</div>
+			</details>
 		</div>
 	</details>
 
@@ -187,6 +193,27 @@
 	}
 	.sub-panel.is-disabled > summary::before {
 		color: #444;
+	}
+
+	/* A foldable part inside a panel. */
+	.nested {
+		margin-top: 0.6rem;
+		padding-top: 0.5rem;
+		border-top: 1px solid #1f1f1f;
+		font-size: 12px;
+
+		& > summary {
+			cursor: pointer;
+			user-select: none;
+			color: #888;
+
+			&:hover {
+				color: #ddd;
+			}
+		}
+	}
+	.nested-body {
+		margin-top: 0.5rem;
 	}
 
 	.sub-body {

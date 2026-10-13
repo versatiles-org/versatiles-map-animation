@@ -44,7 +44,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Per-annotation halo colour & width for both label text and the icon outline (auto-flipping default for legibility on any basemap).
 - Visibility window with optional fade-in / fade-out tails — set on the timeline by dragging the four-handle bar that appears for the selected annotation.
 - Drag annotations directly on the map; reorder them in the sidebar's **Markers** list by drag-and-drop.
-- **Per-animation default style** — set a template in the sidebar's _Default annotation style_ panel; every marker that doesn't override a field follows the template. Change the template later and every still-thin marker updates automatically. The same template is used as the starting state for newly-pinned markers.
+- **Per-animation default style** — set a template under _Default style_ in the sidebar's **Markers** panel; every marker that doesn't override a field follows the template. Change the template later and every still-thin marker updates automatically. The same template is used as the starting state for newly-pinned markers.
 
 ### Sharing & rendering
 
