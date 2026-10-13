@@ -11,6 +11,7 @@
 	} from '../animation.svelte';
 	import { isDarkPalette } from '@versatiles/style';
 	import { buildMapStyle, onlySunMoved, sunPatch, type MapStyleOptions } from '../map_style';
+	import { routeFeatures } from '../route';
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
@@ -94,6 +95,10 @@
 	let rafId = 0;
 
 	const ANNOTATION_SOURCE = 'annotations';
+	// The camera's ground track, drawn in the editor only — see `setupRouteLayers`.
+	const ROUTE_SOURCE = 'route';
+	const ROUTE_LAYERS = ['route-casing', 'route-line'] as const;
+	const showRoute = $derived(editMode && !renderMode);
 	const ANNOTATION_LAYER = 'annotations-layer';
 
 	// Translate user-facing labelPosition ("where the label sits relative to
@@ -229,8 +234,48 @@
 		};
 	}
 
+	/**
+	 * Source and layers for the route: a dark casing under a line coloured
+	 * per move like the bands on the timeline. Added before the annotation
+	 * layer, so markers stay on top of it.
+	 */
+	function setupRouteLayers(): void {
+		if (!map || !showRoute || map.getSource(ROUTE_SOURCE)) return;
+		map.addSource(ROUTE_SOURCE, {
+			type: 'geojson',
+			data: { type: 'FeatureCollection', features: [] }
+		});
+		const layout = { 'line-cap': 'round', 'line-join': 'round' } as const;
+		map.addLayer({
+			id: ROUTE_LAYERS[0],
+			type: 'line',
+			source: ROUTE_SOURCE,
+			layout,
+			paint: { 'line-color': '#000', 'line-opacity': 0.55, 'line-width': 5 }
+		});
+		map.addLayer({
+			id: ROUTE_LAYERS[1],
+			type: 'line',
+			source: ROUTE_SOURCE,
+			layout,
+			paint: {
+				'line-color': [
+					'match',
+					['get', 'kind'],
+					'linear',
+					'#3fc8aa',
+					'curve',
+					'#be96ff',
+					/* arc */ '#4a9eff'
+				],
+				'line-width': 2.5
+			}
+		});
+	}
+
 	function setupAnnotationLayer(): void {
 		if (!map) return;
+		setupRouteLayers();
 		if (!map.getSource(ANNOTATION_SOURCE)) {
 			map.addSource(ANNOTATION_SOURCE, {
 				type: 'geojson',
@@ -561,6 +606,42 @@
 		};
 	});
 
+	// effect: draw the route — the camera's ground track as a line, and a pin
+	// per keyframe shaped like its marker on the timeline (diamond for a stop,
+	// dot for a waypoint). Editor only, and out of the way while the animation
+	// plays or is scrubbed, like the rest of the editing chrome. Clicking a
+	// pin selects its keyframe.
+	let routePins: maplibregl.Marker[] = [];
+	$effect(() => {
+		const keyframes = store.keyframes;
+		const projection = store.projection;
+		const selected = store.selectedIndex;
+		const visible = showRoute && !store.isPlaying && !store.isScrubbing;
+		const ready = annotationsReady;
+		if (!ready || !map || !showRoute) return;
+		const source = map.getSource(ROUTE_SOURCE) as maplibregl.GeoJSONSource | undefined;
+		source?.setData(
+			visible ? routeFeatures(keyframes, projection) : { type: 'FeatureCollection', features: [] }
+		);
+		for (const pin of routePins) pin.remove();
+		routePins = [];
+		if (!visible || keyframes.length < 2) return;
+		routePins = keyframes.map((kf, i) => {
+			const el = document.createElement('button');
+			el.type = 'button';
+			el.className = 'route-pin';
+			el.classList.toggle('waypoint', kf.waypoint === true);
+			el.classList.toggle('selected', selected === i);
+			el.title = `${kf.waypoint ? 'Waypoint' : 'Stop'} ${i + 1} — click to select`;
+			el.addEventListener('click', (e) => {
+				e.stopPropagation();
+				store.pause();
+				store.selectAt(i);
+			});
+			return new maplibregl.Marker({ element: el }).setLngLat([kf.lng, kf.lat]).addTo(map!);
+		});
+	});
+
 	// effect: push the annotation array to the GeoJSON source.
 	// Runs on annotation changes and after a style swap re-installs the source.
 	// Re-using `setData()` instead of recreating the source preserves any
@@ -718,6 +799,39 @@
 	.map-canvas {
 		width: 100%;
 		height: 100%;
+	}
+	/* Keyframe pins of the route. They are created by hand and handed to
+	   MapLibre, so they are outside Svelte's scoping. Same shapes and colours
+	   as the keyframe markers on the timeline. */
+	:global(.route-pin) {
+		display: grid;
+		place-items: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		background: none;
+		border: none;
+		cursor: pointer;
+	}
+	/* The shape is a pseudo-element: MapLibre positions the pin itself with a
+	   transform, and rotating that element would rotate its position too. */
+	:global(.route-pin::before) {
+		content: '';
+		box-sizing: border-box;
+		width: 12px;
+		height: 12px;
+		background: #4a9eff;
+		border: 1px solid #fff;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+		rotate: 45deg;
+	}
+	:global(.route-pin.waypoint::before) {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+	}
+	:global(.route-pin.selected::before) {
+		background: #ffd24a;
 	}
 	/* Crosshair at the screen anchor, editor only. Two bars drawn by the
 	   pseudo-elements, white with a dark outline so it reads on any map. */
