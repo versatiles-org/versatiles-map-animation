@@ -1,15 +1,15 @@
 import type { Animation } from './types';
 
 /**
- * 12-second flight westward across Corsica's Monte Cinto massif — the
+ * 15-second flight westward across Corsica's Monte Cinto massif — the
  * highest range in the Mediterranean. The camera enters from the east just
- * north of the Asco valley, banks WSW to face the spine of the massif, and
- * tracks across the headliner peaks (Cinto, Punta Minuta, Paglia Orba)
- * before pulling out toward the western coast. Used by the editor's
+ * north of the Asco valley, banks WSW to face the spine of the massif,
+ * holds there for three seconds, and then tracks across the range before
+ * pulling out toward the western coast. Used by the editor's
  * "★ Load example" menu item.
  *
- * Annotations mark the five most prominent summits visible from the path;
- * staggered `visibleFrom` times let them fade in as the camera approaches.
+ * Annotations mark the two summits in view during the hold: they fade in
+ * as the camera arrives and out as it leaves.
  * Shared halo / icon-style settings live in `defaultAnnotation` so each
  * marker only spells out what's unique about it.
  */
@@ -38,17 +38,9 @@ export const EXAMPLE_ANIMATION: Animation = {
 			pitch: 74.36376111628292,
 			bearing: -111.39718159357824,
 			roll: 0,
-			path: 'linear'
-		},
-		{
-			t: 6,
-			lng: 9.025101668966386,
-			lat: 42.465075378385336,
-			zoom: 11.730405914063946,
-			pitch: 74.36376111628292,
-			bearing: -111.39718159357824,
-			roll: 0,
-			path: 'linear'
+			path: 'linear',
+			// Rest on the view of the massif while the two summit labels show.
+			hold: 3
 		},
 		{
 			t: 9,
