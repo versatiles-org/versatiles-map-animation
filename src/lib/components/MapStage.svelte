@@ -4,6 +4,7 @@
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 	import { onDestroy, onMount, untrack } from 'svelte';
+	import VersatilesLogo from './VersatilesLogo.svelte';
 	import {
 		getAnnotationOpacity,
 		resolveAnnotation,
@@ -667,9 +668,8 @@
 		]);
 	});
 
-	// Watermark colours flip with the base map: dark text + light outline reads
-	// best on a light map, light text + dark outline on satellite imagery and
-	// on the dark themes of the OSM map.
+	// The watermark is a little stronger on a dark map — satellite imagery and
+	// the dark themes of the OSM map — where it would otherwise get lost.
 	const onDarkMap = $derived(
 		store.style === 'satellite' || isDarkPalette(store.theme ?? DEFAULT_MAP_THEMES[store.style])
 	);
@@ -694,11 +694,14 @@
 		{/if}
 		<a
 			class="watermark"
-			class:on-dark-map={onDarkMap}
 			href="https://versatiles.org/sources"
 			target="_blank"
-			rel="noopener noreferrer">VersaTiles</a
+			rel="noopener noreferrer"
+			aria-label="VersaTiles – sources of the map data"
+			title="VersaTiles – sources of the map data"
 		>
+			<VersatilesLogo onDark={onDarkMap} />
+		</a>
 	</div>
 </div>
 
@@ -773,29 +776,12 @@
 	.watermark {
 		position: absolute;
 		/* Sized as a fraction of the map width via `cqw` so the watermark scales
-		   with the canvas (4K renders get a chunkier label, narrow embeds a
-		   smaller one). The `clamp()` keeps it readable at the extremes. */
+		   with the canvas (4K renders get a larger logo, narrow embeds a
+		   smaller one). The `clamp()` keeps it recognisable at the extremes. */
 		bottom: 0.4cqw;
 		right: 0.6cqw;
 		z-index: 1;
-		font:
-			600 clamp(10px, 1.1cqw, 28px) / 1 system-ui,
-			-apple-system,
-			'Segoe UI',
-			sans-serif;
-		text-decoration: none;
-		paint-order: stroke fill; /* stroke under the fill */
+		height: clamp(30px, 3.3cqw, 84px);
 		user-select: none;
-		letter-spacing: 0.02em;
-		/* Stroke width grows with the font (em-relative). */
-		-webkit-text-stroke-width: 0.18em;
-		/* Default: light map — dark glyphs on a light halo. */
-		color: #000;
-		-webkit-text-stroke-color: #fff;
-
-		&.on-dark-map {
-			color: #fff;
-			-webkit-text-stroke-color: #000;
-		}
 	}
 </style>
