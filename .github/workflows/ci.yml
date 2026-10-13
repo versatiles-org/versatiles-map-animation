@@ -56,6 +56,32 @@ jobs:
           use_oidc: true
           fail_ci_if_error: false
 
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    # The tests load tiles, glyphs and sprites from tiles.versatiles.org. If
+    # that is slow or down, the job fails for no fault of the commit — so it
+    # reports, but neither the build nor the deploy waits for it.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Chromium
+        run: npm run test:e2e:install
+
+      - name: Build
+        run: npm run build
+
+      - name: Playwright
+        run: npm run test:e2e
+
   build:
     name: Build
     needs: check
