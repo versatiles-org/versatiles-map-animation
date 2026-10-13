@@ -154,8 +154,8 @@ export function validateEncoding(opts) {
  * frames came in with, so a part of the picture that does not move keeps
  * exactly its colours. In between the pixels have 16 bits per channel;
  * linear light in 8 bits has far too few steps in the shadows. Requires
- * ffmpeg built with libzimg — Debian's `ffmpeg` package has it, and that's
- * what the Docker image ships.
+ * ffmpeg built with libzimg — the static build in the Docker image has it,
+ * and so does Debian's `ffmpeg` package.
  * @param {number} samples
  * @returns {string[]}
  */

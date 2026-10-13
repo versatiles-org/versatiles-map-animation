@@ -1,6 +1,7 @@
 # Multi-stage build:
 #   1. app-builder — builds the static SvelteKit site (just /index.html and /view.html).
-#   2. final       — node:24-slim with Chromium's headless shell + ffmpeg + the renderer
+#   2. ffmpeg      — only the source of a statically linked ffmpeg binary.
+#   3. final       — node:24-slim with Chromium's headless shell + ffmpeg + the renderer
 #                    + the built site. The headless shell is smaller than the full
 #                    Chromium browser and works fine with --use-gl=swiftshader.
 
@@ -11,9 +12,20 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# One self-contained binary (about 100 MB) in place of Debian's `ffmpeg`
+# package, which brings some 200 packages and 400 MB of codecs, OpenGL and
+# desktop libraries the renderer never touches. It has what `formats.mjs`
+# asks for: libx264, prores_ks, ffv1, qtrle and the zscale filter (libzimg).
+# Pinned by digest, so a moved tag cannot change what gets built.
+FROM mwader/static-ffmpeg:7.1.1@sha256:11a44711684c0b9f754c047dcd64235b8b52deab251bd0e0a86f22faa160749c AS ffmpeg
+
 FROM node:24-bookworm-slim
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
+# fonts-dejavu-core: the font Chromium ends up drawing the map's attribution
+# ("VersaTiles", bottom right) in. Debian's ffmpeg used to bring it along;
+# without it the attribution falls back to another typeface.
+#
 # libvulkan1 + mesa-vulkan-drivers are for `--gpu`: the Vulkan loader, and
 # Mesa's drivers for Intel and AMD GPUs (reached through `--device /dev/dri`).
 # NVIDIA's driver is not in the image; the NVIDIA Container Toolkit hands it
@@ -23,8 +35,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg ca-certificates libvulkan1 mesa-vulkan-drivers \
+	&& apt-get install -y --no-install-recommends ca-certificates fonts-dejavu-core libvulkan1 mesa-vulkan-drivers \
 	&& rm -rf /var/lib/apt/lists/*
+COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 
 WORKDIR /app/render
 COPY render/package.json render/package-lock.json* ./
