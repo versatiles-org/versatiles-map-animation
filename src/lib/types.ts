@@ -518,6 +518,33 @@ export interface Keyframe {
 	 * `t + hold`. Unset means it leaves at once. Waypoints have no hold.
 	 */
 	hold?: number;
+	/**
+	 * How gently the camera arrives at this stop (`easeIn`) and leaves it
+	 * (`easeOut`): from 0, abruptly and at full speed, to 1, very gradually.
+	 * Unset means the default of the move in question — see `DEFAULT_EASE`.
+	 * Waypoints have neither.
+	 */
+	easeIn?: number;
+	easeOut?: number;
+}
+
+/** The two sides of a stop that ease: arriving at it and leaving it. */
+export type EaseSide = 'easeIn' | 'easeOut';
+
+/**
+ * The easing of a stop that sets none, as the strength that comes closest
+ * to it. A move straight from stop to stop eases more than the curve of a
+ * move through waypoints, which only has to come to rest at its two ends.
+ */
+export const DEFAULT_EASE = { direct: 0.65, curve: 1 / 3 } as const;
+
+/** The smallest step of an easing strength. */
+export const EASE_RESOLUTION = 0.01;
+
+/** An easing strength within 0…1, on the grid of `EASE_RESOLUTION`. */
+export function snapEase(ease: number): number {
+	const steps = Math.round(1 / EASE_RESOLUTION);
+	return Math.round(Math.max(0, Math.min(1, ease)) * steps) / steps;
 }
 
 /**
@@ -567,7 +594,7 @@ export function departureOf(kf: Keyframe): number {
 	return kf.t + holdOf(kf);
 }
 
-export type CameraState = Omit<Keyframe, 't' | 'path'>;
+export type CameraState = Omit<Keyframe, 't' | 'path' | EaseSide>;
 
 export interface Annotation {
 	lng: number;

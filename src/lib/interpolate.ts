@@ -1,5 +1,6 @@
 import {
 	cameraOf,
+	DEFAULT_EASE,
 	departureOf,
 	MAX_CAMERA_LATITUDE,
 	type CameraState,
@@ -12,6 +13,67 @@ export function easeInOut(t: number): number {
 	if (t <= 0) return 0;
 	if (t >= 1) return 1;
 	return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+/**
+ * The parameter, 0…1, at which the cubic Bézier curve from 0 to 1 with the
+ * inner control values `c1` and `c2` reaches `x`. The curve has to rise all
+ * the way, which it does for the control values used here.
+ */
+function bezierParameter(c1: number, c2: number, x: number): number {
+	let lo = 0;
+	let hi = 1;
+	for (let i = 0; i < 40; i++) {
+		const s = (lo + hi) / 2;
+		const r = 1 - s;
+		if (3 * r * r * s * c1 + 3 * r * s * s * c2 + s * s * s < x) lo = s;
+		else hi = s;
+	}
+	return (lo + hi) / 2;
+}
+
+function clamp01(v: number): number {
+	return Math.max(0, Math.min(1, v));
+}
+
+/**
+ * How far along a move from stop to stop the camera is at `alpha` of its
+ * time. `easeOut` is the easing of the stop it leaves, `easeIn` of the stop
+ * it arrives at — see `Keyframe`. With neither set this is `easeInOut`.
+ *
+ * Otherwise the timing is the curve `cubic-bezier(easeOut, 0, 1 - easeIn, 1)`
+ * known from CSS and from the "influence" of a keyframe in video editors:
+ * the speed is zero at both ends, and the strength says for how much of the
+ * move the camera keeps gathering or shedding speed. At 0 it starts (or
+ * ends) at full speed.
+ */
+export function easeMove(alpha: number, easeOut?: number, easeIn?: number): number {
+	if (easeOut === undefined && easeIn === undefined) return easeInOut(alpha);
+	if (alpha <= 0) return 0;
+	if (alpha >= 1) return 1;
+	const s = bezierParameter(
+		clamp01(easeOut ?? DEFAULT_EASE.direct),
+		1 - clamp01(easeIn ?? DEFAULT_EASE.direct),
+		alpha
+	);
+	return s * s * (3 - 2 * s);
+}
+
+/**
+ * The same easing for the segment of a curve that starts at a stop: where
+ * on the segment the camera is at `u` of its time. (For a segment that ends
+ * on a stop, run it backwards: `1 - easeFromStop(1 - u, ease)`.)
+ *
+ * The curve comes to rest at a stop by itself, the way an easing of 1/3
+ * does on a move from stop to stop, so that strength changes nothing here.
+ * Any other one stretches or squeezes the time near the stop to match —
+ * down to a start at full speed at 0 — and goes back to the pace of the
+ * curve towards the waypoint, so the speed stays continuous there and the
+ * waypoint is passed at its time.
+ */
+function easeFromStop(u: number, ease: number | undefined): number {
+	if (ease === undefined) return u;
+	return bezierParameter(clamp01(ease), 2 / 3, u);
 }
 
 export function lerp(a: number, b: number, alpha: number): number {
@@ -245,7 +307,8 @@ function globeLinearSample(
 // keyframe the camera flies through, so the segments on either side of it
 // are pieces of one curve through time: cubic Hermite segments that share
 // their velocity at the waypoint. Position *and* speed are then continuous
-// there. At a stop the velocity is zero, which is the ease-in / ease-out. A
+// there. At a stop the velocity is zero, which is the ease-in / ease-out
+// (a stop can make it stronger or weaker, see `easeFromStop`). A
 // waypoint with no neighbour beyond it — the first or last keyframe — keeps
 // the velocity of its one segment, so the animation starts or ends in motion.
 //
@@ -353,6 +416,9 @@ function splineSample(
 		return { ...cameraOf(kf), bearing: normalizeAngle(kf.bearing), roll: normalizeAngle(kf.roll) };
 	}
 	const onGlobe = projection === 'globe';
+	// The easing of the stop this segment starts from or ends on.
+	if (!kfA.waypoint) alpha = easeFromStop(alpha, kfA.easeOut);
+	else if (!kfB.waypoint) alpha = 1 - easeFromStop(1 - alpha, kfB.easeIn);
 
 	// The stretch of the curve that matters here, `kfA` at index 2 and `kfB`
 	// at 3, each as its spline vector with the angles unwrapped along the way.
@@ -496,7 +562,7 @@ export function interpolateKeyframes(
 		return splineSample(kfA, kfB, clamped, projection, neighbours);
 	}
 	const path = kfA.path ?? 'arc';
-	const eased = easeInOut(alpha);
+	const eased = easeMove(alpha, kfA.easeOut, kfB.easeIn);
 	// `path` lives on the *origin* keyframe and describes the shape of the
 	// trajectory leaving it. `linear` goes straight from one view to the
 	// other without rising — the right choice for short moves, where van

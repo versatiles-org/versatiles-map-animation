@@ -69,7 +69,10 @@ function buildWire(anim: Animation): Wire {
 		projection: anim.projection,
 		anchor: normalizeScreenAnchor(anim.anchor),
 		waypoints: anim.keyframes.map((kf) => kf.waypoint === true),
-		holds: anim.keyframes.map(holdOf)
+		holds: anim.keyframes.map(holdOf),
+		eases: anim.keyframes.map((kf) =>
+			kf.waypoint ? [undefined, undefined] : [kf.easeIn, kf.easeOut]
+		)
 	};
 }
 
@@ -90,7 +93,11 @@ function fromWire(wire: Wire): Animation {
 		keyframes: denormalizeKeyframes(wire.keyframes).map((kf, i) => ({
 			...kf,
 			...(wire.waypoints?.[i] && { waypoint: true }),
-			...(!wire.waypoints?.[i] && (wire.holds?.[i] ?? 0) > 0 && { hold: wire.holds![i] })
+			...(!wire.waypoints?.[i] && (wire.holds?.[i] ?? 0) > 0 && { hold: wire.holds![i] }),
+			...(!wire.waypoints?.[i] &&
+				wire.eases?.[i]?.[0] !== undefined && { easeIn: wire.eases[i][0] }),
+			...(!wire.waypoints?.[i] &&
+				wire.eases?.[i]?.[1] !== undefined && { easeOut: wire.eases[i][1] })
 		})),
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,

@@ -9,7 +9,15 @@
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
-	import { holdOf, PATH_STYLE_LABELS, PATH_STYLES, TIME_RESOLUTION } from '../types';
+	import { easeKindOf } from '../moves';
+	import {
+		DEFAULT_EASE,
+		holdOf,
+		PATH_STYLE_LABELS,
+		PATH_STYLES,
+		TIME_RESOLUTION,
+		type EaseSide
+	} from '../types';
 	import Icon from './Icon.svelte';
 	import PathIcon from './PathIcon.svelte';
 
@@ -23,6 +31,11 @@
 			'The camera flies through this view without stopping. As first or last keyframe: the animation starts or ends in motion.'
 		]
 	] as const;
+
+	const EASES: readonly (readonly [EaseSide, string, string])[] = [
+		['easeIn', 'In', 'How gently the camera arrives at this stop'],
+		['easeOut', 'Out', 'How gently the camera leaves this stop']
+	];
 
 	const index = $derived(store.selectedIndex);
 	const keyframe = $derived(store.selectedKeyframe);
@@ -74,7 +87,7 @@
 					onclick={() => store.setKeyframeWaypoint(index, type === 'waypoint')}
 				>
 					<PathIcon icon={type} />
-					{label}
+					<span class="type-label">{label}</span>
 				</button>
 			{/each}
 		</div>
@@ -120,6 +133,44 @@
 			/>
 			<span>s</span>
 		</label>
+		<span class="lbl">Ease</span>
+		{#each EASES as [side, label, hint] (side)}
+			{@const kind = easeKindOf(store.keyframes, index, side)}
+			{@const own = keyframe[side]}
+			{@const percent = Math.round((own ?? (kind ? DEFAULT_EASE[kind] : 0)) * 100)}
+			<div
+				class="field"
+				title={kind
+					? `${hint}: 0 % is abrupt, at full speed; 100 % is very gradual. A stronger easing makes the middle of the move faster.`
+					: isWaypoint
+						? 'A waypoint is flown through and does not ease'
+						: side === 'easeIn'
+							? 'Nothing arrives at the first keyframe'
+							: 'Nothing leaves the last keyframe'}
+			>
+				<span class="lbl">{label}</span>
+				<input
+					type="range"
+					min="0"
+					max="100"
+					step="5"
+					value={percent}
+					disabled={!kind}
+					aria-label="Ease {label.toLowerCase()} of keyframe {index + 1}, in percent"
+					oninput={(e) => store.setKeyframeEase(index, side, Number(e.currentTarget.value) / 100)}
+				/>
+				<button
+					type="button"
+					class="percent"
+					disabled={own === undefined}
+					title={own === undefined ? 'The default of this move' : 'Back to the default'}
+					aria-label="Reset ease {label.toLowerCase()} to the default"
+					onclick={() => store.setKeyframeEase(index, side, null)}
+				>
+					{kind ? `${percent}%` : '–'}
+				</button>
+			</div>
+		{/each}
 		<div class="field">
 			<button
 				type="button"
@@ -145,7 +196,9 @@
 	.inspector {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		/* In a window too narrow for all of it, the last controls go to a second line. */
+		flex-wrap: wrap;
+		gap: 0.4rem 0.75rem;
 		min-width: 0;
 		font-size: 12px;
 		color: #aaa;
@@ -204,6 +257,14 @@
 			width: 4.8em;
 		}
 	}
+	input[type='range'] {
+		width: 3rem;
+		accent-color: #4a9eff;
+
+		&:disabled {
+			opacity: 0.4;
+		}
+	}
 	button {
 		display: inline-flex;
 		align-items: center;
@@ -227,13 +288,38 @@
 			border-color: #4a9eff;
 			color: #fff;
 		}
+		/* The strength of an easing, and the way back to the default: dimmed
+		   while it is the default. Room for "100%". */
+		&.percent {
+			justify-content: flex-end;
+			min-width: 2.5rem;
+			padding: 0.2rem 0.3rem;
+			font-size: 12px;
+			font-variant-numeric: tabular-nums;
+
+			&:disabled {
+				background: none;
+				border-color: transparent;
+				color: #777;
+				cursor: default;
+			}
+		}
 	}
 
 	/* The row shares the window's width with the playback controls. Where a
 	   selected keyframe's controls would not fit, the two actions keep only
-	   their icons; their tooltips still say what they do. */
-	@media (max-width: 1220px) {
+	   their icons, and in a still narrower window so do the two keyframe
+	   types; their tooltips still say what they do. */
+	@media (max-width: 1560px) {
 		.label {
+			display: none;
+		}
+	}
+	@media (max-width: 1400px) {
+		.inspector {
+			column-gap: 0.5rem;
+		}
+		.type-label {
 			display: none;
 		}
 	}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { movesOf } from './moves';
+import { easeKindOf, movesOf } from './moves';
 import type { Keyframe } from './types';
 
 const kf = (t: number, extra: Partial<Keyframe> = {}): Keyframe => ({
@@ -52,5 +52,25 @@ describe('movesOf', () => {
 		expect(moves[0].start).toBe(0);
 		expect(moves[moves.length - 1].end).toBe(keyframes.length - 1);
 		for (let i = 1; i < moves.length; i++) expect(moves[i].start).toBe(moves[i - 1].end);
+	});
+});
+
+describe('easeKindOf', () => {
+	it('names what each side of a stop eases', () => {
+		const kfs = [kf(0), kf(1), via(2), kf(3), via(4)];
+		expect(easeKindOf(kfs, 0, 'easeIn')).toBeNull();
+		expect(easeKindOf(kfs, 0, 'easeOut')).toBe('direct');
+		expect(easeKindOf(kfs, 1, 'easeIn')).toBe('direct');
+		expect(easeKindOf(kfs, 1, 'easeOut')).toBe('curve');
+		expect(easeKindOf(kfs, 3, 'easeIn')).toBe('curve');
+		expect(easeKindOf(kfs, 3, 'easeOut')).toBe('curve');
+	});
+
+	it('is nothing on a waypoint, after the last keyframe or off the list', () => {
+		const kfs = [kf(0), via(1), kf(2)];
+		expect(easeKindOf(kfs, 1, 'easeIn')).toBeNull();
+		expect(easeKindOf(kfs, 1, 'easeOut')).toBeNull();
+		expect(easeKindOf(kfs, 2, 'easeOut')).toBeNull();
+		expect(easeKindOf(kfs, 5, 'easeIn')).toBeNull();
 	});
 });

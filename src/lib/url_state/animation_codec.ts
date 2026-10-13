@@ -37,7 +37,8 @@ import {
 	MAP_LAYER_GROUPS,
 	MAP_PROJECTIONS,
 	MAP_STYLE_IDS,
-	MAP_THEMES
+	MAP_THEMES,
+	snapEase
 } from '../types';
 import type {
 	AnnotationStyle,
@@ -137,6 +138,8 @@ type WireAnimation = {
 	waypoints?: boolean[];
 	/** Hold of each keyframe in seconds, in order; 0 for none. */
 	holds?: number[];
+	/** Easing of each keyframe, in order: arriving and leaving, 0…1 where set. */
+	eases?: [easeIn: number | undefined, easeOut: number | undefined][];
 };
 
 // ---------------------------------------------------------------------------
@@ -266,11 +269,35 @@ const OPTIONS: AnimOption[] = [
 		decode: (v, r) => {
 			v.holds = v.keyframes.map(() => (bool.decode(r) ? vuint.decode(r) / 1000 : 0));
 		}
-	}
+	},
 	// Bit 11 is taken: a short-lived "even speed" flag (one bit per keyframe)
 	// used it. Links from then still decode — the bits are simply not read —
 	// but a new option must not reuse the bit, or it would misread them.
+	{
+		// Per keyframe two flags — does it set how it eases in, and out? —
+		// each followed by that strength in percent.
+		bit: 12,
+		label: 'eases',
+		shouldEmit: (v) => v.eases !== undefined && v.eases.some((e) => e.some(isEase)),
+		encode: (v, w) => {
+			for (let i = 0; i < v.keyframes.length; i++) {
+				for (const ease of v.eases![i] ?? [undefined, undefined]) {
+					bool.encode(isEase(ease), w);
+					if (isEase(ease)) easeCodec.encode(Math.round(snapEase(ease) * 100), w);
+				}
+			}
+		},
+		decode: (v, r) => {
+			const read = () => (bool.decode(r) ? snapEase(easeCodec.decode(r) / 100) : undefined);
+			v.eases = v.keyframes.map(() => [read(), read()]);
+		}
+	}
 ];
+
+const easeCodec = uint(7);
+function isEase(ease: number | undefined): ease is number {
+	return ease !== undefined && Number.isFinite(ease);
+}
 
 function holdMs(seconds: number | undefined): number {
 	return Math.max(0, Math.round((seconds ?? 0) * 1000));

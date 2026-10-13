@@ -14,6 +14,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
 - Drop keyframes on a timeline that capture the current camera (lng, lat, zoom, pitch, bearing, roll).
 - Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
+- Every stop sets how gently the camera **eases in** (arrives) and **eases out** (leaves), each with its own slider when the stop is selected: 0 % is abrupt, at full speed; 100 % is very gradual. A quick take-off with a long, soft landing is two sliders away. A stronger easing makes the middle of the move faster — the speed strip on the timeline shows it. Click the percentage to go back to the default.
 - Keyframes are **stops** or **waypoints**. The camera comes to rest on a stop and flies through a waypoint, so the keyframes from one stop to the next form one move. A move through waypoints is one flowing curve that only eases in and out at its two stops — for following a river, orbiting a place or drifting without pause. The curve is built from what the viewer sees: where it zooms in on the way, the ground is covered while the camera is still high, so it arrives over its target before it gets close and never races across the map; zoom, tilt and bearing do not swing past their keyframes. A waypoint as first or last keyframe starts or ends the animation in motion.
 - A stop can **hold**: the camera rests there for a set time before moving on. Drag the right edge of the selected stop on the timeline or type the seconds; everything after it moves along.
 - Travel style of a move that goes straight from stop to stop: **Fly over** (default, rises and descends on long distances) or **Stay low** (straight, without rising; the ground passes at an even speed on screen even while the zoom changes).
@@ -113,7 +114,9 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 			"roll": 0, // -180..180
 			"path": "arc", // optional: travel style of the move starting here — "arc" (Fly over) | "linear" (Stay low)
 			"waypoint": false, // optional: true = the camera flies through instead of stopping
-			"hold": 0 // optional: seconds the camera rests on this stop; it arrives at `t` and leaves at `t + hold`
+			"hold": 0, // optional: seconds the camera rests on this stop; it arrives at `t` and leaves at `t + hold`
+			"easeIn": 0.65, // optional, stops only: how gently the camera arrives, 0 (abrupt) … 1 (very gradual)
+			"easeOut": 0.65 // optional, stops only: the same for leaving. Unset: the default of the move
 		}
 	],
 	"annotations": [

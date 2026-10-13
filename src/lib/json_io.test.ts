@@ -176,6 +176,34 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(() => read([kf(0, { hold: 'long' })])).toThrow();
 	});
 
+	it('reads the easing of stops, within 0…1, and not on waypoints', () => {
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		const read = (keyframes: object[]) =>
+			validateAnimation({ ...minimalAnim, keyframes }).keyframes;
+		const kfs = read([
+			kf(0, { easeOut: 0 }),
+			kf(1, { easeIn: 0.255, easeOut: 3 }),
+			kf(2, { easeIn: 0.5, waypoint: true }),
+			kf(3)
+		]);
+		expect(kfs.map((k) => [k.easeIn, k.easeOut])).toEqual([
+			[undefined, 0],
+			[0.26, 1],
+			[undefined, undefined],
+			[undefined, undefined]
+		]);
+		expect(() => read([kf(0, { easeIn: 'soft' })])).toThrow();
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

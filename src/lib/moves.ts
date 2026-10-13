@@ -1,4 +1,10 @@
-import { DEFAULT_PATH, type Keyframe, type PathStyle } from './types';
+import {
+	DEFAULT_PATH,
+	type DEFAULT_EASE,
+	type EaseSide,
+	type Keyframe,
+	type PathStyle
+} from './types';
 
 /**
  * A move is the stretch of the animation from one stop to the next,
@@ -36,3 +42,20 @@ export const MOVE_KIND_LABELS: Record<Move['kind'], string> = {
 	linear: 'Stay low',
 	curve: 'Through waypoints'
 };
+
+/**
+ * What a side of the keyframe at `index` eases: a move straight to or from
+ * the neighbouring stop (`'direct'`), or the curve to or from a waypoint.
+ * `null` where there is nothing to ease — on a waypoint, before the first
+ * keyframe and after the last. The kind picks the default in `DEFAULT_EASE`.
+ */
+export function easeKindOf(
+	keyframes: readonly Keyframe[],
+	index: number,
+	side: EaseSide
+): keyof typeof DEFAULT_EASE | null {
+	const kf = keyframes[index];
+	const neighbour = keyframes[side === 'easeIn' ? index - 1 : index + 1];
+	if (!kf || kf.waypoint || !neighbour) return null;
+	return neighbour.waypoint ? 'curve' : 'direct';
+}

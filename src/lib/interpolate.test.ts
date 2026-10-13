@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	easeInOut,
+	easeMove,
 	evenSpeedFraction,
 	fromGlobeZoom,
 	interpolateKeyframes,
@@ -433,6 +434,113 @@ describe('waypoints', () => {
 			const cam = sampleAt(globe, t, 'globe')!;
 			expect(toGlobeZoom(cam.zoom, cam.lat)).toBeCloseTo(3, 9);
 		}
+	});
+});
+
+describe('easing of a stop', () => {
+	const stop = (t: number, lng: number, extra: Partial<Keyframe> = {}): Keyframe => ({
+		t,
+		lng,
+		lat: 0,
+		zoom: 5,
+		pitch: 0,
+		bearing: 0,
+		roll: 0,
+		path: 'linear',
+		...extra
+	});
+	const via = (t: number, lng: number) => stop(t, lng, { waypoint: true });
+	/** Speed in degrees of longitude per second around time `t`. */
+	const speed = (kfs: Keyframe[], t: number, dt = 1e-4) =>
+		(sampleAt(kfs, t + dt)!.lng - sampleAt(kfs, t - dt)!.lng) / (2 * dt);
+	const STEPS = Array.from({ length: 21 }, (_, i) => i / 20);
+
+	it('is the plain ease-in-out where no stop sets one', () => {
+		for (const u of STEPS) expect(easeMove(u)).toBe(easeInOut(u));
+		// The default strength comes close to it.
+		for (const u of STEPS)
+			expect(Math.abs(easeMove(u, 0.65, 0.65) - easeInOut(u))).toBeLessThan(0.03);
+	});
+
+	it('runs from 0 to 1 without turning back, whatever the strengths', () => {
+		for (const out of [0, 0.2, 0.65, 1]) {
+			for (const into of [0, 0.2, 0.65, 1]) {
+				expect(easeMove(0, out, into)).toBe(0);
+				expect(easeMove(1, out, into)).toBe(1);
+				for (let i = 1; i < STEPS.length; i++) {
+					expect(easeMove(STEPS[i], out, into)).toBeGreaterThan(easeMove(STEPS[i - 1], out, into));
+				}
+			}
+		}
+	});
+
+	it('is even at 0 and a smoothstep at a third', () => {
+		for (const u of STEPS) {
+			expect(easeMove(u, 0, 0)).toBeCloseTo(u, 9);
+			expect(easeMove(u, 1 / 3, 1 / 3)).toBeCloseTo(u * u * (3 - 2 * u), 9);
+		}
+	});
+
+	it('eases each end of a move by the stop there', () => {
+		const move = (easeOut?: number, easeIn?: number) => [
+			stop(0, 0, { easeOut }),
+			stop(1, 10, { easeIn })
+		];
+		// Leaving abruptly and arriving gently: fast at once, most of the way done by half time.
+		const quick = move(0, 1);
+		expect(speed(quick, 0.01)).toBeGreaterThan(10);
+		expect(Math.abs(speed(quick, 0.99))).toBeLessThan(0.5);
+		expect(sampleAt(quick, 0.5)!.lng).toBeGreaterThan(7);
+		// And the other way around.
+		const slow = move(1, 0);
+		expect(Math.abs(speed(slow, 0.01))).toBeLessThan(0.5);
+		expect(speed(slow, 0.99)).toBeGreaterThan(10);
+		expect(sampleAt(slow, 0.5)!.lng).toBeLessThan(3);
+		// One side set: the other keeps the default.
+		expect(sampleAt(move(0.65), 0.3)!.lng).toBeCloseTo(sampleAt(move(0.65, 0.65), 0.3)!.lng, 9);
+		// The easing of the far side of a stop is not this move's business.
+		const others = [stop(0, 0, { easeIn: 0 }), stop(1, 10, { easeOut: 0 })];
+		expect(sampleAt(others, 0.3)).toEqual(sampleAt(move(), 0.3));
+	});
+
+	it('eases the ends of a move through waypoints, and leaves the waypoints alone', () => {
+		const curve = (easeOut?: number, easeIn?: number) => [
+			stop(0, 0, { easeOut }),
+			via(1, 10),
+			via(2, 20),
+			stop(3, 30, { easeIn })
+		];
+		const plain = curve();
+		// A third is what the curve does by itself.
+		for (const t of [0.2, 0.5, 0.8, 2.2, 2.5, 2.8]) {
+			expect(sampleAt(curve(1 / 3, 1 / 3), t)!.lng).toBeCloseTo(sampleAt(plain, t)!.lng, 9);
+		}
+		for (const [out, into] of [
+			[0, 0],
+			[1, 1],
+			[0, 1],
+			[0.8, 0.1]
+		]) {
+			const eased = curve(out, into);
+			// Every keyframe at its time, the same speed through the waypoints …
+			for (const k of eased) expect(sampleAt(eased, k.t)!.lng).toBeCloseTo(k.lng, 9);
+			for (const t of [1, 1.5, 2]) expect(speed(eased, t)).toBeCloseTo(speed(plain, t), 2);
+			// … and never backwards.
+			for (let t = 0.05; t < 3; t += 0.05) expect(speed(eased, t)).toBeGreaterThan(0);
+		}
+		// Weaker: under way at once. Stronger: slower to get going than the curve alone.
+		expect(speed(curve(0), 0.01)).toBeGreaterThan(5);
+		expect(speed(curve(1), 0.2)).toBeLessThan(speed(plain, 0.2));
+		expect(speed(curve(undefined, 0), 2.99)).toBeGreaterThan(5);
+		expect(speed(curve(undefined, 1), 2.8)).toBeLessThan(speed(plain, 2.8));
+		// Only the end it belongs to changes.
+		expect(sampleAt(curve(0), 2.5)).toEqual(sampleAt(plain, 2.5));
+	});
+
+	it('means nothing on a waypoint', () => {
+		const row = [stop(0, 0), via(1, 10), stop(2, 20)];
+		const set = [row[0], { ...row[1], easeIn: 0, easeOut: 1 }, row[2]];
+		for (const t of [0.3, 0.9, 1.1, 1.7]) expect(sampleAt(set, t)).toEqual(sampleAt(row, t));
 	});
 });
 

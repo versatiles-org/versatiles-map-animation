@@ -790,6 +790,75 @@ describe('holds', () => {
 	});
 });
 
+describe('eases', () => {
+	type Ease = [number | undefined, number | undefined];
+	const flight = (eases: Ease[], waypoints: number[] = []): Animation => ({
+		...example,
+		keyframes: eases.map(([easeIn, easeOut], i) => ({
+			t: i * 10,
+			lng: 10 + i,
+			lat: 50,
+			zoom: 8,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...(easeIn !== undefined && { easeIn }),
+			...(easeOut !== undefined && { easeOut }),
+			...(waypoints.includes(i) && { waypoint: true })
+		}))
+	});
+	const none: Ease = [undefined, undefined];
+	const easesOf = (anim: Animation | null) => anim?.keyframes.map((k) => [k.easeIn, k.easeOut]);
+
+	it('cost nothing when no stop sets one', () => {
+		const plain = encodeAnimation(flight([none, none, none]));
+		expect(encodeAnimation({ ...example, keyframes: flight([none, none, none]).keyframes })).toBe(
+			plain
+		);
+		expect(encodeAnimation(flight([none, [0.5, undefined], none])).length).toBeGreaterThan(
+			plain.length
+		);
+		for (const kf of decodeAnimation(plain)!.keyframes) {
+			expect(kf).not.toHaveProperty('easeIn');
+			expect(kf).not.toHaveProperty('easeOut');
+		}
+	});
+
+	it('round-trip to the percent, each side on its own, 0 included', () => {
+		for (const eases of [
+			[[undefined, 0], none, [1, undefined]],
+			[none, [0.33, 0.65], none],
+			[
+				[0.05, 0.95],
+				[0, 0],
+				[1, 1]
+			]
+		] as Ease[][]) {
+			expect(easesOf(decodeAnimation(encodeAnimation(flight(eases))))).toEqual(eases);
+		}
+		expect(easesOf(decodeAnimation(encodeAnimation(flight([[0.337, 2], none]))))).toEqual([
+			[0.34, 1],
+			none
+		]);
+	});
+
+	it('round-trip next to waypoints and holds, and never end up on a waypoint', () => {
+		const anim = flight(
+			[
+				[undefined, 0.2],
+				[0.5, 0.5],
+				[0.8, undefined]
+			],
+			[1]
+		);
+		anim.keyframes[2].hold = 2;
+		const decoded = decodeAnimation(encodeAnimation(anim));
+		expect(easesOf(decoded)).toEqual([[undefined, 0.2], none, [0.8, undefined]]);
+		expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual([false, true, false]);
+		expect(decoded?.keyframes[2].hold).toBe(2);
+	});
+});
+
 describe('legacy spline path', () => {
 	// Links written while `spline` was a path style, four keyframes each.
 	const ALL_SPLINE = 'AhQkdTA4mHYp_W49h0-_RLrmZhcRVP4afjw8y1ENueLHIAfwvcPKErqKcancNU1YAAAA';

@@ -8,6 +8,7 @@ import {
 	isAnnotationIcon,
 	isAspectRatio,
 	isDefaultScreenAnchor,
+	snapEase,
 	isLabelPosition,
 	isMapProjection,
 	isMapStyleId,
@@ -109,6 +110,10 @@ export function validateAnimation(input: unknown): Animation {
 		if (o.waypoint === true) kf.waypoint = true;
 		const hold = optionalNum(o, 'hold', ctx);
 		if (hold !== undefined && hold > 0 && !kf.waypoint) kf.hold = hold;
+		for (const side of ['easeIn', 'easeOut'] as const) {
+			const ease = optionalNum(o, side, ctx);
+			if (ease !== undefined && !kf.waypoint) kf[side] = snapEase(ease);
+		}
 		return kf;
 	});
 	const keyframes: Keyframe[] = convertLegacySplinePaths(rawKeyframes);

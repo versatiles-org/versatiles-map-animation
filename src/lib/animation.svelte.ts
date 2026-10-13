@@ -16,6 +16,7 @@ import {
 	normalizeScreenAnchor,
 	normalizeSun,
 	SCHEMA_VERSION,
+	snapEase,
 	snapKeyframeTimes,
 	snapTime,
 	TIME_RESOLUTION
@@ -27,6 +28,7 @@ import type {
 	AnnotationStyle,
 	AspectRatio,
 	CameraState,
+	EaseSide,
 	Keyframe,
 	MapLayerGroup,
 	MapProjection,
@@ -294,7 +296,23 @@ export class AnimationStore {
 			updated.waypoint = true;
 			// A waypoint is flown through; the time of its hold stays part of the move.
 			delete updated.hold;
+			delete updated.easeIn;
+			delete updated.easeOut;
 		} else delete updated.waypoint;
+		this.keyframes = replaceAt(this.keyframes, index, updated);
+	}
+
+	/**
+	 * Set how gently the camera arrives at a stop (`easeIn`) or leaves it
+	 * (`easeOut`), 0…1. `null` goes back to the default of the move.
+	 */
+	setKeyframeEase(index: number, side: EaseSide, ease: number | null): void {
+		const kf = this.keyframes[index];
+		if (!kf || kf.waypoint) return;
+		const updated: Keyframe = { ...kf };
+		if (ease === null || !Number.isFinite(ease)) delete updated[side];
+		else updated[side] = snapEase(ease);
+		if (updated[side] === kf[side]) return;
 		this.keyframes = replaceAt(this.keyframes, index, updated);
 	}
 

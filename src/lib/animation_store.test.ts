@@ -673,6 +673,28 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s.selectedMove).toBeNull();
 	});
 
+	it('sets how a stop eases, and drops it with the default or on a waypoint', () => {
+		const s = new AnimationStore();
+		const kf = (t: number) => ({ t, lng: t * 10, lat: 0, zoom: 5, pitch: 0, bearing: 0, roll: 0 });
+		s.loadFromAnimation({ ...s.toAnimation(), keyframes: [kf(0), kf(1), kf(2)] });
+		s.seekTo(0.5);
+		const before = s.sampledCamera!.lng;
+		s.setKeyframeEase(0, 'easeOut', 0);
+		expect(s.keyframes[0].easeOut).toBe(0);
+		expect(s.sampledCamera!.lng).toBeGreaterThan(before);
+		expect(s.toAnimation().keyframes[0].easeOut).toBe(0);
+		// On the grid, within 0…1.
+		s.setKeyframeEase(1, 'easeIn', 0.337);
+		s.setKeyframeEase(1, 'easeOut', 7);
+		expect(s.keyframes[1]).toMatchObject({ easeIn: 0.34, easeOut: 1 });
+		s.setKeyframeEase(1, 'easeIn', null);
+		expect(s.keyframes[1]).not.toHaveProperty('easeIn');
+		s.setKeyframeWaypoint(1, true);
+		expect(s.keyframes[1]).not.toHaveProperty('easeOut');
+		s.setKeyframeEase(1, 'easeOut', 0.5);
+		expect(s.keyframes[1]).not.toHaveProperty('easeOut');
+	});
+
 	describe('hold', () => {
 		const kf = (t: number, extra: object = {}) => ({
 			t,
