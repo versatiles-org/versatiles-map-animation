@@ -524,6 +524,10 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	const samples = Math.max(1, opts.motionBlur);
 	const shutterRatio = opts.shutterAngle / 360;
 	const progress = new Progress(total, 'rendering frames');
+	// Where the time of this pass goes, for the summary printed at the end:
+	// drawing (seek + wait until the map has settled) and capturing (the
+	// screenshot: read-back, PNG encoding, transfer from the browser).
+	const timing = { drawMs: 0, captureMs: 0, captures: 0, pngBytes: 0 };
 	for (let i = 0; i < total; i++) {
 		// If ffmpeg has died, bail out instead of looping through all 700+
 		// remaining frames writing PNGs into a dead pipe. The exit promise
@@ -536,6 +540,7 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 			// Sub-frame offset inside one shutter-open window. samples=1
 			// degenerates to t = i / fps (the original behaviour).
 			const t = Math.min(duration, (i + (j * shutterRatio) / samples) / opts.fps);
+			const drawStart = performance.now();
 			await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
 			try {
 				await waitForFrameReady(page, opts.frameTimeoutMs);
@@ -546,13 +551,43 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 						: `frame ${i + 1}/${total}`;
 				log(`! ${label} timeout (t=${t.toFixed(3)}): ${err.message}`);
 			}
+			const captureStart = performance.now();
 			const png = await page.screenshot({ type: 'png' });
+			timing.drawMs += captureStart - drawStart;
+			timing.captureMs += performance.now() - captureStart;
+			timing.captures++;
+			timing.pngBytes += png.length;
 			ffmpegStdin.write(png);
 		}
 		progress.update(i + 1);
 	}
 	progress.finish();
 	ffmpegStdin.end();
+	return timing;
+}
+
+/**
+ * One line per phase: how long it took, its share of the whole run, and
+ * for the per-frame phases the average per captured frame. This is what
+ * tells whether a faster GPU, a faster capture path or a faster encoder
+ * preset would actually help.
+ */
+function logTiming(phases, totalMs, timing) {
+	log('timing:');
+	for (const [label, ms, perCapture] of phases) {
+		const share = `${Math.round((ms / totalMs) * 100)}%`.padStart(4);
+		const each =
+			perCapture && timing.captures > 0
+				? `  (${(ms / timing.captures).toFixed(0)} ms per frame)`
+				: '';
+		log(`  ${label.padEnd(26)} ${(ms / 1000).toFixed(1).padStart(7)} s ${share}${each}`);
+	}
+	log(`  ${'total'.padEnd(26)} ${(totalMs / 1000).toFixed(1).padStart(7)} s`);
+	if (timing.captures > 0) {
+		log(
+			`  ${timing.captures} frames captured, ${fmtBytes(timing.pngBytes / timing.captures)} per PNG on average`
+		);
+	}
 }
 
 async function main() {
@@ -600,7 +635,9 @@ async function main() {
 
 	try {
 		log('preparing renderer…');
+		const startedAt = performance.now();
 		const { ctx, page, duration } = await setupPage(browser, opts, hash);
+		const setupMs = performance.now() - startedAt;
 		const cappedDuration = opts.endTime != null ? Math.min(duration, opts.endTime) : duration;
 		const totalFrames = Math.max(2, Math.ceil(cappedDuration * opts.fps) + 1);
 		const height = opts.height ?? Math.round((opts.width * 9) / 16);
@@ -613,14 +650,31 @@ async function main() {
 				(opts.endTime != null ? ` (capped from ${duration.toFixed(2)}s)` : '')
 		);
 
+		const prewarmStart = performance.now();
 		if (opts.prewarm) {
 			await prewarmPass(page, cappedDuration, opts);
 		}
+		const prewarmMs = performance.now() - prewarmStart;
 
 		const { proc, exit } = spawnFfmpeg(opts);
-		await capturePass(page, cappedDuration, opts, proc.stdin);
+		const timing = await capturePass(page, cappedDuration, opts, proc.stdin);
 		log('encoding video…');
+		const encodeStart = performance.now();
 		await exit;
+		// ffmpeg encodes while frames are still being captured, so only what
+		// is left over after the last frame shows up as its own phase.
+		const encodeMs = performance.now() - encodeStart;
+		logTiming(
+			[
+				['loading the page', setupMs, false],
+				['warming the tile cache', prewarmMs, false],
+				['drawing frames', timing.drawMs, true],
+				['capturing frames', timing.captureMs, true],
+				['encoding after last frame', encodeMs, false]
+			],
+			performance.now() - startedAt,
+			timing
+		);
 
 		const { size } = await stat(opts.output);
 		log(`done · ${opts.output} (${fmtBytes(size)})`);

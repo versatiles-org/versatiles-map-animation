@@ -67,6 +67,25 @@ docker run --rm -it -v "$PWD:/out" \
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
 | `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |
 
+## Timing summary
+
+At the end of every run the renderer prints where the time went:
+
+```
+timing:
+  loading the page               7.5 s   3%
+  warming the tile cache        15.1 s   5%
+  drawing frames               191.2 s  70%  (1062 ms per frame)
+  capturing frames              60.6 s  22%  (337 ms per frame)
+  encoding after last frame      0.2 s   0%
+  total                        274.6 s
+```
+
+"Drawing" is seeking to a frame and waiting until the map has settled;
+"capturing" is the screenshot (read-back, PNG encoding, transfer from the
+browser). ffmpeg encodes in parallel while frames are captured, so only what
+is left after the last frame shows up as encoding.
+
 ## How it works
 
 The container bundles a prerendered version of the `/view` route. A small
