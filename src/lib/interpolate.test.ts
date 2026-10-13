@@ -351,6 +351,50 @@ describe('waypoints', () => {
 		expect(sampleAt(hop, 2)!.lng).toBeCloseTo(1, 9);
 	});
 
+	it('keeps to the way between its keyframes, however sharp the corners', () => {
+		// Random routes with hairpins, short hops between long hauls, uneven
+		// timing and changing zoom. Between two keyframes the camera may cut a
+		// corner, but it does not loop: measured against the straight line from
+		// one to the other, it never falls back by more than a small part of
+		// that line, nor strays to the side by more than half of it.
+		let seed = 7;
+		const random = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+		let worstBack = 0;
+		let worstAside = 0;
+		for (let route = 0; route < 300; route++) {
+			const count = 3 + Math.floor(random() * 3);
+			const sameZoom = random() < 0.5;
+			const zoom = 4 + random() * 6;
+			const kfs: Keyframe[] = [];
+			let [t, lng, lat] = [0, 0, 0];
+			for (let i = 0; i < count; i++) {
+				const extra = { zoom: sameZoom ? zoom : 3 + random() * 9 };
+				kfs.push(i > 0 && i < count - 1 ? via(t, lng, lat, extra) : stop(t, lng, lat, extra));
+				t += 0.3 + random() * 4;
+				const length = random() < 0.3 ? 0.05 + random() * 0.3 : 1 + random() * 8;
+				const direction = random() * 2 * Math.PI;
+				lng += length * Math.cos(direction);
+				lat += (length * Math.sin(direction)) / 2;
+			}
+			for (let i = 0; i < count - 1; i++) {
+				const [a, b] = [kfs[i], kfs[i + 1]];
+				const [dx, dy] = [b.lng - a.lng, b.lat - a.lat];
+				const squared = dx * dx + dy * dy;
+				let furthest = 0;
+				for (let k = 1; k <= 100; k++) {
+					const c = sampleAt(kfs, a.t + ((b.t - a.t) * k) / 100)!;
+					const along = ((c.lng - a.lng) * dx + (c.lat - a.lat) * dy) / squared;
+					const aside = Math.abs((c.lng - a.lng) * dy - (c.lat - a.lat) * dx) / squared;
+					worstBack = Math.max(worstBack, furthest - along);
+					furthest = Math.max(furthest, along);
+					worstAside = Math.max(worstAside, aside);
+				}
+			}
+		}
+		expect(worstBack).toBeLessThan(0.15);
+		expect(worstAside).toBeLessThan(0.5);
+	});
+
 	it('curves through a corner instead of turning on the spot', () => {
 		// East, then north: at the corner the camera is already heading north-east.
 		const corner = [stop(0, 0, 0), via(1, 10, 0), via(2, 10, 10), stop(3, 10, 20)];
