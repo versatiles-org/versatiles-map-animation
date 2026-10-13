@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
-	import { MOVE_KIND_LABELS } from '../moves';
+	import { MOVE_KIND_LABELS, type Move } from '../moves';
+	import { SPEED_FAST, SPEED_VERY_FAST, speedProfile } from '../speed';
 	import { departureOf, holdOf } from '../types';
 	import PathIcon from './PathIcon.svelte';
 
@@ -244,6 +245,35 @@
 		});
 	}
 
+	/**
+	 * Where a move is too fast to follow: a colour per moment, clear below
+	 * `SPEED_FAST`, orange up to `SPEED_VERY_FAST`, red beyond. Drawn as a
+	 * strip along the bottom of the move's band.
+	 */
+	function speedColor(speed: number): string {
+		if (speed < SPEED_FAST) return 'transparent';
+		if (speed >= SPEED_VERY_FAST) return '#ff4d4d';
+		const alpha = 0.55 + (0.45 * (speed - SPEED_FAST)) / (SPEED_VERY_FAST - SPEED_FAST);
+		return `rgba(255, 165, 40, ${alpha.toFixed(2)})`;
+	}
+	function speedTint(move: Move): { peak: number; gradient: string | null } {
+		const from = departureOf(store.keyframes[move.start]);
+		const to = store.keyframes[move.end].t;
+		const profile = speedProfile(store.keyframes, store.projection, from, to);
+		const peak = Math.max(0, ...profile);
+		if (peak < SPEED_FAST) return { peak, gradient: null };
+		const stops = profile.map(
+			(speed, i) => `${speedColor(speed)} ${(((i + 0.5) / profile.length) * 100).toFixed(1)}%`
+		);
+		return { peak, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
+	}
+	const speedTints = $derived(store.moves.map(speedTint));
+	function speedNote(peak: number): string {
+		if (peak < SPEED_FAST) return '';
+		const word = peak >= SPEED_VERY_FAST ? 'very fast' : 'fast';
+		return ` — ${word}: up to ${peak.toFixed(1)} frame widths per second`;
+	}
+
 	function zoomAt(factor: number, anchorClientX: number) {
 		const tAnchor = tFromClientX(anchorClientX);
 		const newSpan = Math.max(MIN_SPAN, Math.min(MAX_SPAN, span * factor));
@@ -383,7 +413,8 @@
 			</div>
 		{/each}
 
-		{#each store.moves as move (move.start)}
+		{#each store.moves as move, m (move.start)}
+			{@const tint = speedTints[m]}
 			{@const from = departureOf(store.keyframes[move.start])}
 			{@const to = store.keyframes[move.end].t}
 			<button
@@ -393,12 +424,17 @@
 				data-start={move.start}
 				style="left: {pct(from)}%; width: {pct(to) - pct(from)}%"
 				onclick={() => store.selectMove(move.start)}
-				title="Move: {MOVE_KIND_LABELS[move.kind]}, {fmt(to - from)}s — click to select"
+				title="Move: {MOVE_KIND_LABELS[move.kind]}, {fmt(to - from)}s{speedNote(
+					tint?.peak ?? 0
+				)} — click to select"
 				aria-label="Move from keyframe {move.start + 1} to {move.end + 1}: {MOVE_KIND_LABELS[
 					move.kind
 				]}"
 			>
 				<PathIcon icon={move.kind === 'curve' ? 'waypoint' : move.kind} size={14} />
+				{#if tint?.gradient}
+					<span class="speed" style="background: {tint.gradient}"></span>
+				{/if}
 			</button>
 		{/each}
 
@@ -673,6 +709,15 @@
 			:global(svg) {
 				display: none;
 			}
+		}
+		/* Strip that marks where the picture moves too fast — see `speedTint`. */
+		.speed {
+			position: absolute;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			height: 5px;
+			pointer-events: none;
 		}
 	}
 	/* A stop that rests: a solid block from arrival to departure, in the
