@@ -532,9 +532,10 @@ export interface Keyframe {
 export type EaseSide = 'easeIn' | 'easeOut';
 
 /**
- * The easing of a stop that sets none, as the strength that comes closest
- * to it. A move straight from stop to stop eases more than the curve of a
- * move through waypoints, which only has to come to rest at its two ends.
+ * The easing of a stop that sets none. A move straight from stop to stop
+ * eases more than the curve of a move through waypoints, which only has to
+ * come to rest at its two ends — and comes to rest by itself, the way a
+ * strength of a third does.
  */
 export const DEFAULT_EASE = { direct: 0.65, curve: 1 / 3 } as const;
 

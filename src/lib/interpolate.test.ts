@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-	easeInOut,
 	easeMove,
 	evenSpeedFraction,
 	fromGlobeZoom,
@@ -12,20 +11,6 @@ import {
 } from './interpolate';
 import { screenSpeed, SPEED_FAST } from './screen_speed';
 import type { Keyframe } from './types';
-
-describe('easeInOut', () => {
-	it('is 0 at 0 and 1 at 1', () => {
-		expect(easeInOut(0)).toBe(0);
-		expect(easeInOut(1)).toBe(1);
-	});
-	it('is 0.5 at midpoint', () => {
-		expect(easeInOut(0.5)).toBeCloseTo(0.5);
-	});
-	it('clamps below 0 and above 1', () => {
-		expect(easeInOut(-1)).toBe(0);
-		expect(easeInOut(2)).toBe(1);
-	});
-});
 
 describe('lerp', () => {
 	it('linearly interpolates', () => {
@@ -489,11 +474,14 @@ describe('easing of a stop', () => {
 		(sampleAt(kfs, t + dt)!.lng - sampleAt(kfs, t - dt)!.lng) / (2 * dt);
 	const STEPS = Array.from({ length: 21 }, (_, i) => i / 20);
 
-	it('is the plain ease-in-out where no stop sets one', () => {
-		for (const u of STEPS) expect(easeMove(u)).toBe(easeInOut(u));
-		// The default strength comes close to it.
-		for (const u of STEPS)
-			expect(Math.abs(easeMove(u, 0.65, 0.65) - easeInOut(u))).toBeLessThan(0.03);
+	it('is the default strength on both sides where no stop sets one', () => {
+		for (const u of STEPS) expect(easeMove(u)).toBe(easeMove(u, 0.65, 0.65));
+		// Which is the cubic ease-in-out, to within a hundredth of the way.
+		const cubic = (u: number) => (u < 0.5 ? 4 * u ** 3 : 1 - (2 - 2 * u) ** 3 / 2);
+		for (const u of STEPS) expect(Math.abs(easeMove(u) - cubic(u))).toBeLessThan(0.01);
+		expect(easeMove(0.5)).toBeCloseTo(0.5, 9);
+		expect(easeMove(-1)).toBe(0);
+		expect(easeMove(2)).toBe(1);
 	});
 
 	it('runs from 0 to 1 without turning back, whatever the strengths', () => {

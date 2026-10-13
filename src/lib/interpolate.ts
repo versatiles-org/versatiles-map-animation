@@ -8,13 +8,6 @@ import {
 	type MapProjection
 } from './types';
 
-/** Standard cubic ease-in-out on [0, 1]. */
-export function easeInOut(t: number): number {
-	if (t <= 0) return 0;
-	if (t >= 1) return 1;
-	return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
 /**
  * The parameter, 0…1, at which the cubic Bézier curve from 0 to 1 with the
  * inner control values `c1` and `c2` reaches `x`. The curve has to rise all
@@ -26,7 +19,10 @@ function bezierParameter(c1: number, c2: number, x: number): number {
 	for (let i = 0; i < 40; i++) {
 		const s = (lo + hi) / 2;
 		const r = 1 - s;
-		if (3 * r * r * s * c1 + 3 * r * s * s * c2 + s * s * s < x) lo = s;
+		const value = 3 * r * r * s * c1 + 3 * r * s * s * c2 + s * s * s;
+		// Spot on — as at the middle of a move that eases alike at both ends.
+		if (value === x) return s;
+		if (value < x) lo = s;
 		else hi = s;
 	}
 	return (lo + hi) / 2;
@@ -39,16 +35,17 @@ function clamp01(v: number): number {
 /**
  * How far along a move from stop to stop the camera is at `alpha` of its
  * time. `easeOut` is the easing of the stop it leaves, `easeIn` of the stop
- * it arrives at — see `Keyframe`. With neither set this is `easeInOut`.
+ * it arrives at — see `Keyframe`. A side that sets none eases by
+ * `DEFAULT_EASE.direct`, which gives a move with nothing set the familiar
+ * cubic ease-in-out, to within a hundredth of the way.
  *
- * Otherwise the timing is the curve `cubic-bezier(easeOut, 0, 1 - easeIn, 1)`
- * known from CSS and from the "influence" of a keyframe in video editors:
- * the speed is zero at both ends, and the strength says for how much of the
+ * The timing is the curve `cubic-bezier(easeOut, 0, 1 - easeIn, 1)` known
+ * from CSS and from the "influence" of a keyframe in video editors: the
+ * speed is zero at both ends, and the strength says for how much of the
  * move the camera keeps gathering or shedding speed. At 0 it starts (or
  * ends) at full speed.
  */
 export function easeMove(alpha: number, easeOut?: number, easeIn?: number): number {
-	if (easeOut === undefined && easeIn === undefined) return easeInOut(alpha);
 	if (alpha <= 0) return 0;
 	if (alpha >= 1) return 1;
 	const s = bezierParameter(
