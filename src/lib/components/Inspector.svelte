@@ -16,7 +16,8 @@
 		PATH_STYLE_LABELS,
 		PATH_STYLES,
 		TIME_RESOLUTION,
-		type EaseSide
+		type EaseSide,
+		type Keyframe
 	} from '../types';
 	import Icon from './Icon.svelte';
 	import PathIcon from './PathIcon.svelte';
@@ -41,7 +42,57 @@
 	const keyframe = $derived(store.selectedKeyframe);
 	const isWaypoint = $derived(keyframe?.waypoint === true);
 	const move = $derived(store.selectedMove);
+
+	// The easing controls of a narrow window: a click anywhere else closes them.
+	let easeEl = $state<HTMLDetailsElement | undefined>(undefined);
+	function handleDocClick(e: MouseEvent) {
+		if (easeEl?.open && !easeEl.contains(e.target as Node)) easeEl.open = false;
+	}
+	$effect(() => {
+		document.addEventListener('click', handleDocClick);
+		return () => document.removeEventListener('click', handleDocClick);
+	});
 </script>
+
+{#snippet easeControls(keyframe: Keyframe, index: number)}
+	{#each EASES as [side, label, hint] (side)}
+		{@const kind = easeKindOf(store.keyframes, index, side)}
+		{@const own = keyframe[side]}
+		{@const percent = Math.round((own ?? (kind ? DEFAULT_EASE[kind] : 0)) * 100)}
+		<div
+			class="field"
+			title={kind
+				? `${hint}: 0 % is abrupt, at full speed; 100 % is very gradual. A stronger easing makes the middle of the move faster.`
+				: isWaypoint
+					? 'A waypoint is flown through and does not ease'
+					: side === 'easeIn'
+						? 'Nothing arrives at the first keyframe'
+						: 'Nothing leaves the last keyframe'}
+		>
+			<span class="lbl">{label}</span>
+			<input
+				type="range"
+				min="0"
+				max="100"
+				step="5"
+				value={percent}
+				disabled={!kind}
+				aria-label="Ease {label.toLowerCase()} of keyframe {index + 1}, in percent"
+				oninput={(e) => store.setKeyframeEase(index, side, Number(e.currentTarget.value) / 100)}
+			/>
+			<button
+				type="button"
+				class="percent"
+				disabled={own === undefined}
+				title={own === undefined ? 'The default of this move' : 'Back to the default'}
+				aria-label="Reset ease {label.toLowerCase()} to the default"
+				onclick={() => store.setKeyframeEase(index, side, null)}
+			>
+				{kind ? `${percent}%` : '–'}
+			</button>
+		</div>
+	{/each}
+{/snippet}
 
 <div class="inspector" role="group" aria-label="Selected keyframe or move">
 	{#if move}
@@ -133,44 +184,16 @@
 			/>
 			<span>s</span>
 		</label>
-		<span class="lbl">Ease</span>
-		{#each EASES as [side, label, hint] (side)}
-			{@const kind = easeKindOf(store.keyframes, index, side)}
-			{@const own = keyframe[side]}
-			{@const percent = Math.round((own ?? (kind ? DEFAULT_EASE[kind] : 0)) * 100)}
-			<div
-				class="field"
-				title={kind
-					? `${hint}: 0 % is abrupt, at full speed; 100 % is very gradual. A stronger easing makes the middle of the move faster.`
-					: isWaypoint
-						? 'A waypoint is flown through and does not ease'
-						: side === 'easeIn'
-							? 'Nothing arrives at the first keyframe'
-							: 'Nothing leaves the last keyframe'}
-			>
-				<span class="lbl">{label}</span>
-				<input
-					type="range"
-					min="0"
-					max="100"
-					step="5"
-					value={percent}
-					disabled={!kind}
-					aria-label="Ease {label.toLowerCase()} of keyframe {index + 1}, in percent"
-					oninput={(e) => store.setKeyframeEase(index, side, Number(e.currentTarget.value) / 100)}
-				/>
-				<button
-					type="button"
-					class="percent"
-					disabled={own === undefined}
-					title={own === undefined ? 'The default of this move' : 'Back to the default'}
-					aria-label="Reset ease {label.toLowerCase()} to the default"
-					onclick={() => store.setKeyframeEase(index, side, null)}
-				>
-					{kind ? `${percent}%` : '–'}
-				</button>
-			</div>
-		{/each}
+		<!-- Next to the other controls where the window has room for them,
+		     otherwise behind a button of their own. -->
+		<span class="lbl ease-inline">Ease</span>
+		<div class="ease-inline">{@render easeControls(keyframe, index)}</div>
+		<details bind:this={easeEl} class="ease-menu">
+			<summary title="How gently the camera arrives at this stop and leaves it">
+				Ease <Icon name="caret" size={12} />
+			</summary>
+			<div class="popup">{@render easeControls(keyframe, index)}</div>
+		</details>
 		<div class="field">
 			<button
 				type="button"
@@ -306,10 +329,67 @@
 		}
 	}
 
+	.ease-inline {
+		display: contents;
+	}
+	.ease-menu {
+		display: none;
+		position: relative;
+
+		summary {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			padding: 0.4rem 0.6rem;
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid #333;
+			border-radius: 4px;
+			color: #ddd;
+			font-size: 13px;
+			cursor: pointer;
+			list-style: none;
+			user-select: none;
+
+			&::-webkit-details-marker {
+				display: none;
+			}
+			&:hover {
+				border-color: #4a9eff;
+			}
+		}
+		&[open] summary {
+			background: rgba(74, 158, 255, 0.18);
+			border-color: #4a9eff;
+		}
+		/* Opens upwards: the row sits right above the timeline. */
+		.popup {
+			position: absolute;
+			bottom: calc(100% + 0.3rem);
+			left: 0;
+			z-index: 5;
+			display: flex;
+			flex-direction: column;
+			gap: 0.4rem;
+			padding: 0.6rem 0.7rem;
+			background: #16191f;
+			border: 1px solid #333;
+			border-radius: 6px;
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+			.lbl {
+				width: 2rem;
+			}
+			input[type='range'] {
+				width: 7rem;
+			}
+		}
+	}
+
 	/* The row shares the window's width with the playback controls. Where a
 	   selected keyframe's controls would not fit, the two actions keep only
-	   their icons, and in a still narrower window so do the two keyframe
-	   types; their tooltips still say what they do. */
+	   their icons, in a still narrower window so do the two keyframe types,
+	   and at last the easing moves behind a button; their tooltips still say
+	   what they do. */
 	@media (max-width: 1560px) {
 		.label {
 			display: none;
@@ -321,6 +401,14 @@
 		}
 		.type-label {
 			display: none;
+		}
+	}
+	@media (max-width: 1280px) {
+		.ease-inline {
+			display: none;
+		}
+		.ease-menu {
+			display: block;
 		}
 	}
 </style>
