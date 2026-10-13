@@ -39,9 +39,19 @@ RUN npm ci --omit=dev --no-audit --no-fund \
 FROM debian:bookworm-slim
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# fonts-dejavu-core: the font Chromium ends up drawing the map's attribution
-# ("VersaTiles", bottom right) in. Debian's ffmpeg used to bring it along;
-# without it the attribution falls back to another typeface.
+# The system libraries Chromium's headless shell links against (`ldd` on its
+# binaries), named one by one. Playwright's own `install-deps` would also
+# bring xvfb, and with it Mesa's OpenGL drivers and LLVM, plus fonts for
+# every script — some 250 MB that drawing a map in software never uses.
+# When a new Playwright brings a browser that needs another library, the
+# renderer fails at start with the name of the missing file.
+#
+# fonts-dejavu-core is the one font in the image: Chromium draws the map's
+# attribution ("VersaTiles", bottom right) in it. Map and marker labels come
+# as glyphs from the tile server and need no font here — except Chinese,
+# Japanese and Korean characters, which MapLibre draws with a system font
+# and which therefore come out as empty boxes in a video from this image.
+# libfontconfig1 brings the configuration that lets Chromium find the font.
 #
 # `--build-arg GPU=true` builds the variant for `--gpu`, published with a
 # `-gpu` suffix on its tags. It adds libvulkan1 + mesa-vulkan-drivers: the
@@ -57,7 +67,11 @@ ENV RENDERER_GPU_DRIVERS=${GPU}
 ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates fonts-dejavu-core \
+	&& apt-get install -y --no-install-recommends ca-certificates \
+		fonts-dejavu-core libfontconfig1 \
+		libasound2 libatk1.0-0 libatspi2.0-0 libdbus-1-3 libdrm2 libexpat1 libgbm1 \
+		libglib2.0-0 libnspr4 libnss3 libx11-6 libxcb1 libxcomposite1 libxdamage1 \
+		libxext6 libxfixes3 libxi6 libxkbcommon0 libxrandr2 libxrender1 \
 		$([ "$GPU" = true ] && echo libvulkan1 mesa-vulkan-drivers) \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
@@ -66,10 +80,6 @@ COPY --from=renderer-deps /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app/render
 COPY --from=renderer-deps /app/render/node_modules ./node_modules
-# The system libraries and fonts Chromium needs. Playwright's command line
-# runs without npm.
-RUN node node_modules/playwright/cli.js install-deps chromium-headless-shell \
-	&& rm -rf /var/lib/apt/lists/*
 COPY --from=renderer-deps /ms-playwright /ms-playwright
 COPY render/package.json ./
 

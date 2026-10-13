@@ -155,6 +155,18 @@ when `--gpu` is given to the default image.
 - **The picture is not bit-identical to software rendering.** GPUs and
   drivers round differently; the difference is not visible.
 
+## Fonts
+
+The image carries a single font, DejaVu Sans, for the map's attribution.
+Map and marker labels are drawn from glyphs that come with the map tiles and
+need no font in the image — with one exception: **Chinese, Japanese and
+Korean characters** are drawn with a font of the machine, and since the
+image has none for them, they come out as empty boxes. To render such
+labels, build your own image with a font for them added to the `apt-get
+install` line of `render/Dockerfile` (for example `fonts-wqy-zenhei` or
+`fonts-noto-cjk`), or run the renderer without Docker on a machine that has
+the fonts.
+
 ## Timing summary
 
 At the end of every run the renderer prints where the time went:
