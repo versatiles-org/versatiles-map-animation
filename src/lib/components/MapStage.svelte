@@ -398,6 +398,16 @@
 			map.on('render', () => refreshTerrainTexturesAtOnce(mapForRender));
 		}
 		if (initialOptions.projection === 'globe') map.setTransformConstrain(constrainGlobe);
+		// Zoom buttons and a compass, for composing a view: the compass shows
+		// bearing, tilt and roll, and a click on it turns the map back north.
+		// Only in the editor — the viewer and the rendered video show the
+		// animation and nothing else.
+		if (editMode && !renderMode) {
+			map.addControl(
+				new maplibregl.NavigationControl({ visualizePitch: true, visualizeRoll: true }),
+				'top-right'
+			);
+		}
 		if (testMode) {
 			(window as unknown as { __viewer_map: maplibregl.Map }).__viewer_map = map;
 		}
