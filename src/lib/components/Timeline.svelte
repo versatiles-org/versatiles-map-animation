@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
-	import { MOVE_KIND_LABELS, type Move } from '../moves';
-	import { SPEED_FAST, SPEED_VERY_FAST, speedProfile } from '../speed';
+	import { MOVE_KIND_LABELS } from '../moves';
+	import {
+		SPEED_SAMPLES,
+		speedCurve,
+		speedGradient,
+		speedNote,
+		speedProfile,
+		speedScaleFor
+	} from '../speed';
 	import { departureOf, holdOf, snapTime, TIME_RESOLUTION } from '../types';
 	import PathIcon from './PathIcon.svelte';
 	import Transport from './Transport.svelte';
@@ -276,56 +283,16 @@
 		});
 	}
 
-	/**
-	 * Where a move is too fast to follow: a colour per moment, clear below
-	 * `SPEED_FAST`, orange up to `SPEED_VERY_FAST`, red beyond. Drawn as a
-	 * strip along the bottom of the move's band.
-	 */
-	function speedColor(speed: number): string {
-		if (speed < SPEED_FAST) return 'transparent';
-		if (speed >= SPEED_VERY_FAST) return '#ff4d4d';
-		const alpha = 0.55 + (0.45 * (speed - SPEED_FAST)) / (SPEED_VERY_FAST - SPEED_FAST);
-		return `rgba(255, 165, 40, ${alpha.toFixed(2)})`;
-	}
-	/** Moments per move at which its speed is measured. */
-	const SPEED_SAMPLES = 64;
-	function speedTint(move: Move): { profile: number[]; peak: number; gradient: string | null } {
-		const from = departureOf(store.keyframes[move.start]);
-		const to = store.keyframes[move.end].t;
-		const profile = speedProfile(store.keyframes, store.projection, from, to, SPEED_SAMPLES);
-		const peak = Math.max(0, ...profile);
-		if (peak < SPEED_FAST) return { profile, peak, gradient: null };
-		const stops = profile.map(
-			(speed, i) => `${speedColor(speed)} ${(((i + 0.5) / profile.length) * 100).toFixed(1)}%`
-		);
-		return { profile, peak, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
-	}
-	const speedTints = $derived(store.moves.map(speedTint));
-	/**
-	 * The speed that reaches the top of a band. The same for every move, so
-	 * their curves compare: a little above the peak of the fastest one — but
-	 * not so low that an animation that hardly moves looks like it races.
-	 */
-	const speedScale = $derived(
-		1.1 * Math.max(SPEED_FAST / 3, ...speedTints.map((tint) => tint.peak))
+	/** How fast the picture moves on each move — see `speedProfile`. */
+	const speedTints = $derived(
+		store.moves.map((move) => {
+			const from = departureOf(store.keyframes[move.start]);
+			const to = store.keyframes[move.end].t;
+			const profile = speedProfile(store.keyframes, store.projection, from, to, SPEED_SAMPLES);
+			return { profile, peak: Math.max(0, ...profile), gradient: speedGradient(profile) };
+		})
 	);
-	/**
-	 * The speed of a move over its time as the outline of an area, in a box
-	 * as wide as the profile is long and 1 high (y points down, as in SVG).
-	 */
-	function speedCurve(profile: number[]): string {
-		if (profile.length === 0) return '';
-		const y = (speed: number) => (1 - Math.min(1, speed / speedScale)).toFixed(3);
-		// Each value is the speed over one interval: drawn at its middle, and
-		// carried on level to the two ends of the move.
-		const points = profile.map((speed, i) => `L${i + 0.5},${y(speed)}`).join('');
-		return `M0,1L0,${y(profile[0])}${points}L${profile.length},${y(profile.at(-1)!)}L${profile.length},1Z`;
-	}
-	function speedNote(peak: number): string {
-		if (peak < SPEED_FAST) return '';
-		const word = peak >= SPEED_VERY_FAST ? 'very fast' : 'fast';
-		return ` — ${word}: up to ${peak.toFixed(1)} frame widths per second`;
-	}
+	const speedScale = $derived(speedScaleFor(speedTints.map((tint) => tint.peak)));
 
 	function zoomAt(factor: number, anchorClientX: number) {
 		const tAnchor = tFromClientX(anchorClientX);
@@ -493,7 +460,7 @@
 						preserveAspectRatio="none"
 						aria-hidden="true"
 					>
-						<path d={speedCurve(tint.profile)} />
+						<path d={speedCurve(tint.profile, speedScale)} />
 					</svg>
 				{/if}
 				<!-- One icon per stretch between two keyframes: a move through
@@ -803,7 +770,7 @@
 				vector-effect: non-scaling-stroke;
 			}
 		}
-		/* Strip that marks where the picture moves too fast — see `speedTint`. */
+		/* Strip that marks where the picture moves too fast — see `speedGradient`. */
 		.speed {
 			position: absolute;
 			left: 0;

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { screenSpeed, SPEED_FAST, SPEED_VERY_FAST, speedProfile } from './speed';
+import {
+	screenSpeed,
+	SPEED_FAST,
+	SPEED_VERY_FAST,
+	speedColor,
+	speedCurve,
+	speedGradient,
+	speedNote,
+	speedProfile,
+	speedScaleFor
+} from './speed';
 import type { CameraState, Keyframe } from './types';
 
 const cam = (extra: Partial<CameraState> = {}): CameraState => ({
@@ -175,5 +185,41 @@ describe('speedProfile', () => {
 	it('is zero while a stop holds', () => {
 		const held = [kf(0, 0, { hold: 2 }), kf(4, 1)];
 		expect(Math.max(...speedProfile(held, 'mercator', 0, 2))).toBe(0);
+	});
+});
+
+describe('drawing the speed on the timeline', () => {
+	it('colours only what is too fast, and red what is far too fast', () => {
+		expect(speedColor(SPEED_FAST * 0.99)).toBe('transparent');
+		expect(speedColor(SPEED_FAST)).toMatch(/^rgba\(255, 165, 40, 0\.55\)$/);
+		expect(speedColor(SPEED_VERY_FAST)).toBe('#ff4d4d');
+	});
+
+	it('has no strip for a move that is nowhere too fast', () => {
+		expect(speedGradient([0, 0.5, SPEED_FAST * 0.99])).toBeNull();
+		expect(speedGradient([])).toBeNull();
+		const strip = speedGradient([0, SPEED_FAST, SPEED_VERY_FAST, 0])!;
+		expect(strip).toBe(
+			'linear-gradient(to right, transparent 12.5%, rgba(255, 165, 40, 0.55) 37.5%, #ff4d4d 62.5%, transparent 87.5%)'
+		);
+	});
+
+	it('scales all moves alike, by the fastest, and never amplifies a slow animation', () => {
+		expect(speedScaleFor([0.2, 2, 1])).toBeCloseTo(2.2);
+		expect(speedScaleFor([0.01])).toBeCloseTo((1.1 * SPEED_FAST) / 3);
+		expect(speedScaleFor([])).toBeCloseTo((1.1 * SPEED_FAST) / 3);
+	});
+
+	it('draws the curve as a closed area, level at both ends and capped at the top', () => {
+		expect(speedCurve([], 1)).toBe('');
+		expect(speedCurve([0, 1, 4], 2)).toBe(
+			'M0,1L0,1.000L0.5,1.000L1.5,0.500L2.5,0.000L3,0.000L3,1Z'
+		);
+	});
+
+	it('mentions the speed of a move only where it is too fast', () => {
+		expect(speedNote(1)).toBe('');
+		expect(speedNote(2)).toBe(' — fast: up to 2.0 frame widths per second');
+		expect(speedNote(3.26)).toBe(' — very fast: up to 3.3 frame widths per second');
 	});
 });
