@@ -1,13 +1,14 @@
 <script lang="ts">
 	/**
 	 * Bar across the top of the editor: everything that concerns the animation
-	 * as a whole. The File menu loads, saves and clears it; the buttons on the
-	 * right are the ways to get it out of the editor.
+	 * as a whole. The File menu loads, saves and clears it, the Examples menu
+	 * offers ready-made ones, and the buttons on the right are the ways to
+	 * get it out of the editor.
 	 */
 
 	import { resolve } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
-	import { EXAMPLE_ANIMATION } from '../example_animation';
+	import { EXAMPLES, type Example } from '../examples';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
@@ -18,6 +19,7 @@
 
 	let fileInput: HTMLInputElement;
 	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
+	let examplesEl = $state<HTMLDetailsElement | undefined>(undefined);
 	let importError = $state<string | null>(null);
 	// Embed and video share the space below the bar, so only one is open.
 	let panel = $state<'embed' | 'video' | null>(null);
@@ -34,6 +36,7 @@
 
 	function closeMenu() {
 		if (menuEl) menuEl.open = false;
+		if (examplesEl) examplesEl.open = false;
 	}
 
 	function onExport() {
@@ -58,9 +61,9 @@
 			input.value = '';
 		}
 	}
-	function onLoadExample() {
+	function onLoadExample(example: Example) {
 		closeMenu();
-		store.loadFromAnimation(EXAMPLE_ANIMATION);
+		store.loadFromAnimation(example.animation);
 	}
 	function onClear() {
 		closeMenu();
@@ -84,8 +87,10 @@
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (!menuEl?.open) return;
-		if (!menuEl.contains(e.target as Node)) menuEl.open = false;
+		// A click anywhere else closes a menu — also a click on the other menu.
+		for (const el of [menuEl, examplesEl]) {
+			if (el?.open && !el.contains(e.target as Node)) el.open = false;
+		}
 	}
 
 	$effect(() => {
@@ -101,13 +106,9 @@
 <header class="topbar">
 	<h1 title="Drop keyframes on a map, hit play.">Map Animation</h1>
 
-	<details bind:this={menuEl} class="file-menu">
+	<details bind:this={menuEl} class="dropdown file-menu">
 		<summary>File <span class="caret"><Icon name="caret" size={12} /></span></summary>
 		<div class="menu" role="menu">
-			<button type="button" role="menuitem" onclick={onLoadExample}
-				><Icon name="star" /> Load example</button
-			>
-			<hr />
 			<button type="button" role="menuitem" onclick={onImportClick}
 				><Icon name="import" /> Import JSON</button
 			>
@@ -118,6 +119,23 @@
 			<button type="button" role="menuitem" onclick={onClear} disabled={!hasKeyframes}>
 				<Icon name="trash" /> Clear
 			</button>
+		</div>
+	</details>
+
+	<details bind:this={examplesEl} class="dropdown examples-menu">
+		<summary>Examples <span class="caret"><Icon name="caret" size={12} /></span></summary>
+		<div class="menu" role="menu">
+			{#each EXAMPLES as example (example.id)}
+				<button
+					type="button"
+					role="menuitem"
+					title={example.description}
+					onclick={() => onLoadExample(example)}
+				>
+					<Icon name="star" />
+					{example.title}
+				</button>
+			{/each}
 		</div>
 	</details>
 
@@ -247,7 +265,7 @@
 		}
 	}
 
-	.file-menu {
+	.dropdown {
 		position: relative;
 
 		& > summary {
@@ -272,6 +290,7 @@
 		top: calc(100% + 0.3rem);
 		left: 0;
 		min-width: 12rem;
+		width: max-content;
 		padding: 0.3rem;
 		background: #16191f;
 		border: 1px solid #333;

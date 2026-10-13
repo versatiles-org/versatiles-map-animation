@@ -1,8 +1,10 @@
 /**
- * Encode the editor's built-in `EXAMPLE_ANIMATION` to the base64-url hash
- * format that the embed iframe consumes, and print it to stdout. Run with:
+ * Encode one of the editor's examples (`src/lib/examples/*.json`) to the
+ * base64-url hash format that the embed iframe consumes, and print it to
+ * stdout. Run with:
  *
- *     npx tsx scripts/encode-example.mts
+ *     npx tsx scripts/encode-example.mts            # the Corsica example
+ *     npx tsx scripts/encode-example.mts alps       # another one, by file name
  *
  * The output is the value that goes after `view#kf=` in `static/embed-demo.html`
  * (and in any `<iframe src="…">` snippet generated from the example). Whenever
@@ -14,10 +16,17 @@
  * alongside thin annotations — no pre-baking needed.
  */
 
-import { EXAMPLE_ANIMATION } from '../src/lib/example_animation.ts';
+import { readFileSync } from 'node:fs';
+import { validateAnimation } from '../src/lib/json_io.ts';
 import { decodeAnimation, encodeAnimation } from '../src/lib/url_state/index.ts';
 
-const hash = encodeAnimation(EXAMPLE_ANIMATION);
+// Read straight from the folder: `src/lib/examples/index.ts` collects the
+// files with a Vite feature that is not there when this runs under tsx.
+const name = process.argv[2] ?? 'corsica';
+const file = new URL(`../src/lib/examples/${name}.json`, import.meta.url);
+const animation = validateAnimation(JSON.parse(readFileSync(file, 'utf8')));
+
+const hash = encodeAnimation(animation);
 console.log('--- HASH (paste after `view#kf=` in static/embed-demo.html) ---');
 console.log(hash);
 console.log();

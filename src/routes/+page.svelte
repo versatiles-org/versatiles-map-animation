@@ -91,8 +91,8 @@
 					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
-							Compose a shot, then click <strong>+ Keyframe</strong> above the timeline. Or pick
-							<strong>Load example</strong> from the <strong>File</strong> menu.
+							Compose a shot, then click <strong>+ Keyframe</strong> above the timeline. Or start
+							from one in the <strong>Examples</strong> menu.
 						</div>
 					{/if}
 				</div>

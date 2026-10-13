@@ -27,12 +27,12 @@ test('changing font on an example-animation annotation actually fetches the new 
 
 	await openEditor(page);
 
-	// Load example: satellite + 5 peak annotations across Corsica's
+	// Load the Corsica example: satellite + 5 peak annotations across Corsica's
 	// Monte Cinto massif, all rendered in the default font (noto_sans_bold).
 	await page
-		.locator('details.file-menu')
+		.locator('details.examples-menu')
 		.evaluate((el) => (el as HTMLDetailsElement).setAttribute('open', ''));
-	await page.locator('button[role="menuitem"]', { hasText: 'Load example' }).click();
+	await page.locator('button[role="menuitem"]', { hasText: 'Corsica' }).click();
 	await page.waitForFunction(
 		() => window.__viewer_map?.areTilesLoaded() && window.__viewer_map?.loaded()
 	);

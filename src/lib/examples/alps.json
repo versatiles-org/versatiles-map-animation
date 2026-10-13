@@ -1,0 +1,45 @@
+{
+	"title": "Alps: from the globe into a valley",
+	"description": "Starts on the globe and comes down to the Alps through a waypoint, then tilts into the terrain.",
+	"version": 1,
+	"style": "satellite",
+	"labels": false,
+	"projection": "globe",
+	"terrain": true,
+	"sky": true,
+	"keyframes": [
+		{
+			"t": 0,
+			"lng": 16.35964109137521,
+			"lat": 35.29234982298335,
+			"zoom": 1.73,
+			"pitch": 0,
+			"bearing": 0,
+			"roll": 0
+		},
+		{
+			"t": 5.84,
+			"lng": 7.138270843198171,
+			"lat": 46.144389334272425,
+			"zoom": 12.41321224448358,
+			"pitch": 65.99999999999997,
+			"bearing": -120.95761832528278,
+			"roll": 0,
+			"waypoint": true
+		},
+		{
+			"t": 10,
+			"lng": 6.921926493052865,
+			"lat": 46.127828014365576,
+			"zoom": 12.29162608916927,
+			"pitch": 66.90145997559036,
+			"bearing": 0,
+			"roll": 0,
+			"hold": 1
+		}
+	],
+	"annotations": [],
+	"annotationScale": 1,
+	"aspectRatio": "16:9",
+	"defaultAnnotation": {}
+}
