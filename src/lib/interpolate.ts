@@ -319,6 +319,11 @@ function globeLinearSample(
 //   value turns around at a waypoint it rests there for that instant, and it
 //   never runs more than three times as fast as the slower of the two
 //   segments (the Fritsch–Carlson condition for a curve without overshoot).
+//   A value that is held back like this would brake at full strength right
+//   up to the waypoint and be done with a jolt, so it gets a soft landing:
+//   the less of the segment's pace it keeps at the waypoint, the more its
+//   acceleration fades out there as well — all of it where it comes to
+//   rest. The curve still does not swing past its keyframes.
 //
 // - The position is measured in what the viewer sees. A degree of ground is
 //   twice as many pixels one zoom level further in, so the curve is built
@@ -454,18 +459,36 @@ function splineSample(
 		return limitedVelocity(into, out, slope(j - 1, j + 1, i) ?? 0);
 	};
 
-	/** Zoom at `u` of the way from keyframe `j` to the one after it. */
-	const zoomOn = (j: number): ((u: number) => number) => {
-		const from = vectors[j]![2];
-		const to = vectors[j + 1]![2];
+	/** Zoom, pitch, bearing or roll (component `i`) at `u` of the way from keyframe `j` to the one after it. */
+	const along = (j: number, i: number): ((u: number) => number) => {
+		const from = vectors[j]![i];
+		const to = vectors[j + 1]![i];
 		const h = kfs[j + 1]!.t - kfs[j]!.t;
-		const tangentFrom = h * velocity(j, 2);
-		const tangentTo = h * velocity(j + 1, 2);
+		const tangentFrom = h * velocity(j, i);
+		const tangentTo = h * velocity(j + 1, i);
+		// The soft landing, see the section comment: how much of the cubic's
+		// acceleration at each end to take out. All of it where the value
+		// rests at a waypoint, none where it passes at the segment's own pace.
+		const delta = to - from;
+		const soft = (waypoint: boolean | undefined, tangent: number) =>
+			waypoint && delta !== 0 ? Math.max(0, 1 - Math.abs(tangent / delta)) / 2 : 0;
+		const softFrom =
+			soft(kfs[j]!.waypoint, tangentFrom) * (4 * tangentFrom + 2 * tangentTo - 6 * delta);
+		const softTo =
+			soft(kfs[j + 1]!.waypoint, tangentTo) * (6 * delta - 2 * tangentFrom - 4 * tangentTo);
 		return (u) => {
 			const [h00, h10, h01, h11] = hermite(u);
-			return h00 * from + h10 * tangentFrom + h01 * to + h11 * tangentTo;
+			const r = 1 - u;
+			return (
+				h00 * from +
+				h10 * tangentFrom +
+				h01 * to +
+				h11 * tangentTo +
+				u * u * r * r * (softFrom * r + softTo * u)
+			);
 		};
 	};
+	const zoomOn = (j: number) => along(j, 2);
 	/** Visible width, relative to zoom 0, averaged over the segment from keyframe `j`. */
 	const meanWidth = (j: number): number => {
 		const zoom = zoomOn(j);
@@ -512,10 +535,7 @@ function splineSample(
 	const a = vectors[2]!;
 	const b = vectors[3]!;
 	const h = kfB.t - kfA.t;
-	const [h00, h10, h01, h11] = hermite(alpha);
-	const v = a.map(
-		(_, i) => h00 * a[i] + h10 * h * velocity(2, i) + h01 * b[i] + h11 * h * velocity(3, i)
-	);
+	const v = a.map((_, i) => along(2, i)(alpha));
 
 	// The position runs along its own Hermite curve, not by time but by the
 	// share of the segment's ground covered so far — the visible width summed
@@ -525,11 +545,31 @@ function splineSample(
 	const widthSum = integrate(width, 1);
 	const covered = integrate(width, alpha) / widthSum;
 	const [g00, g10, g01, g11] = hermite(covered);
-	const from = positionVelocity(2);
-	const to = positionVelocity(3);
+	// On-screen velocity → tangent in terms of the ground covered.
+	const tangentFrom = positionVelocity(2).map((velocity) => h * widthSum * velocity);
+	const tangentTo = positionVelocity(3).map((velocity) => h * widthSum * velocity);
+	// The same soft landing as for the other components (see `along`),
+	// measured along the way: where the camera passes a waypoint slower than
+	// it crosses this segment, it does not speed up or brake there at once.
+	const distance = Math.hypot(b[0] - a[0], b[1] - a[1]);
+	const soft = (waypoint: boolean | undefined, tangent: number[]) =>
+		waypoint && distance > 0
+			? Math.max(0, 1 - Math.hypot(tangent[0], tangent[1]) / distance) / 2
+			: 0;
+	const softFrom = soft(kfA.waypoint, tangentFrom);
+	const softTo = soft(kfB.waypoint, tangentTo);
+	const rest = 1 - covered;
+	const bump = covered * covered * rest * rest;
 	for (const i of [0, 1]) {
-		// On-screen velocity → tangent in terms of the ground covered.
-		v[i] = g00 * a[i] + g10 * h * widthSum * from[i] + g01 * b[i] + g11 * h * widthSum * to[i];
+		const delta = b[i] - a[i];
+		v[i] =
+			g00 * a[i] +
+			g10 * tangentFrom[i] +
+			g01 * b[i] +
+			g11 * tangentTo[i] +
+			bump *
+				(softFrom * (4 * tangentFrom[i] + 2 * tangentTo[i] - 6 * delta) * rest +
+					softTo * (6 * delta - 2 * tangentFrom[i] - 4 * tangentTo[i]) * covered);
 	}
 
 	const lat = onGlobe ? clampLat(v[1]) : mercatorYToLat(v[1]);

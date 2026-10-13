@@ -332,6 +332,40 @@ describe('waypoints', () => {
 		expect(across.bearing).toBeCloseTo(-173.75, 6);
 	});
 
+	it('lands softly where a value turns around at a waypoint', () => {
+		// The zoom dives, ends on the waypoint and stays; the bearing swings out and back.
+		const dive = [
+			stop(0, 0, 0, { zoom: 2 }),
+			via(2, 0, 0, { zoom: 10, bearing: -90 }),
+			stop(4, 0, 0, { zoom: 10 })
+		];
+		const rate = (key: 'zoom' | 'bearing', t: number, dt = 1e-4) =>
+			(sampleAt(dive, t + dt)![key] - sampleAt(dive, t - dt)![key]) / (2 * dt);
+		for (const key of ['zoom', 'bearing'] as const) {
+			// It rests at the waypoint, and has all but stopped changing speed there …
+			expect(Math.abs(rate(key, 2))).toBeLessThan(1e-3);
+			const braking = Math.abs(rate(key, 1.98) - rate(key, 2)) / 0.02;
+			const midway = Math.abs(rate(key, 1.1) - rate(key, 1)) / 0.1;
+			expect(braking).toBeLessThan(midway / 4);
+			// … without ever going past the keyframe or turning back on the way.
+			for (let t = 0.05; t < 2; t += 0.05) {
+				expect(Math.sign(rate(key, t))).toBe(key === 'zoom' ? 1 : -1);
+			}
+		}
+		expect(sampleAt(dive, 2)).toMatchObject({ zoom: 10, bearing: -90 });
+	});
+
+	it('lands softly where the camera passes a waypoint slower than it travels on', () => {
+		// A short hop, then a long haul: the pace of the hop is kept through the waypoint.
+		const hop = [stop(0, 0), via(2, 1), stop(4, 30)];
+		const through = speed(hop, 2);
+		expect(through).toBeGreaterThan(0.2);
+		expect(speed(hop, 2.1) - through).toBeLessThan(through);
+		expect(speed(hop, 3)).toBeGreaterThan(10 * through);
+		for (let t = 0.05; t < 4; t += 0.05) expect(speed(hop, t)).toBeGreaterThan(0);
+		expect(sampleAt(hop, 2)!.lng).toBeCloseTo(1, 9);
+	});
+
 	it('curves through a corner instead of turning on the spot', () => {
 		// East, then north: at the corner the camera is already heading north-east.
 		const corner = [stop(0, 0, 0), via(1, 10, 0), via(2, 10, 10), stop(3, 10, 20)];
