@@ -1,8 +1,9 @@
 <script lang="ts">
 	/**
-	 * Edits `store.defaultAnnotation` — the per-animation template that new
-	 * markers (the "+ Marker" button) start from, and that the URL/JSON codecs use
-	 * as the carry-forward baseline. Each field has a reset button that
+	 * Edits `store.defaultAnnotation` — the per-animation template that every
+	 * marker falls back to for the fields it has not set itself (see
+	 * `resolveAnnotation`), and that the URL/JSON codecs use as the
+	 * carry-forward baseline. Each field has a reset button that
 	 * `delete`s the key from the template (so it falls back to the hardcoded
 	 * `ANNOTATION_FIELD_DEFAULTS`). Style-only: see `AnnotationStyle`.
 	 */
@@ -55,13 +56,13 @@
 		class="mini"
 		onclick={() => (store.defaultAnnotation = {})}
 		disabled={Object.keys(store.defaultAnnotation).length === 0}
-		title="Clear every default — new markers fall back to the hardcoded baseline"
+		title="Clear every default — markers without their own style go back to the built-in look"
 	>
 		Reset all
 	</button>
 </div>
 <p class="hint">
-	Style applied to <strong>new</strong> markers (+ Marker button). Doesn't change existing ones. The
+	The style of every marker, new or existing, wherever it has not been given its own. The
 	<strong>⟲</strong> next to each row clears just that field.
 </p>
 
