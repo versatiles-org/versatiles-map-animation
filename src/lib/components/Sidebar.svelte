@@ -23,11 +23,24 @@
 	import AnnotationEditor from './AnnotationEditor.svelte';
 	import AnnotationList from './AnnotationList.svelte';
 	import DefaultStyleEditor from './DefaultStyleEditor.svelte';
+	import Icon from './Icon.svelte';
 	import SceneSettings from './SceneSettings.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
 	const hasSelection = $derived(store.selectedAnnotationIndex !== null);
+
+	function onAddMarker(e: MouseEvent) {
+		// The button sits in the panel's header; a click must not fold the panel.
+		e.preventDefault();
+		const cam = store.liveCamera;
+		// Thin annotation: only position + (empty) label. Icon, colour, and
+		// every other style field stay undefined so the renderer pulls them
+		// from `defaultAnnotation` — change a default later and the marker
+		// follows. The hardcoded baselines live in `ANNOTATION_FIELD_DEFAULTS`.
+		store.addAnnotation({ lng: cam.lng, lat: cam.lat, label: '' });
+		listOpen = true;
+	}
 
 	// User-toggleable panel state. Initial values match the requested
 	// open-by-default set; the user can override by clicking the summary.
@@ -85,8 +98,16 @@
 		<summary>
 			Markers
 			{#if store.annotations.length > 0}
-				<span class="value">{store.annotations.length}</span>
+				<span class="count">{store.annotations.length}</span>
 			{/if}
+			<button
+				type="button"
+				class="add"
+				onclick={onAddMarker}
+				title="Pin a marker at the current map center"
+			>
+				<Icon name="plus" size={12} /> Marker
+			</button>
 		</summary>
 		<div class="sub-body">
 			<AnnotationList {store} />
@@ -175,6 +196,28 @@
 		color: #666;
 		text-transform: none;
 		letter-spacing: 0;
+	}
+	.sub-panel > summary .count {
+		color: #666;
+	}
+	.sub-panel > summary .add {
+		margin: -0.2rem -0.25rem -0.2rem auto;
+		padding: 0.2rem 0.5rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font: inherit;
+		font-size: 12px;
+		text-transform: none;
+		letter-spacing: 0;
+		cursor: pointer;
+		white-space: nowrap;
+
+		&:hover {
+			background: rgba(255, 255, 255, 0.12);
+			border-color: #4a9eff;
+		}
 	}
 	.sub-panel > summary:hover {
 		background: rgba(255, 255, 255, 0.04);

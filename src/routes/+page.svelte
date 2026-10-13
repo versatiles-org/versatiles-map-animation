@@ -12,7 +12,6 @@
 	import MapStage from '#lib/components/MapStage.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import Timeline from '#lib/components/Timeline.svelte';
-	import Inspector from '#lib/components/Inspector.svelte';
 	import TopBar from '#lib/components/TopBar.svelte';
 
 	const store = new AnimationStore();
@@ -92,13 +91,12 @@
 					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
-							Compose a shot, then click <strong>+ Keyframe</strong> below the map. Or pick
+							Compose a shot, then click <strong>+ Keyframe</strong> above the timeline. Or pick
 							<strong>Load example</strong> from the <strong>File</strong> menu.
 						</div>
 					{/if}
 				</div>
 			</div>
-			<Inspector {store} />
 		</div>
 	</div>
 
@@ -157,8 +155,8 @@
 		}
 	}
 
-	/* Middle of the viewport: sidebar on the left, main column (map +
-	   inspector) on the right. Timeline sits below this row, full width. */
+	/* Middle of the viewport: sidebar on the left, main column (the
+	   map) on the right. Timeline sits below this row, full width. */
 	.body {
 		flex: 1 1 auto;
 		min-height: 0;

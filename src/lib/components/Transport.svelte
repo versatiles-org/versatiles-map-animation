@@ -1,11 +1,13 @@
 <script lang="ts">
 	/**
-	 * Row on top of the timeline: play the animation, read the time, and put
-	 * new things onto the timeline at the playhead.
+	 * Row on top of the timeline: play the animation, read the time, add a
+	 * keyframe at the playhead, and — in the same row, see `Inspector` — edit
+	 * the keyframe or move that is selected on the timeline.
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
 	import Icon from './Icon.svelte';
+	import Inspector from './Inspector.svelte';
 
 	let {
 		store,
@@ -20,14 +22,6 @@
 
 	function onAddKeyframe() {
 		store.addKeyframeFromCamera(store.liveCamera);
-	}
-	function onAddMarker() {
-		const cam = store.liveCamera;
-		// Thin annotation: only position + (empty) label. Icon, colour, and
-		// every other style field stay undefined so the renderer pulls them
-		// from `defaultAnnotation` — change a default later and the marker
-		// follows. The hardcoded baselines live in `ANNOTATION_FIELD_DEFAULTS`.
-		store.addAnnotation({ lng: cam.lng, lat: cam.lat, label: '' });
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -76,22 +70,15 @@
 		<span>{store.totalDuration.toFixed(2)}s</span>
 	</span>
 
-	<div class="group" role="group" aria-label="Add">
-		<button
-			type="button"
-			onclick={onAddKeyframe}
-			title="Add a keyframe with the current view at the playhead"
-		>
-			<Icon name="plus" /> Keyframe
-		</button>
-		<button type="button" onclick={onAddMarker} title="Pin a marker at the current map center">
-			<Icon name="plus" /> Marker
-		</button>
-	</div>
+	<button
+		type="button"
+		onclick={onAddKeyframe}
+		title="Add a keyframe with the current view at the playhead"
+	>
+		<Icon name="plus" /> Keyframe
+	</button>
 
-	{#if !hasKeyframes}
-		<span class="hint">add a keyframe to begin</span>
-	{/if}
+	<Inspector {store} />
 
 	<span class="spacer"></span>
 
@@ -110,7 +97,7 @@
 	.transport {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: 0.75rem;
 		margin-bottom: 0.5rem;
 	}
 	.group {
@@ -122,7 +109,7 @@
 	}
 	.time {
 		/* Wide enough for "123.45s / 123.45s", so the buttons after it stay put. */
-		min-width: 9.5rem;
+		min-width: 8rem;
 		font-family: ui-monospace, monospace;
 		font-size: 12px;
 		font-variant-numeric: tabular-nums;
@@ -130,10 +117,6 @@
 	}
 	.dim {
 		color: #555;
-	}
-	.hint {
-		font-size: 12px;
-		color: #666;
 	}
 	button {
 		padding: 0.4rem 0.7rem;

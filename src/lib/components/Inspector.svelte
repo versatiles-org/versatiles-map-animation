@@ -1,8 +1,8 @@
 <script lang="ts">
 	/**
-	 * One row between the map and the timeline that edits what is selected on
-	 * the timeline: a keyframe or a move. With nothing selected it says so —
-	 * the row keeps its height either way, so the map never jumps.
+	 * The part of the row above the timeline (see `Transport`) that edits what
+	 * is selected on the timeline: a keyframe or a move. With nothing selected
+	 * it says so.
 	 *
 	 * Markers have their own, larger editor in the sidebar and their own
 	 * selection, so a keyframe and a marker can be worked on side by side.
@@ -126,16 +126,16 @@
 				onclick={() => store.updateSelectedFromCamera(store.liveCamera)}
 				title="Replace this keyframe's view with what the map shows now"
 			>
-				<Icon name="view" /> Set to current view
+				<Icon name="view" /> <span class="label">Set to current view</span>
 			</button>
 			<button type="button" onclick={() => store.deleteAt(index)} title="Delete this keyframe">
-				<Icon name="trash" /> Delete
+				<Icon name="trash" /> <span class="label">Delete</span>
 			</button>
 		</div>
 	{:else}
 		<span class="empty">
 			{store.keyframes.length === 0
-				? 'Nothing to edit yet.'
+				? 'Add a keyframe to begin.'
 				: 'Click a keyframe or a move on the timeline to edit it.'}
 		</span>
 	{/if}
@@ -145,9 +145,8 @@
 	.inspector {
 		display: flex;
 		align-items: center;
-		gap: 1rem;
-		/* The height of a row of buttons, also when it only holds text. */
-		min-height: 31px;
+		gap: 0.75rem;
+		min-width: 0;
 		font-size: 12px;
 		color: #aaa;
 	}
@@ -227,6 +226,15 @@
 			background: rgba(74, 158, 255, 0.2);
 			border-color: #4a9eff;
 			color: #fff;
+		}
+	}
+
+	/* The row shares the window's width with the playback controls. Where a
+	   selected keyframe's controls would not fit, the two actions keep only
+	   their icons; their tooltips still say what they do. */
+	@media (max-width: 1220px) {
+		.label {
+			display: none;
 		}
 	}
 </style>

@@ -55,8 +55,8 @@
 
 {#if store.annotations.length === 0}
 	<p class="placeholder">
-		No markers yet. Click <strong>+ Marker</strong> above the timeline to add one — new markers take the
-		default style below.
+		No markers yet. Click <strong>+ Marker</strong> above to add one — new markers take the default style
+		below.
 	</p>
 {:else}
 	<ul class="annotation-list" role="list">
