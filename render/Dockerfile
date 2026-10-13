@@ -14,8 +14,16 @@ RUN npm run build
 FROM node:24-bookworm-slim
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
+# libvulkan1 + mesa-vulkan-drivers are for `--gpu`: the Vulkan loader, and
+# Mesa's drivers for Intel and AMD GPUs (reached through `--device /dev/dri`).
+# NVIDIA's driver is not in the image; the NVIDIA Container Toolkit hands it
+# in at `docker run --gpus all`, and NVIDIA_DRIVER_CAPABILITIES tells it to
+# include the graphics part (Vulkan), not just CUDA. Without `--gpu` none of
+# this is used.
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility
+
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+	&& apt-get install -y --no-install-recommends ffmpeg ca-certificates libvulkan1 mesa-vulkan-drivers \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/render
@@ -26,7 +34,7 @@ RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
 	&& rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache /root/.npm
 
 COPY --from=app-builder /src/build /app/site
-COPY render/render.mjs render/formats.mjs ./
+COPY render/render.mjs render/formats.mjs render/gpu.mjs ./
 
 # Final WORKDIR is the volume mount point so `--output` accepts plain
 # filenames (`--output animation.mp4`) — they resolve relative to the

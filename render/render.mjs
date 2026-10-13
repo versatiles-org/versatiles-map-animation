@@ -34,6 +34,7 @@ import {
 	QUALITIES,
 	validateEncoding
 } from './formats.mjs';
+import { chromiumArgs, isSoftwareRenderer, noGpuMessage } from './gpu.mjs';
 
 const ALLOWED_WIDTHS = [640, 1280, 1920, 3840];
 const DEFAULT_OPTS = {
@@ -49,6 +50,8 @@ const DEFAULT_OPTS = {
 	quality: undefined,
 	crf: null,
 	preset: null,
+	// Draw WebGL on a GPU instead of in software — see `gpu.mjs`.
+	gpu: false,
 	frameTimeoutMs: 30_000,
 	prewarm: true,
 	endTime: null,
@@ -184,6 +187,9 @@ function parseArgv(argv) {
 			case '--end-time':
 				out.endTime = parseFloat(next());
 				break;
+			case '--gpu':
+				out.gpu = true;
+				break;
 			case '--no-prewarm':
 				out.prewarm = false;
 				break;
@@ -235,6 +241,9 @@ function usage() {
 		'  --shutter-angle <deg>  shutter angle for motion blur (default 180 — cinematic).',
 		'                          180° spans half a frame duration; 360° spans the whole.',
 		'                          Only meaningful with --motion-blur > 1.',
+		'  --gpu                  draw on a GPU instead of in software — several times faster.',
+		'                          In Docker on Linux, start the container with access to it:',
+		'                          `--gpus all` (NVIDIA) or `--device /dev/dri` (Intel, AMD).',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
 		'  --output <path>        output file (required); its ending has to match the format',
 		'  -v, --verbose          show ffmpeg output and page console messages',
@@ -405,6 +414,42 @@ async function waitForFrameReady(page, timeoutMs) {
 		// renderer sat idle for up to two minutes after "done".
 		clearTimeout(timer);
 	}
+}
+
+/**
+ * Find out which renderer WebGL really ended up on, before anything else is
+ * loaded. Asking for a GPU is not the same as getting one: without a usable
+ * driver the browser draws in software after all, several times slower, or
+ * does not get WebGL going at all and the map would never appear. Either
+ * way it is better to stop here with an explanation than to let a render
+ * crawl or hang.
+ */
+async function checkWebglRenderer(browser, opts) {
+	const page = await browser.newPage();
+	const probe = page.evaluate(() => {
+		const gl = document.createElement('canvas').getContext('webgl2');
+		if (!gl) return null;
+		const info = gl.getExtension('WEBGL_debug_renderer_info');
+		return String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+	});
+	let timer;
+	const renderer = await Promise.race([
+		probe.catch(() => null),
+		new Promise((res) => {
+			timer = setTimeout(() => res(null), 20_000);
+		})
+	]);
+	clearTimeout(timer);
+	// A browser stuck on a broken graphics stack may not close a page either.
+	page.close().catch(() => {});
+	if (!opts.gpu) {
+		debug(`WebGL renderer: ${renderer}`);
+		return;
+	}
+	if (isSoftwareRenderer(renderer)) {
+		throw new Error(noGpuMessage(renderer, { inContainer: existsSync('/.dockerenv') }));
+	}
+	log(`  drawing on the GPU: ${renderer}`);
 }
 
 async function setupPage(browser, opts, hash) {
@@ -637,21 +682,15 @@ async function main() {
 		debug(`serving ${root} on ${server.url}`);
 	}
 
-	const browser = await chromium.launch({
-		args: [
-			'--use-gl=swiftshader',
-			'--enable-unsafe-swiftshader',
-			'--disable-gpu-vsync',
-			'--disable-dev-shm-usage',
-			'--no-sandbox'
-		]
-	});
+	const browser = await chromium.launch({ args: chromiumArgs({ gpu: opts.gpu }) });
 
 	try {
 		log('preparing renderer…');
 		const startedAt = performance.now();
+		await checkWebglRenderer(browser, opts);
 		const { ctx, page, duration } = await setupPage(browser, opts, hash);
 		const setupMs = performance.now() - startedAt;
+
 		const cappedDuration = opts.endTime != null ? Math.min(duration, opts.endTime) : duration;
 		const totalFrames = Math.max(2, Math.ceil(cappedDuration * opts.fps) + 1);
 		const height = opts.height ?? Math.round((opts.width * 9) / 16);
@@ -694,13 +733,23 @@ async function main() {
 		log(`done · ${opts.output} (${fmtBytes(size)})`);
 		await ctx.close();
 	} finally {
-		await browser.close();
+		// With a broken graphics stack (`--gpu` without a GPU) the browser can
+		// take forever to shut down; don't let that hold up the error message.
+		let timer;
+		await Promise.race([
+			browser.close().catch(() => {}),
+			new Promise((res) => {
+				timer = setTimeout(res, 5000);
+			})
+		]);
+		clearTimeout(timer);
 		if (server) await server.close();
 	}
 }
 
 main().catch((err) => {
 	process.stderr.write(`[renderer] error: ${err.message}\n`);
-	if (err.stack) process.stderr.write(err.stack + '\n');
+	// The stack repeats the message; it only helps when debugging.
+	if (VERBOSE && err.stack) process.stderr.write(err.stack + '\n');
 	process.exit(1);
 });
