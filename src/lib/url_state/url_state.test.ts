@@ -564,3 +564,24 @@ describe('hiddenLayers option', () => {
 		expect(decoded?.hiddenLayers).toEqual(['buildings']);
 	});
 });
+
+describe('buildings3d option', () => {
+	it('costs no payload: on is one mask bit, off is nothing', () => {
+		const plain = encodeAnimation(example);
+		expect(encodeAnimation({ ...example, buildings3d: false })).toBe(plain);
+		expect(encodeAnimation({ ...example, buildings3d: true }).length).toBe(plain.length);
+		expect(decodeAnimation(plain)).not.toHaveProperty('buildings3d');
+	});
+
+	it('round-trips, also next to other options', () => {
+		expect(decodeAnimation(encodeAnimation({ ...example, buildings3d: true }))?.buildings3d).toBe(
+			true
+		);
+		const decoded = decodeAnimation(
+			encodeAnimation({ ...example, buildings3d: true, theme: 'gray', hiddenLayers: ['pois'] })
+		);
+		expect(decoded?.buildings3d).toBe(true);
+		expect(decoded?.theme).toBe('gray');
+		expect(decoded?.hiddenLayers).toEqual(['pois']);
+	});
+});

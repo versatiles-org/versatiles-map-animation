@@ -121,6 +121,7 @@ export function validateAnimation(input: unknown): Animation {
 		...(isMapTheme(obj.theme) && { theme: obj.theme }),
 		labels,
 		...(hiddenLayers.length > 0 && { hiddenLayers }),
+		...(obj.buildings3d === true && { buildings3d: true }),
 		terrain,
 		sky,
 		keyframes,

@@ -48,6 +48,15 @@
 		}
 		return null;
 	}
+
+	// Same idea for the 3D switch: it needs the building layer to act on.
+	const buildings3dBlocked = $derived(
+		onSatellite
+			? 'The satellite map has no buildings layer'
+			: store.hiddenLayers.includes('buildings')
+				? 'The Buildings layer is hidden'
+				: null
+	);
 </script>
 
 <div class="map-style-control" role="group" aria-label="Map style">
@@ -126,6 +135,19 @@
 			{/each}
 		</div>
 	</details>
+	<label
+		class="row checkbox"
+		class:blocked={buildings3dBlocked !== null}
+		title={buildings3dBlocked ??
+			'Draw buildings as 3D blocks with their real heights. Visible from zoom 14, best with a pitched camera.'}
+	>
+		<input
+			type="checkbox"
+			bind:checked={store.buildings3d}
+			disabled={buildings3dBlocked !== null}
+		/>
+		<span>3D buildings</span>
+	</label>
 	<label class="row checkbox" title="Toggle 3D terrain">
 		<input type="checkbox" bind:checked={store.terrain} />
 		<span>Terrain</span>
@@ -184,11 +206,10 @@
 		gap: 0.3rem 0.6rem;
 		margin-top: 0.4rem;
 		padding-left: 0.2rem;
-
-		.blocked {
-			opacity: 0.45;
-			cursor: default;
-		}
+	}
+	.blocked {
+		opacity: 0.45;
+		cursor: default;
 	}
 	select {
 		padding: 0.2rem 0.4rem;

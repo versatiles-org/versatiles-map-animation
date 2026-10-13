@@ -25,6 +25,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Theme: 24 colour themes for the OSM map — `colorful` (default), `natural`, `muted`, `gray`, `toner`, each with a `-dark` variant, plus lookalikes of other well-known maps. On satellite the theme colours the overlay.
 - Toggle all labels and icons (or, for satellite, the OSM overlay on top).
 - Switch individual layer groups on and off: land cover, water, roads, transit, buildings, sites, airports, boundaries, names, POIs, road markings.
+- Optional 3D buildings with their real heights (OSM map, from zoom 14).
 - Optional 3D terrain (with hillshade).
 - Optional atmospheric sky (visible when the camera is pitched).
 - Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
@@ -86,6 +87,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"theme": "colorful", // optional: colour theme, see MAP_THEMES in src/lib/types.ts
 	"labels": true, // all names and symbols (OSM map) or overlay (satellite)
 	"hiddenLayers": ["buildings", "pois"], // optional: layer groups switched off, see MAP_LAYER_GROUPS in src/lib/types.ts
+	"buildings3d": false, // optional: buildings as 3D blocks (OSM map only)
 	"terrain": false,
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize

@@ -545,6 +545,19 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.hiddenLayers).toEqual([]);
 	});
 
+	it('serialises buildings3d only when it is on', () => {
+		const s = new AnimationStore();
+		expect(s.toAnimation()).not.toHaveProperty('buildings3d');
+		s.buildings3d = true;
+		expect(s.mapStyleOptions.buildings3d).toBe(true);
+		expect(s.toAnimation().buildings3d).toBe(true);
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.buildings3d).toBe(true);
+		s2.reset();
+		expect(s2.buildings3d).toBe(false);
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

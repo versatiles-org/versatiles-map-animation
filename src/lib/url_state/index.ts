@@ -52,7 +52,8 @@ function buildWire(anim: Animation): Wire {
 		aspectRatio: anim.aspectRatio,
 		defaultAnnotation: anim.defaultAnnotation,
 		theme: anim.theme,
-		hiddenLayers: anim.hiddenLayers
+		hiddenLayers: anim.hiddenLayers,
+		buildings3d: anim.buildings3d
 	};
 }
 
@@ -64,6 +65,7 @@ function fromWire(wire: Wire): Animation {
 		labels: wire.labels,
 		...(wire.hiddenLayers !== undefined &&
 			wire.hiddenLayers.length > 0 && { hiddenLayers: wire.hiddenLayers }),
+		...(wire.buildings3d && { buildings3d: true }),
 		terrain: wire.terrain,
 		sky: wire.sky,
 		keyframes: wire.keyframes.map(denormalizeKeyframe),

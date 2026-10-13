@@ -94,6 +94,7 @@ type WireAnimation = {
 	defaultAnnotation?: Partial<AnnotationStyle>;
 	theme?: MapTheme;
 	hiddenLayers?: MapLayerGroup[];
+	buildings3d?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -153,6 +154,16 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => hiddenLayersCodec.encode(v.hiddenLayers!, w),
 		decode: (v, r) => {
 			v.hiddenLayers = hiddenLayersCodec.decode(r);
+		}
+	},
+	{
+		// A plain flag: the mask bit is the value, there is no payload.
+		bit: 5,
+		label: 'buildings3d',
+		shouldEmit: (v) => v.buildings3d === true,
+		encode: () => {},
+		decode: (v) => {
+			v.buildings3d = true;
 		}
 	}
 ];

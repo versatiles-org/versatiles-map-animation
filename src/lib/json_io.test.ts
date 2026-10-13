@@ -90,6 +90,16 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(validateAnimation(minimalAnim)).not.toHaveProperty('hiddenLayers');
 	});
 
+	it('reads buildings3d only when it is exactly true', () => {
+		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
+		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(
+			'buildings3d'
+		);
+		expect(validateAnimation({ ...minimalAnim, buildings3d: 'yes' })).not.toHaveProperty(
+			'buildings3d'
+		);
+	});
+
 	it('falls back to default annotationScale when missing or invalid', () => {
 		const a = validateAnimation({ ...minimalAnim, annotationScale: undefined });
 		expect(a.annotationScale).toBe(DEFAULT_ANNOTATION_SCALE);

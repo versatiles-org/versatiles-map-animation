@@ -9,7 +9,7 @@ import { DEFAULT_MAP_THEMES, type Animation } from './types';
  */
 export type MapStyleOptions = Pick<
 	Animation,
-	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'terrain' | 'sky'
+	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'buildings3d' | 'terrain' | 'sky'
 >;
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
@@ -126,7 +126,11 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 						...common,
 						theme,
 						layers: labels ? hidden : { ...hidden, labels: false, icons: false, pois: false },
-						features: { terrain, hillshade: terrain }
+						features: {
+							terrain,
+							hillshade: terrain,
+							buildings: options.buildings3d ? 'extruded' : 'flat'
+						}
 					})
 				),
 				sky

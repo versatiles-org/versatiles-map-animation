@@ -157,6 +157,8 @@ export class AnimationStore {
 	labels = $state(ANIMATION_DEFAULTS.labels);
 	/** Layer groups switched off, kept in `MAP_LAYER_GROUPS` order. */
 	hiddenLayers = $state<MapLayerGroup[]>([]);
+	/** Buildings as 3D blocks (OSM map only). */
+	buildings3d = $state(false);
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
@@ -191,6 +193,7 @@ export class AnimationStore {
 		theme: this.theme,
 		labels: this.labels,
 		hiddenLayers: this.hiddenLayers,
+		buildings3d: this.buildings3d,
 		terrain: this.terrain,
 		sky: this.sky
 	});
@@ -432,6 +435,7 @@ export class AnimationStore {
 		this.theme = anim.theme;
 		this.labels = anim.labels ?? ANIMATION_DEFAULTS.labels;
 		this.hiddenLayers = normalizeLayerGroups(anim.hiddenLayers ?? []);
+		this.buildings3d = anim.buildings3d ?? false;
 		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
 		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
@@ -451,6 +455,7 @@ export class AnimationStore {
 			...(this.theme !== undefined && { theme: this.theme }),
 			labels: this.labels,
 			...(this.hiddenLayers.length > 0 && { hiddenLayers: [...this.hiddenLayers] }),
+			...(this.buildings3d && { buildings3d: true }),
 			terrain: this.terrain,
 			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),

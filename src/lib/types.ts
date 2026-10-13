@@ -808,6 +808,12 @@ export interface Animation {
 	 * `SATELLITE_OVERLAY_LAYER_GROUPS` have an effect.
 	 */
 	hiddenLayers?: MapLayerGroup[];
+	/**
+	 * Draw buildings as 3D blocks with their real heights instead of flat
+	 * footprints. OSM map only — the satellite overlay has no buildings.
+	 * Buildings appear from zoom 14, so that is where the blocks show up.
+	 */
+	buildings3d?: boolean;
 	terrain: boolean;
 	/** Renders the maplibre atmospheric sky behind the horizon (visible at pitch). */
 	sky: boolean;

@@ -121,6 +121,34 @@ describe('layer groups', () => {
 	});
 });
 
+describe('3D buildings', () => {
+	const buildingLayers = (options: MapStyleOptions) =>
+		buildBaseStyle(options)
+			.layers.filter((l) => l.id.startsWith('building'))
+			.map((l) => `${l.id}:${l.type}`);
+
+	it('draws flat footprints by default', () => {
+		expect(buildingLayers(base)).toEqual(['building:outline:fill', 'building:fill']);
+		expect(buildBaseStyle({ ...base, buildings3d: false })).toEqual(buildBaseStyle(base));
+	});
+
+	it('draws extrusions that read the height from the tiles when switched on', () => {
+		const style = buildBaseStyle({ ...base, buildings3d: true });
+		expect(buildingLayers({ ...base, buildings3d: true })).toEqual(['building-3d:fill-extrusion']);
+		const layer = style.layers.find((l) => l.id === 'building-3d');
+		expect(JSON.stringify(layer?.paint)).toContain('["get","height"]');
+	});
+
+	it('draws no buildings at all when the group is hidden', () => {
+		expect(buildingLayers({ ...base, buildings3d: true, hiddenLayers: ['buildings'] })).toEqual([]);
+	});
+
+	it('is ignored on satellite', () => {
+		const sat: MapStyleOptions = { ...base, style: 'satellite' };
+		expect(buildBaseStyle({ ...sat, buildings3d: true })).toEqual(buildBaseStyle(sat));
+	});
+});
+
 describe('buildMapStyle', () => {
 	const tileJson = (path: string) => ({
 		tilejson: '3.0.0',
