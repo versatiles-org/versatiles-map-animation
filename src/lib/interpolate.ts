@@ -225,12 +225,14 @@ function globeLinearSample(
 ): ZoomedPosition {
 	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
 	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
-	const lat = lerp(kfA.lat, kfB.lat, alpha);
-	const globeZoom = lerp(toGlobeZoom(kfA.zoom, kfA.lat), toGlobeZoom(kfB.zoom, kfB.lat), alpha);
+	const g0 = toGlobeZoom(kfA.zoom, kfA.lat);
+	const g1 = toGlobeZoom(kfB.zoom, kfB.lat);
+	const f = evenSpeedFraction(g0, g1, alpha);
+	const lat = lerp(kfA.lat, kfB.lat, f);
 	return {
-		lng: normalizeLng(kfA.lng + shortestLngDelta(kfA.lng, kfB.lng) * alpha),
+		lng: normalizeLng(kfA.lng + shortestLngDelta(kfA.lng, kfB.lng) * f),
 		lat,
-		zoom: fromGlobeZoom(globeZoom, lat)
+		zoom: fromGlobeZoom(lerp(g0, g1, alpha), lat)
 	};
 }
 
@@ -357,9 +359,9 @@ export function interpolateKeyframes(
 	const path = kfA.path ?? 'arc';
 	const eased = easeInOut(alpha);
 	// `path` lives on the *origin* keyframe and describes the shape of the
-	// trajectory leaving it. `linear` is a direct lerp through
-	// (lng, lat, zoom) — the right choice for tiny moves where van Wijk's
-	// out-and-back arc feels theatrical.
+	// trajectory leaving it. `linear` goes straight from one view to the
+	// other without rising — the right choice for short moves, where van
+	// Wijk's out-and-back arc feels theatrical.
 	const useArc = path !== 'linear';
 	const onGlobe = projection === 'globe';
 	const sample = useArc
@@ -380,13 +382,32 @@ export function interpolateKeyframes(
 	};
 }
 
+/**
+ * How far along a straight move the camera is when its zoom is `alpha` of
+ * the way from `zoom0` to `zoom1`.
+ *
+ * Moving the position in step with the zoom looks wrong as soon as the two
+ * zooms differ: a degree of ground is twice as many pixels one zoom level
+ * further in, so the map crawls while zoomed out and rushes past at the
+ * zoomed-in end. To keep the speed *on screen* even, the ground speed has to
+ * follow the visible width, which shrinks by half per zoom level: the
+ * fraction travelled is the integral of 2^-zoom over the part of the move
+ * done so far, divided by the integral over all of it.
+ */
+export function evenSpeedFraction(zoom0: number, zoom1: number, alpha: number): number {
+	const dz = zoom1 - zoom0;
+	// Same zoom at both ends (or as good as): position and zoom go in step.
+	if (Math.abs(dz) < 1e-6) return alpha;
+	return (Math.pow(2, -dz * alpha) - 1) / (Math.pow(2, -dz) - 1);
+}
+
 function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number): ZoomedPosition {
 	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
 	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
-	const dlng = shortestLngDelta(kfA.lng, kfB.lng);
+	const f = evenSpeedFraction(kfA.zoom, kfB.zoom, alpha);
 	return {
-		lng: normalizeLng(kfA.lng + dlng * alpha),
-		lat: lerp(kfA.lat, kfB.lat, alpha),
+		lng: normalizeLng(kfA.lng + shortestLngDelta(kfA.lng, kfB.lng) * f),
+		lat: lerp(kfA.lat, kfB.lat, f),
 		zoom: lerp(kfA.zoom, kfB.zoom, alpha)
 	};
 }

@@ -150,7 +150,9 @@ test.describe('globe projection', () => {
 		await openViewer(page, 1280, 720, GLOBE_HASH, 2);
 		const middle = await page.evaluate(() => window.__viewer_map!.getCenter().lat);
 		expect(start).toBeCloseTo(64.1, 1);
-		expect(middle).toBeCloseTo(31.4, 1);
+		// Not quite the 31.4° halfway between the two: the globe is a touch
+		// smaller at the end, and a Stay-low move covers more ground while zoomed out.
+		expect(middle).toBeCloseTo(31.5, 1);
 	});
 
 	test('the globe keeps its size while the camera travels between equally sized views', async ({

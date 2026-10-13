@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	easeInOut,
+	evenSpeedFraction,
 	fromGlobeZoom,
 	interpolateKeyframes,
 	lerp,
@@ -411,5 +412,70 @@ describe('hold', () => {
 		const flagged = [kf(0, 0), kf(1, 10, { waypoint: true, hold: 3 }), kf(2, 20)];
 		const plain = [kf(0, 0), kf(1, 10, { waypoint: true }), kf(2, 20)];
 		for (const t of [0.5, 1, 1.5]) expect(sampleAt(flagged, t)).toEqual(sampleAt(plain, t));
+	});
+});
+
+describe('Stay low: even speed on screen', () => {
+	const kf = (t: number, lng: number, lat: number, zoom: number): Keyframe => ({
+		t,
+		lng,
+		lat,
+		zoom,
+		pitch: 0,
+		bearing: 0,
+		roll: 0,
+		path: 'linear'
+	});
+
+	it('starts at 0, ends at 1, and goes in step with the zoom when it does not change', () => {
+		for (const [z0, z1] of [
+			[3, 9],
+			[9, 3],
+			[5, 5]
+		]) {
+			expect(evenSpeedFraction(z0, z1, 0)).toBeCloseTo(0, 12);
+			expect(evenSpeedFraction(z0, z1, 1)).toBeCloseTo(1, 12);
+		}
+		for (const a of [0.1, 0.5, 0.9]) expect(evenSpeedFraction(5, 5, a)).toBe(a);
+	});
+
+	it('covers most of the ground while zoomed out', () => {
+		// Zooming in by 4 levels: halfway through, 80 % of the way is done.
+		expect(evenSpeedFraction(4, 8, 0.5)).toBeCloseTo(0.8, 12);
+		// Zooming out is the same move backwards.
+		for (const a of [0.2, 0.5, 0.7]) {
+			expect(evenSpeedFraction(8, 4, a)).toBeCloseTo(1 - evenSpeedFraction(4, 8, 1 - a), 12);
+		}
+	});
+
+	it('keeps ground speed × map scale constant, which is the speed on screen', () => {
+		const z0 = 4;
+		const z1 = 9;
+		const screenSpeed = (a: number, da = 1e-6) =>
+			((evenSpeedFraction(z0, z1, a + da) - evenSpeedFraction(z0, z1, a - da)) / (2 * da)) *
+			Math.pow(2, z0 + (z1 - z0) * a);
+		const reference = screenSpeed(0.5);
+		for (const a of [0.05, 0.25, 0.75, 0.95]) expect(screenSpeed(a) / reference).toBeCloseTo(1, 5);
+	});
+
+	it('moves the camera that way in Mercator', () => {
+		const a = kf(0, 0, 0, 4);
+		const b = kf(2, 10, 20, 8);
+		const mid = interpolateKeyframes(a, b, 0.5); // easing is symmetric: halfway in zoom
+		expect(mid.zoom).toBeCloseTo(6, 10);
+		expect(mid.lng).toBeCloseTo(8, 10);
+		expect(mid.lat).toBeCloseTo(16, 10);
+		// Without a zoom change nothing changes: still the plain straight line.
+		const flat = interpolateKeyframes(kf(0, 0, 0, 6), kf(2, 10, 20, 6), 0.5);
+		expect(flat).toMatchObject({ lng: 5, lat: 10, zoom: 6 });
+	});
+
+	it('moves the camera that way on the globe, measured in globe size', () => {
+		const a = kf(0, 0, 0, 4);
+		const b = kf(2, 40, 60, 7); // globe zoom 8 at 60° north
+		const mid = interpolateKeyframes(a, b, 0.5, 'globe');
+		expect(mid.lng).toBeCloseTo(32, 10);
+		expect(mid.lat).toBeCloseTo(48, 10);
+		expect(toGlobeZoom(mid.zoom, mid.lat)).toBeCloseTo(6, 10);
 	});
 });

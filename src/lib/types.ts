@@ -58,7 +58,7 @@ export const PATH_STYLE_LABELS: Record<PathStyle, readonly [string, string]> = {
 	arc: ['Fly over', 'Rises and descends on long moves, like a flight. The default.'],
 	linear: [
 		'Stay low',
-		'Travels straight between the two views without rising. Best for short moves.'
+		'Travels straight between the two views without rising, at an even speed on screen. Best for short moves.'
 	]
 };
 
