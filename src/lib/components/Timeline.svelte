@@ -4,6 +4,7 @@
 	import { SPEED_FAST, SPEED_VERY_FAST, speedProfile } from '../speed';
 	import { departureOf, holdOf, snapTime, TIME_RESOLUTION } from '../types';
 	import PathIcon from './PathIcon.svelte';
+	import Transport from './Transport.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -424,6 +425,8 @@
 </script>
 
 <div class="timeline">
+	<Transport {store} {isFit} onFit={fitView} />
+
 	<div
 		bind:this={trackEl}
 		class="track"
@@ -657,25 +660,6 @@
 			<div class="thumb-body" aria-hidden="true"></div>
 			<div class="thumb-handle thumb-handle-right" aria-hidden="true"></div>
 		</div>
-	</div>
-
-	<div class="time-readout">
-		<button
-			type="button"
-			class="fit"
-			onclick={fitView}
-			disabled={isFit}
-			title="Fit timeline to full duration"
-		>
-			Fit
-		</button>
-		<span class="spacer"></span>
-		<span>{fmt(store.currentTime)}s</span>
-		<span class="dim"> / </span>
-		<span>{fmt(store.totalDuration)}s</span>
-		{#if store.keyframes.length === 0}
-			<span class="hint">— add a keyframe to begin</span>
-		{/if}
 	</div>
 </div>
 
@@ -1032,44 +1016,5 @@
 	}
 	.thumb-handle-right {
 		border-radius: 0 4px 4px 0;
-	}
-
-	.time-readout {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 0.4rem;
-		font-family: ui-monospace, monospace;
-		font-size: 12px;
-		color: #aaa;
-	}
-	.spacer {
-		flex: 1 1 auto;
-	}
-	.fit {
-		padding: 0.2rem 0.5rem;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid #333;
-		border-radius: 4px;
-		color: #ddd;
-		font-size: 11px;
-		font-family: inherit;
-		cursor: pointer;
-
-		&:hover:not(:disabled) {
-			background: rgba(255, 255, 255, 0.12);
-			border-color: #4a9eff;
-		}
-		&:disabled {
-			opacity: 0.4;
-			cursor: not-allowed;
-		}
-	}
-	.dim {
-		color: #555;
-	}
-	.hint {
-		margin-left: 0.5rem;
-		color: #666;
 	}
 </style>

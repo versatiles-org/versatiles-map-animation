@@ -89,7 +89,7 @@
 					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
-							Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or pick
+							Compose a shot, then click <strong>+ Keyframe</strong> below the map. Or pick
 							<strong>Load example</strong> from the <strong>File</strong> menu.
 						</div>
 					{/if}

@@ -5,47 +5,13 @@
 
 	let { store }: { store: AnimationStore } = $props();
 
-	function onAdd() {
-		store.addKeyframeFromCamera(store.liveCamera);
-	}
-	function onPinAnnotation() {
-		const cam = store.liveCamera;
-		// Thin annotation: only position + (empty) label. Icon, colour, and
-		// every other style field stay undefined so the renderer pulls them
-		// from `defaultAnnotation` — change a default later and the marker
-		// follows. The hardcoded baselines live in `ANNOTATION_FIELD_DEFAULTS`.
-		store.addAnnotation({ lng: cam.lng, lat: cam.lat, label: '' });
-	}
 	function onUpdate() {
 		store.updateSelectedFromCamera(store.liveCamera);
 	}
 	function onDelete() {
 		if (store.selectedIndex !== null) store.deleteAt(store.selectedIndex);
 	}
-	function onTogglePlay() {
-		store.togglePlay();
-	}
-	function onRestart() {
-		store.restart();
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.code !== 'Space') return;
-		const target = e.target as HTMLElement;
-		if (target.matches('input, textarea, [contenteditable="true"]')) return;
-		e.preventDefault();
-		store.togglePlay();
-	}
-
-	$effect(() => {
-		window.addEventListener('keydown', handleKeydown);
-		return () => {
-			window.removeEventListener('keydown', handleKeydown);
-		};
-	});
-
 	const hasSelection = $derived(store.selectedIndex !== null);
-	const hasKeyframes = $derived(store.keyframes.length > 0);
 	const KEYFRAME_TYPES = [
 		['stop', 'Stop', 'The camera comes to rest on this view.'],
 		[
@@ -56,15 +22,11 @@
 	] as const;
 	const isWaypoint = $derived(store.selectedKeyframe?.waypoint === true);
 	const selectedMove = $derived(store.selectedMove);
-	const canPlay = $derived(store.keyframes.length >= 2);
 </script>
 
 <div class="toolbar">
 	<div class="group" role="group" aria-label="Keyframe">
 		<span class="group-label">Keyframe</span>
-		<button type="button" onclick={onAdd} title="Add a keyframe at the current playhead time">
-			+ Add
-		</button>
 		{#if selectedMove}
 			<!-- A move is selected on the timeline: its controls take the place
 			     of the keyframe's, so the toolbar keeps its width. -->
@@ -192,9 +154,6 @@
 
 	<div class="group" role="group" aria-label="Annotation">
 		<span class="group-label">Annotation</span>
-		<button type="button" onclick={onPinAnnotation} title="Pin a marker at the current map center">
-			📍 Pin
-		</button>
 		<label
 			class="control-label scale-control"
 			title="Scale all annotations (markers and labels). Stacks on top of automatic container-size scaling."
@@ -213,19 +172,6 @@
 			<span class="num">{store.annotationScale.toFixed(2)}×</span>
 		</label>
 	</div>
-
-	<div class="group playback">
-		<button
-			type="button"
-			class="primary"
-			onclick={onTogglePlay}
-			disabled={!canPlay}
-			title="Spacebar"
-		>
-			{store.isPlaying ? '⏸ Pause' : '▶ Play'}
-		</button>
-		<button type="button" onclick={onRestart} disabled={!hasKeyframes}>⏮ Restart</button>
-	</div>
 </div>
 
 <style>
@@ -239,10 +185,6 @@
 		display: flex;
 		gap: 0.25rem;
 		align-items: center;
-
-		&.playback {
-			margin-left: 1.5rem;
-		}
 	}
 	.group-label {
 		font-size: 10px;
@@ -350,16 +292,6 @@
 		&:disabled {
 			opacity: 0.4;
 			cursor: not-allowed;
-		}
-		&.primary {
-			background: #4a9eff;
-			border-color: #4a9eff;
-			color: #fff;
-			font-weight: 600;
-
-			&:hover:not(:disabled) {
-				background: #5fa9ff;
-			}
 		}
 	}
 </style>
