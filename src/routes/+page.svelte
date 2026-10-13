@@ -2,7 +2,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import { AnimationStore } from '#lib/animation.svelte.ts';
 	import { History } from '#lib/history.svelte.ts';
-	import { aspectRatioValue, type Animation } from '#lib/types.ts';
+	import { aspectRatioValue, snapTime, type Animation } from '#lib/types.ts';
 	import {
 		clearUrlHash,
 		readAnimationFromStorage,
@@ -98,14 +98,50 @@
 			) ?? false
 		);
 	}
+	/** Seconds the playhead moves per press of an arrow key, and with Shift held. */
+	const STEP = 0.1;
+	const STEP_LARGE = 1;
 	function handleKeydown(e: KeyboardEvent) {
 		if (isTyping(e)) return;
 		const key = e.key.toLowerCase();
-		if ((e.metaKey || e.ctrlKey) && !e.altKey && (key === 'z' || key === 'y')) {
-			e.preventDefault();
-			if (key === 'y' || e.shiftKey) redo();
-			else undo();
+		if (e.metaKey || e.ctrlKey || e.altKey) {
+			if ((e.metaKey || e.ctrlKey) && !e.altKey && (key === 'z' || key === 'y')) {
+				e.preventDefault();
+				if (key === 'y' || e.shiftKey) redo();
+				else undo();
+			}
+			return;
 		}
+		switch (e.key) {
+			case 'Delete':
+			case 'Backspace':
+				// The keyframe first: it is what the row above the timeline shows.
+				if (store.selectedIndex !== null) store.deleteAt(store.selectedIndex);
+				else if (store.selectedAnnotationIndex !== null) {
+					store.deleteAnnotation(store.selectedAnnotationIndex);
+				} else return;
+				break;
+			case 'Escape':
+				if (store.selectedIndex !== null || store.selectedMoveStart !== null) {
+					store.clearSelection();
+					store.clearMoveSelection();
+				} else if (store.selectedAnnotationIndex !== null) store.clearAnnotationSelection();
+				else return;
+				break;
+			case 'ArrowLeft':
+			case 'ArrowRight': {
+				// A slider or a menu has its own use for the arrows, and on the map they pan.
+				const target = e.target as HTMLElement | null;
+				if (target?.closest('input, select, .maplibregl-map')) return;
+				const step = (e.shiftKey ? STEP_LARGE : STEP) * (e.key === 'ArrowLeft' ? -1 : 1);
+				store.pause();
+				store.seekTo(snapTime(store.currentTime + step));
+				break;
+			}
+			default:
+				return;
+		}
+		e.preventDefault();
 	}
 </script>
 

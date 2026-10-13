@@ -22,6 +22,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Scrub anywhere on the timeline; click a keyframe to select it and jump to its view; drag the selected keyframe along the track to retime it — and past its neighbours to **reorder** the sequence. Only the selected keyframe can be dragged, so a click never moves one by accident. The selected keyframe's time can also be typed into the **Time** field of the row above the timeline. Times lie on a grid of 1/100 s, the smallest step of an animation; anything finer in a loaded file or link is rounded to it.
 - Timeline zoom & pan: vertical scroll / Ctrl-wheel / pinch zooms; horizontal scroll pans; drag the pan-bar thumb to scroll, drag its edges to zoom; the playhead can be moved past the last keyframe to add a new one there.
 - **Undo and redo** every change to the animation with the two buttons in the top bar, or ⌘Z / ⇧⌘Z (Ctrl+Z / Ctrl+Y). Dragging a keyframe or a slider counts as one step; loading a file or an example can be undone as well.
+- **Keyboard:** Space plays and pauses, ← and → move the playhead by 0.1 s (with Shift by 1 s), Delete removes the selected keyframe (or, with none selected, the selected marker), Esc clears the selection.
 - Insert keyframes at the current playhead (compose a shot, then **+ Keyframe** above the timeline).
 
 ### Map style
