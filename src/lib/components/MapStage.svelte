@@ -775,13 +775,14 @@
 	}
 	.watermark {
 		position: absolute;
-		/* Sized as a fraction of the map width via `cqw` so the watermark scales
-		   with the canvas (4K renders get a larger logo, narrow embeds a
-		   smaller one). The `clamp()` keeps it recognisable at the extremes. */
+		/* Sized as a fraction of the map width via `cqw`, so the watermark takes
+		   up the same share of the picture at any resolution — a 4K render
+		   gets a logo three times the size of a 1280 px one. In a narrow embed
+		   it stops shrinking at the size it is still recognisable at. */
 		bottom: 0.4cqw;
 		right: 0.6cqw;
 		z-index: 1;
-		height: clamp(30px, 3.3cqw, 84px);
+		height: max(30px, 3.3cqw);
 		user-select: none;
 	}
 </style>
