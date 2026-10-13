@@ -101,9 +101,14 @@ so WebGL runs on the CPU, then drives the page frame-by-frame:
    idle wait is the synchronisation point — by the time it resolves,
    tiles are loaded and any MapLibre internal animations have settled —
    so wall-clock time spent rendering each frame doesn't leak into the
-   captured output.
+   captured output. In render mode the page switches off what makes
+   MapLibre take many frames to settle (label fades, terrain textures
+   renewed one tile per frame), so a frame is usually final after one or
+   two redraws. The screenshot uses Chromium's speed-optimised PNG.
 4. Frames stream into ffmpeg over stdin → H.264 / yuv420p MP4 with `+faststart`.
 
 Per-frame render time scales with viewport size and animation complexity.
-Plan for ~2–5 s/frame at 1920×1080 with satellite + terrain at high zoom,
-and 4–6× that at 4K.
+As a guide, the example animation (satellite + terrain) takes about
+0.6 s/frame at 1920×1080 in the container on an Apple M4 Pro; expect
+several times that at 4K, and multiply by the `--motion-blur` factor. The
+timing summary at the end of a run shows the numbers for your machine.

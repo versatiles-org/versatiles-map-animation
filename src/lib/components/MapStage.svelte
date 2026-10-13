@@ -11,6 +11,7 @@
 	} from '../animation.svelte';
 	import { isDarkPalette } from '@versatiles/style';
 	import { buildMapStyle, onlySunMoved, sunPatch, type MapStyleOptions } from '../map_style';
+	import { refreshTerrainTexturesAtOnce } from '../render_mode';
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
@@ -383,8 +384,19 @@
 			// expired-tile refetches too — the satellite/DEM data we use is
 			// stable, so respecting the browser's HTTP cache is fine.
 			maxTileCacheZoomLevels: 20,
-			refreshExpiredTiles: false
+			refreshExpiredTiles: false,
+			// The offline renderer captures a frame once the map has settled.
+			// With label fades on, MapLibre holds back the next label placement
+			// until the last fade is over and then fades again — around twenty
+			// extra redraws per captured frame, none of which end up in the
+			// video. Without fades it places the labels for good in every frame.
+			...(renderMode && { fadeDuration: 0 })
 		});
+		// Same idea for the terrain — see `refreshTerrainTexturesAtOnce`.
+		if (renderMode) {
+			const mapForRender = map;
+			map.on('render', () => refreshTerrainTexturesAtOnce(mapForRender));
+		}
 		if (initialOptions.projection === 'globe') map.setTransformConstrain(constrainGlobe);
 		if (testMode) {
 			(window as unknown as { __viewer_map: maplibregl.Map }).__viewer_map = map;
