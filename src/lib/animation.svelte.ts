@@ -168,8 +168,9 @@ export class AnimationStore {
 	selectedIndex = $state<number | null>(null);
 	selectedAnnotationIndex = $state<number | null>(null);
 	/**
-	 * Start keyframe of the selected move. A keyframe, an annotation and a
-	 * move are never selected together — whatever selects one clears the rest.
+	 * Start keyframe of the selected move. A keyframe and a move are never
+	 * selected together — selecting one clears the other; they share the
+	 * inspector row. An annotation is selected independently of both.
 	 */
 	selectedMoveStart = $state<number | null>(null);
 	style = $state<MapStyleId>(ANIMATION_DEFAULTS.style);
@@ -381,7 +382,6 @@ export class AnimationStore {
 	selectAt(index: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
 		this.selectedIndex = index;
-		this.selectedAnnotationIndex = null;
 		this.selectedMoveStart = null;
 		this.currentTime = this.keyframes[index].t;
 	}
@@ -395,7 +395,6 @@ export class AnimationStore {
 		if (!this.moves.some((m) => m.start === start)) return;
 		this.selectedMoveStart = start;
 		this.selectedIndex = null;
-		this.selectedAnnotationIndex = null;
 	}
 
 	clearMoveSelection(): void {
@@ -414,8 +413,6 @@ export class AnimationStore {
 		// after the marker exists automatically updates the marker.
 		this.annotations = [...this.annotations, ann];
 		this.selectedAnnotationIndex = this.annotations.length - 1;
-		this.selectedIndex = null;
-		this.selectedMoveStart = null;
 	}
 
 	updateAnnotation(index: number, patch: Partial<Annotation>): void {
@@ -496,8 +493,6 @@ export class AnimationStore {
 	selectAnnotation(index: number): void {
 		if (index < 0 || index >= this.annotations.length) return;
 		this.selectedAnnotationIndex = index;
-		this.selectedIndex = null;
-		this.selectedMoveStart = null;
 	}
 
 	clearAnnotationSelection(): void {

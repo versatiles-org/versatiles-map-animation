@@ -241,14 +241,14 @@ describe('AnimationStore - annotation CRUD', () => {
 		expect(resolved.iconColor).toBeDefined();
 	});
 
-	it('addAnnotation appends, selects it, and clears keyframe selection', () => {
+	it('addAnnotation appends and selects it, next to the selected keyframe', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());
 		s.selectedIndex = 0;
 		s.addAnnotation(ann({ lng: 5 }));
 		expect(s.annotations).toHaveLength(1);
 		expect(s.selectedAnnotationIndex).toBe(0);
-		expect(s.selectedIndex).toBeNull();
+		expect(s.selectedIndex).toBe(0);
 	});
 
 	it('updateAnnotation merges patch with existing fields', () => {
@@ -308,16 +308,20 @@ describe('AnimationStore - annotation CRUD', () => {
 		expect(s.selectedAnnotationIndex).toBeNull();
 	});
 
-	it('selectAt clears annotation selection; selectAnnotation clears keyframe selection', () => {
+	it('a keyframe or move and an annotation are selected independently', () => {
 		const s = new AnimationStore();
+		s.addKeyframeFromCamera(cam());
 		s.addKeyframeFromCamera(cam());
 		s.addAnnotation(ann());
 		s.selectAt(0);
-		expect(s.selectedAnnotationIndex).toBeNull();
+		expect(s.selectedAnnotationIndex).toBe(0);
 		expect(s.selectedIndex).toBe(0);
 		s.selectAnnotation(0);
-		expect(s.selectedIndex).toBeNull();
+		expect(s.selectedIndex).toBe(0);
+		s.selectMove(0);
 		expect(s.selectedAnnotationIndex).toBe(0);
+		s.clearAnnotationSelection();
+		expect(s.selectedMove?.start).toBe(0);
 	});
 
 	it('duplicateAnnotation inserts a clone after the source and selects it', () => {
@@ -662,10 +666,6 @@ describe('AnimationStore - load/serialise', () => {
 		s.selectAt(3);
 		expect(s.selectedMove).toBeNull();
 		s.selectMove(0);
-		s.addAnnotation({ lng: 0, lat: 0, label: '' });
-		expect(s.selectedMove).toBeNull();
-		s.selectMove(0);
-		expect(s.selectedAnnotationIndex).toBeNull();
 		s.clearMoveSelection();
 		expect(s.selectedMove).toBeNull();
 		s.selectMove(0);

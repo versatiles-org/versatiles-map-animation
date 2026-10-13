@@ -122,6 +122,27 @@
 			</label>
 		{/each}
 	</div>
+	<div
+		class="sliders"
+		title="Scale all annotations (markers and labels). Stacks on top of automatic container-size scaling."
+	>
+		<div class="row head">
+			<span class="lbl">Marker size</span>
+		</div>
+		<label class="row">
+			<span class="lbl"></span>
+			<input
+				type="range"
+				min="0.4"
+				max="2.5"
+				step="0.05"
+				aria-label="Marker size"
+				value={store.annotationScale}
+				oninput={(e) => (store.annotationScale = Number(e.currentTarget.value))}
+			/>
+			<span class="val">{store.annotationScale.toFixed(2)}×</span>
+		</label>
+	</div>
 	<label class="row" title="Base map style">
 		<span class="lbl">Map</span>
 		<select bind:value={store.style}>
@@ -327,7 +348,7 @@
 
 		.row {
 			display: grid;
-			grid-template-columns: 3.6rem 1fr 2.2rem;
+			grid-template-columns: 3.6rem 1fr 2.6rem;
 		}
 		.row.head {
 			display: flex;

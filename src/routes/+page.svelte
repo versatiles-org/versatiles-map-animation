@@ -11,7 +11,7 @@
 	import MapStage from '#lib/components/MapStage.svelte';
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import Timeline from '#lib/components/Timeline.svelte';
-	import Toolbar from '#lib/components/Toolbar.svelte';
+	import Inspector from '#lib/components/Inspector.svelte';
 	import TopBar from '#lib/components/TopBar.svelte';
 
 	const store = new AnimationStore();
@@ -95,7 +95,7 @@
 					{/if}
 				</div>
 			</div>
-			<Toolbar {store} />
+			<Inspector {store} />
 		</div>
 	</div>
 
@@ -155,7 +155,7 @@
 	}
 
 	/* Middle of the viewport: sidebar on the left, main column (map +
-	   toolbar) on the right. Timeline sits below this row, full width. */
+	   inspector) on the right. Timeline sits below this row, full width. */
 	.body {
 		flex: 1 1 auto;
 		min-height: 0;
