@@ -629,6 +629,50 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s.keyframes.map((k) => k.waypoint === true)).toEqual([false, false, true]);
 	});
 
+	it('selects a move, and never together with a keyframe or an annotation', () => {
+		const s = new AnimationStore();
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t * 10,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		s.loadFromAnimation({
+			...s.toAnimation(),
+			keyframes: [kf(0), kf(1, { waypoint: true }), kf(2), kf(3)]
+		});
+		expect(s.moves.map((m) => [m.start, m.end, m.kind])).toEqual([
+			[0, 2, 'curve'],
+			[2, 3, 'arc']
+		]);
+		s.selectAt(0);
+		s.selectMove(2);
+		expect(s.selectedMove).toEqual({ start: 2, end: 3, kind: 'arc' });
+		expect(s.selectedIndex).toBeNull();
+		// A keyframe that starts no move cannot be selected as one.
+		s.selectMove(1);
+		expect(s.selectedMove?.start).toBe(2);
+		// The style of the move is the path of the stop it starts from.
+		s.setKeyframePath(2, 'linear');
+		expect(s.selectedMove?.kind).toBe('linear');
+		s.selectAt(3);
+		expect(s.selectedMove).toBeNull();
+		s.selectMove(0);
+		s.addAnnotation({ lng: 0, lat: 0, label: '' });
+		expect(s.selectedMove).toBeNull();
+		s.selectMove(0);
+		expect(s.selectedAnnotationIndex).toBeNull();
+		s.clearMoveSelection();
+		expect(s.selectedMove).toBeNull();
+		s.selectMove(0);
+		s.reset();
+		expect(s.selectedMove).toBeNull();
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

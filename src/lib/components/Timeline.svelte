@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
+	import { MOVE_KIND_LABELS } from '../moves';
+	import PathIcon from './PathIcon.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -70,6 +72,11 @@
 	function startScrub(e: PointerEvent) {
 		const target = e.target as HTMLElement;
 		if (target.closest('.marker')) return;
+		// A press on a move's band selects that move; anywhere else on the
+		// track drops the selection. Either way it also scrubs.
+		const band = target.closest<HTMLElement>('.move');
+		if (band) store.selectMove(Number(band.dataset.start));
+		else store.clearMoveSelection();
 		e.preventDefault();
 		store.pause();
 		store.isScrubbing = true;
@@ -343,6 +350,25 @@
 			</div>
 		{/each}
 
+		{#each store.moves as move (move.start)}
+			{@const from = store.keyframes[move.start].t}
+			{@const to = store.keyframes[move.end].t}
+			<button
+				type="button"
+				class="move {move.kind}"
+				class:selected={store.selectedMove?.start === move.start}
+				data-start={move.start}
+				style="left: {pct(from)}%; width: {pct(to) - pct(from)}%"
+				onclick={() => store.selectMove(move.start)}
+				title="Move: {MOVE_KIND_LABELS[move.kind]}, {fmt(to - from)}s — click to select"
+				aria-label="Move from keyframe {move.start + 1} to {move.end + 1}: {MOVE_KIND_LABELS[
+					move.kind
+				]}"
+			>
+				<PathIcon icon={move.kind === 'curve' ? 'waypoint' : move.kind} size={14} />
+			</button>
+		{/each}
+
 		{#each store.keyframes as kf, i (i)}
 			<button
 				type="button"
@@ -543,6 +569,48 @@
 		color: #888;
 		font-family: ui-monospace, monospace;
 		white-space: nowrap;
+	}
+	/* One band per move, from the stop it starts at to the stop it ends on,
+	   behind the keyframe markers. The colour says how the camera travels. */
+	.move {
+		--move-color: 74, 158, 255;
+		position: absolute;
+		top: 50%;
+		height: 18px;
+		transform: translateY(-50%);
+		box-sizing: border-box;
+		padding: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(var(--move-color), 0.22);
+		border: 1px solid rgba(var(--move-color), 0.55);
+		border-radius: 3px;
+		color: rgb(var(--move-color));
+		cursor: pointer;
+		overflow: hidden;
+		/* For hiding the icon when the band gets too narrow for it. */
+		container-type: inline-size;
+
+		&.linear {
+			--move-color: 63, 200, 170;
+		}
+		&.curve {
+			--move-color: 190, 150, 255;
+		}
+		&:hover {
+			background: rgba(var(--move-color), 0.35);
+		}
+		&.selected {
+			background: rgba(255, 210, 74, 0.3);
+			border-color: #ffd24a;
+			color: #ffd24a;
+		}
+		@container (max-width: 40px) {
+			:global(svg) {
+				display: none;
+			}
+		}
 	}
 	.marker {
 		position: absolute;

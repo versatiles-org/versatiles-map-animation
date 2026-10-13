@@ -3,7 +3,7 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { DEFAULT_PATH, PATH_STYLE_LABELS, PATH_STYLES } from '../types';
+	import { PATH_STYLE_LABELS, PATH_STYLES } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
 	import PathIcon from './PathIcon.svelte';
@@ -147,21 +147,7 @@
 		]
 	] as const;
 	const isWaypoint = $derived(store.selectedKeyframe?.waypoint === true);
-	/**
-	 * Why the travel style cannot be set right now, or `null` when it can.
-	 * The style belongs to the move leaving the selected stop, and only a
-	 * move that goes straight to the next stop has one.
-	 */
-	const moveStyleBlocked = $derived.by(() => {
-		const i = store.selectedIndex;
-		if (i === null) return 'Select a stop to set how the camera travels from it';
-		if (i === store.keyframes.length - 1) return 'No move leaves the last keyframe';
-		if (isWaypoint || store.keyframes[i + 1]?.waypoint) {
-			return 'This move runs through waypoints and follows the curve through them';
-		}
-		return null;
-	});
-	const selectedPath = $derived(store.selectedKeyframe?.path ?? DEFAULT_PATH);
+	const selectedMove = $derived(store.selectedMove);
 	const canPlay = $derived(store.keyframes.length >= 2);
 </script>
 
@@ -171,73 +157,81 @@
 		<button type="button" onclick={onAdd} title="Add a keyframe at the current playhead time">
 			+ Add
 		</button>
-		<button
-			type="button"
-			onclick={onUpdate}
-			disabled={!hasSelection}
-			title="Update the selected keyframe to the current camera"
-		>
-			↻ Update
-		</button>
-		<button
-			type="button"
-			onclick={onDelete}
-			disabled={!hasSelection}
-			title="Delete the selected keyframe"
-		>
-			✕ Delete
-		</button>
-		<div
-			class="choice"
-			role="radiogroup"
-			aria-label="Keyframe type"
-			title={hasSelection ? undefined : 'Select a keyframe to set its type'}
-		>
-			{#each KEYFRAME_TYPES as [type, label, hint] (type)}
-				{@const active = hasSelection && isWaypoint === (type === 'waypoint')}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={active}
-					class:active
-					disabled={!hasSelection}
-					title={hint}
-					onclick={() => {
-						if (store.selectedIndex !== null) {
-							store.setKeyframeWaypoint(store.selectedIndex, type === 'waypoint');
-						}
-					}}
-				>
-					<PathIcon icon={type} />
-					{label}
-				</button>
-			{/each}
-		</div>
-		<div
-			class="choice"
-			role="radiogroup"
-			aria-label="Travel style of the move leaving the selected keyframe"
-			title={moveStyleBlocked ?? undefined}
-		>
-			<span class="lbl">Move →</span>
-			{#each PATH_STYLES as path (path)}
-				{@const active = moveStyleBlocked === null && selectedPath === path}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={active}
-					class:active
-					disabled={moveStyleBlocked !== null}
-					title={PATH_STYLE_LABELS[path][1]}
-					onclick={() => {
-						if (store.selectedIndex !== null) store.setKeyframePath(store.selectedIndex, path);
-					}}
-				>
-					<PathIcon icon={path} />
-					{PATH_STYLE_LABELS[path][0]}
-				</button>
-			{/each}
-		</div>
+		{#if selectedMove}
+			<!-- A move is selected on the timeline: its controls take the place
+			     of the keyframe's, so the toolbar keeps its width. -->
+			<div
+				class="choice"
+				role="radiogroup"
+				aria-label="Travel style of the selected move"
+				title={selectedMove.kind === 'curve'
+					? 'This move runs through waypoints and follows the curve through them. Turn them into stops to choose a travel style.'
+					: undefined}
+			>
+				<span class="lbl">Move</span>
+				{#if selectedMove.kind === 'curve'}
+					<span class="note"><PathIcon icon="waypoint" /> Follows its waypoints</span>
+				{:else}
+					{#each PATH_STYLES as path (path)}
+						{@const active = selectedMove.kind === path}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={active}
+							class:active
+							title={PATH_STYLE_LABELS[path][1]}
+							onclick={() => store.setKeyframePath(selectedMove.start, path)}
+						>
+							<PathIcon icon={path} />
+							{PATH_STYLE_LABELS[path][0]}
+						</button>
+					{/each}
+				{/if}
+			</div>
+		{:else}
+			<button
+				type="button"
+				onclick={onUpdate}
+				disabled={!hasSelection}
+				title="Update the selected keyframe to the current camera"
+			>
+				↻ Update
+			</button>
+			<button
+				type="button"
+				onclick={onDelete}
+				disabled={!hasSelection}
+				title="Delete the selected keyframe"
+			>
+				✕ Delete
+			</button>
+			<div
+				class="choice"
+				role="radiogroup"
+				aria-label="Keyframe type"
+				title={hasSelection ? undefined : 'Select a keyframe to set its type'}
+			>
+				{#each KEYFRAME_TYPES as [type, label, hint] (type)}
+					{@const active = hasSelection && isWaypoint === (type === 'waypoint')}
+					<button
+						type="button"
+						role="radio"
+						aria-checked={active}
+						class:active
+						disabled={!hasSelection}
+						title={hint}
+						onclick={() => {
+							if (store.selectedIndex !== null) {
+								store.setKeyframeWaypoint(store.selectedIndex, type === 'waypoint');
+							}
+						}}
+					>
+						<PathIcon icon={type} />
+						{label}
+					</button>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
 	<div class="group" role="group" aria-label="Annotation">
@@ -369,6 +363,14 @@
 			text-transform: uppercase;
 			letter-spacing: 0.06em;
 			color: #777;
+		}
+		.note {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			padding: 0.4rem 0.2rem;
+			font-size: 13px;
+			color: #ddd;
 		}
 		button {
 			display: inline-flex;

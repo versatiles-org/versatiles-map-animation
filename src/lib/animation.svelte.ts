@@ -1,5 +1,6 @@
 import { sampleAt } from './interpolate';
 import type { MapStyleOptions } from './map_style';
+import { movesOf, type Move } from './moves';
 import {
 	ANIMATION_DEFAULTS,
 	ANNOTATION_FIELD_DEFAULTS,
@@ -159,6 +160,11 @@ export class AnimationStore {
 	isScrubbing = $state(false);
 	selectedIndex = $state<number | null>(null);
 	selectedAnnotationIndex = $state<number | null>(null);
+	/**
+	 * Start keyframe of the selected move. A keyframe, an annotation and a
+	 * move are never selected together — whatever selects one clears the rest.
+	 */
+	selectedMoveStart = $state<number | null>(null);
 	style = $state<MapStyleId>(ANIMATION_DEFAULTS.style);
 	/** Unset = the style's default theme, see `DEFAULT_MAP_THEMES`. */
 	theme = $state<MapTheme | undefined>(undefined);
@@ -195,6 +201,11 @@ export class AnimationStore {
 		this.selectedAnnotationIndex !== null
 			? (this.annotations[this.selectedAnnotationIndex] ?? null)
 			: null
+	);
+	/** The moves between the stops — see `Move`. */
+	moves = $derived(movesOf(this.keyframes));
+	selectedMove = $derived<Move | null>(
+		this.moves.find((m) => m.start === this.selectedMoveStart) ?? null
 	);
 	sampledCamera = $derived(sampleAt(this.keyframes, this.currentTime, this.projection));
 	/**
@@ -235,6 +246,7 @@ export class AnimationStore {
 		const idx = after === -1 ? this.keyframes.length : after;
 		this.keyframes = [...this.keyframes.slice(0, idx), kf, ...this.keyframes.slice(idx)];
 		this.selectedIndex = idx;
+		this.selectedMoveStart = null;
 		this.currentTime = t;
 	}
 
@@ -249,6 +261,7 @@ export class AnimationStore {
 		if (index < 0 || index >= this.keyframes.length) return;
 		this.keyframes = this.keyframes.filter((_, i) => i !== index);
 		this.selectedIndex = adjustIndexAfterDelete(this.selectedIndex, index);
+		this.selectedMoveStart = null;
 	}
 
 	/** Set the travel style of the move that starts at this keyframe. */
@@ -308,6 +321,8 @@ export class AnimationStore {
 			else if (index > sel && newIndex <= sel) this.selectedIndex = sel + 1;
 		}
 		this.keyframes = sorted;
+		// Indices may have shifted, and with them what a move's start means.
+		this.selectedMoveStart = null;
 	}
 
 	/** Show or hide one layer group of the base map. */
@@ -320,11 +335,24 @@ export class AnimationStore {
 		if (index < 0 || index >= this.keyframes.length) return;
 		this.selectedIndex = index;
 		this.selectedAnnotationIndex = null;
+		this.selectedMoveStart = null;
 		this.currentTime = this.keyframes[index].t;
 	}
 
 	clearSelection(): void {
 		this.selectedIndex = null;
+	}
+
+	/** Select the move that starts at keyframe `start` — see `moves`. */
+	selectMove(start: number): void {
+		if (!this.moves.some((m) => m.start === start)) return;
+		this.selectedMoveStart = start;
+		this.selectedIndex = null;
+		this.selectedAnnotationIndex = null;
+	}
+
+	clearMoveSelection(): void {
+		this.selectedMoveStart = null;
 	}
 
 	// -------------------------------------------------------------------------
@@ -340,6 +368,7 @@ export class AnimationStore {
 		this.annotations = [...this.annotations, ann];
 		this.selectedAnnotationIndex = this.annotations.length - 1;
 		this.selectedIndex = null;
+		this.selectedMoveStart = null;
 	}
 
 	updateAnnotation(index: number, patch: Partial<Annotation>): void {
@@ -421,6 +450,7 @@ export class AnimationStore {
 		if (index < 0 || index >= this.annotations.length) return;
 		this.selectedAnnotationIndex = index;
 		this.selectedIndex = null;
+		this.selectedMoveStart = null;
 	}
 
 	clearAnnotationSelection(): void {
@@ -471,6 +501,7 @@ export class AnimationStore {
 		this.defaultAnnotation = { ...(anim.defaultAnnotation ?? {}) };
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
+		this.selectedMoveStart = null;
 		this.currentTime = 0;
 		this.isPlaying = false;
 	}

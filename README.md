@@ -16,6 +16,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
 - Keyframes are **stops** or **waypoints**. The camera comes to rest on a stop and flies through a waypoint, so the keyframes from one stop to the next form one move. A move through waypoints is one flowing curve that only eases in and out at its two stops — for following a river, orbiting a place or drifting without pause. A waypoint as first or last keyframe starts or ends the animation in motion.
 - Travel style of a move that goes straight from stop to stop: **Fly over** (default, rises and descends on long distances) or **Stay low**.
+- The timeline shows every move as a band between its stops, coloured by how the camera travels, with waypoints as dots on it. Click a keyframe to edit the keyframe, click a band to edit the move.
 - Scrub anywhere on the timeline; click a keyframe to jump to its view; drag markers along the track to retime — and past their neighbours to **reorder** the sequence. Timestamps snap to 1/100 s.
 - Timeline zoom & pan: vertical scroll / Ctrl-wheel / pinch zooms; horizontal scroll pans; drag the pan-bar thumb to scroll, drag its edges to zoom; the playhead can be moved past the last keyframe to add a new one there.
 - Insert keyframes at the current playhead (compose a shot, then **+ Add** in the Keyframe group).
