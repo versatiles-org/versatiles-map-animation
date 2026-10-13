@@ -18,6 +18,7 @@
 		"check:svelte": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "npm run format && npm run check:svelte && npm run lint && npm run test",
 		"dev": "vite dev",
+		"docker:build": "docker build -f render/Dockerfile -t versatiles-map-animation .",
 		"format:check": "prettier --log-level=warn --check .",
 		"format": "prettier --log-level=warn --write .",
 		"inspect": "tsx scripts/inspect-hash.ts",

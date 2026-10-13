@@ -20,11 +20,16 @@ Tags published: `latest` (default branch), `main` (branch name), `sha-<short>`
 ## Or build it yourself
 
 ```sh
-docker build -f render/Dockerfile -t map-anim-render .
+npm run docker:build
 ```
 
-(Run from the repository root — the Dockerfile expects to see both `package.json`
-and `render/` in the build context.)
+This runs `docker build -f render/Dockerfile -t versatiles-map-animation .`
+from the repository root (the Dockerfile expects to see both `package.json`
+and `render/` in the build context) and leaves you with a local image named
+`versatiles-map-animation`. Use that name in place of
+`ghcr.io/versatiles-org/versatiles-map-animation:latest` in the commands
+below, and drop `--pull always` if you copied a command from the editor:
+with it Docker looks for an image of that name online and fails.
 
 ## Render an animation
 
