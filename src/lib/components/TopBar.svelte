@@ -1,0 +1,321 @@
+<script lang="ts">
+	/**
+	 * Bar across the top of the editor: everything that concerns the animation
+	 * as a whole. The File menu loads, saves and clears it; the buttons on the
+	 * right are the ways to get it out of the editor.
+	 */
+
+	import { resolve } from '$app/paths';
+	import type { AnimationStore } from '../animation.svelte';
+	import { EXAMPLE_ANIMATION } from '../example_animation';
+	import { downloadAnimation, uploadAnimation } from '../json_io';
+	import { encodeAnimation } from '../url_state';
+	import EmbedDialog from './EmbedDialog.svelte';
+	import VideoDialog from './VideoDialog.svelte';
+
+	let { store }: { store: AnimationStore } = $props();
+
+	let fileInput: HTMLInputElement;
+	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
+	let importError = $state<string | null>(null);
+	// Embed and video share the space below the bar, so only one is open.
+	let panel = $state<'embed' | 'video' | null>(null);
+
+	// Status flash for the share-link copy result. The two dialogs each have
+	// their own internal "✓ Copied" badge state.
+	let status = $state<{ tone: 'ok' | 'err'; text: string } | null>(null);
+	let statusTimer: ReturnType<typeof setTimeout> | undefined;
+	function flash(tone: 'ok' | 'err', text: string) {
+		status = { tone, text };
+		if (statusTimer) clearTimeout(statusTimer);
+		statusTimer = setTimeout(() => (status = null), 1800);
+	}
+
+	function closeMenu() {
+		if (menuEl) menuEl.open = false;
+	}
+
+	function onExport() {
+		closeMenu();
+		downloadAnimation(store.toAnimation());
+	}
+	function onImportClick() {
+		closeMenu();
+		importError = null;
+		fileInput.click();
+	}
+	async function onImportChange(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			const anim = await uploadAnimation(file);
+			store.loadFromAnimation(anim);
+		} catch (err) {
+			importError = err instanceof Error ? err.message : String(err);
+		} finally {
+			input.value = '';
+		}
+	}
+	function onLoadExample() {
+		closeMenu();
+		store.loadFromAnimation(EXAMPLE_ANIMATION);
+	}
+	function onClear() {
+		closeMenu();
+		if (store.keyframes.length > 0 && !confirm('Discard the current animation and start over?')) {
+			return;
+		}
+		store.reset();
+	}
+
+	async function onShare() {
+		const url = `${window.location.origin}${resolve('/')}#kf=${encodeAnimation(store.toAnimation())}`;
+		try {
+			await navigator.clipboard.writeText(url);
+			flash('ok', '✓ Share link copied');
+		} catch {
+			flash('err', '✕ Could not copy link');
+		}
+	}
+	function togglePanel(which: 'embed' | 'video') {
+		panel = panel === which ? null : which;
+	}
+
+	function handleDocClick(e: MouseEvent) {
+		if (!menuEl?.open) return;
+		if (!menuEl.contains(e.target as Node)) menuEl.open = false;
+	}
+
+	$effect(() => {
+		document.addEventListener('click', handleDocClick);
+		return () => document.removeEventListener('click', handleDocClick);
+	});
+
+	const hasKeyframes = $derived(store.keyframes.length > 0);
+	// The panels describe the current animation; without one there is nothing to show.
+	const openPanel = $derived(hasKeyframes ? panel : null);
+</script>
+
+<header class="topbar">
+	<h1 title="Drop keyframes on a map, hit play.">Map Animation</h1>
+
+	<details bind:this={menuEl} class="file-menu">
+		<summary>File <span class="caret" aria-hidden="true">▾</span></summary>
+		<div class="menu" role="menu">
+			<button type="button" role="menuitem" onclick={onLoadExample}>★ Load example</button>
+			<hr />
+			<button type="button" role="menuitem" onclick={onImportClick}>↑ Import JSON</button>
+			<button type="button" role="menuitem" onclick={onExport} disabled={!hasKeyframes}>
+				↓ Export JSON
+			</button>
+			<hr />
+			<button type="button" role="menuitem" onclick={onClear} disabled={!hasKeyframes}>
+				⌫ Clear
+			</button>
+		</div>
+	</details>
+
+	<div class="spacer"></div>
+
+	{#if status}
+		<span class="status" class:ok={status.tone === 'ok'} class:err={status.tone === 'err'}>
+			{status.text}
+		</span>
+	{/if}
+
+	<div class="outputs" role="group" aria-label="Share and export">
+		<button
+			type="button"
+			onclick={onShare}
+			disabled={!hasKeyframes}
+			title="Copy a link that opens this animation in the editor"
+		>
+			🔗 Share link
+		</button>
+		<button
+			type="button"
+			class:active={openPanel === 'embed'}
+			aria-expanded={openPanel === 'embed'}
+			onclick={() => togglePanel('embed')}
+			disabled={!hasKeyframes}
+			title="Get an iframe snippet for your own page"
+		>
+			🖼 Embed…
+		</button>
+		<button
+			type="button"
+			class:active={openPanel === 'video'}
+			aria-expanded={openPanel === 'video'}
+			onclick={() => togglePanel('video')}
+			disabled={!hasKeyframes}
+			title="Get the command that renders this animation to a video file"
+		>
+			🎬 Export video…
+		</button>
+	</div>
+
+	<input
+		bind:this={fileInput}
+		type="file"
+		accept="application/json,.json"
+		onchange={onImportChange}
+		hidden
+	/>
+</header>
+
+{#if importError}
+	<div class="import-error" role="alert">
+		<span>Import failed: {importError}</span>
+		<button type="button" onclick={() => (importError = null)} aria-label="Dismiss">✕</button>
+	</div>
+{/if}
+
+{#if openPanel === 'embed'}
+	<EmbedDialog {store} onClose={() => (panel = null)} />
+{:else if openPanel === 'video'}
+	<VideoDialog {store} onClose={() => (panel = null)} />
+{/if}
+
+<style>
+	.topbar {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+	h1 {
+		margin: 0 0.25rem 0 0;
+		font-size: 1.05rem;
+		white-space: nowrap;
+	}
+	.spacer {
+		flex: 1 1 auto;
+	}
+	.outputs {
+		display: flex;
+		gap: 0.25rem;
+	}
+	button,
+	summary {
+		padding: 0.4rem 0.7rem;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid #333;
+		border-radius: 4px;
+		color: #ddd;
+		font-size: 13px;
+		cursor: pointer;
+		font-family: inherit;
+		white-space: nowrap;
+
+		&:hover:not(:disabled) {
+			background: rgba(255, 255, 255, 0.12);
+			border-color: #4a9eff;
+		}
+		&:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+		&.active {
+			background: rgba(74, 158, 255, 0.2);
+			border-color: #4a9eff;
+			color: #fff;
+		}
+	}
+
+	.status {
+		font-size: 12px;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+
+		&.ok {
+			background: rgba(80, 200, 120, 0.18);
+			border: 1px solid #4ac888;
+			color: #b6f0c9;
+		}
+		&.err {
+			background: rgba(255, 80, 80, 0.18);
+			border: 1px solid #ff7070;
+			color: #ffbcbc;
+		}
+	}
+
+	.file-menu {
+		position: relative;
+
+		& > summary {
+			list-style: none;
+			user-select: none;
+
+			&::-webkit-details-marker {
+				display: none;
+			}
+			.caret {
+				color: #888;
+			}
+		}
+		&[open] > summary {
+			background: rgba(74, 158, 255, 0.18);
+			border-color: #4a9eff;
+			color: #cfe4ff;
+		}
+	}
+	.menu {
+		position: absolute;
+		top: calc(100% + 0.3rem);
+		left: 0;
+		min-width: 12rem;
+		padding: 0.3rem;
+		background: #16191f;
+		border: 1px solid #333;
+		border-radius: 6px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		z-index: 5;
+
+		button {
+			text-align: left;
+			padding: 0.4rem 0.6rem;
+			background: transparent;
+			border: 1px solid transparent;
+
+			&:hover:not(:disabled) {
+				background: rgba(74, 158, 255, 0.14);
+				border-color: transparent;
+			}
+		}
+		hr {
+			margin: 0.2rem 0.1rem;
+			border: 0;
+			border-top: 1px solid #2a2a2a;
+		}
+	}
+
+	.import-error {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.4rem 0.6rem;
+		background: rgba(255, 80, 80, 0.15);
+		border: 1px solid rgba(255, 80, 80, 0.4);
+		border-radius: 4px;
+		color: #ffaaaa;
+		font-size: 13px;
+
+		button {
+			padding: 0.1rem 0.4rem;
+			background: transparent;
+			border: none;
+			color: #ffaaaa;
+
+			&:hover:not(:disabled) {
+				background: transparent;
+				color: #fff;
+			}
+		}
+	}
+
+	/* Embed/Video dialog chrome lives in EmbedDialog.svelte / VideoDialog.svelte. */
+</style>

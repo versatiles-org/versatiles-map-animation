@@ -214,7 +214,6 @@
 
 <style>
 	.embed-panel {
-		margin-top: 0.5rem;
 		padding: 0.6rem 0.75rem;
 		background: rgba(255, 255, 255, 0.04);
 		border: 1px solid #333;

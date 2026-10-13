@@ -30,7 +30,7 @@ test('changing font on an example-animation annotation actually fetches the new 
 	// Load example: satellite + 5 peak annotations across Corsica's
 	// Monte Cinto massif, all rendered in the default font (noto_sans_bold).
 	await page
-		.locator('details.more')
+		.locator('details.file-menu')
 		.evaluate((el) => (el as HTMLDetailsElement).setAttribute('open', ''));
 	await page.locator('button[role="menuitem"]', { hasText: 'Load example' }).click();
 	await page.waitForFunction(

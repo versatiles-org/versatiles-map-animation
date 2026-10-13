@@ -34,11 +34,6 @@
 </script>
 
 <aside class="sidebar" aria-label="Editor sidebar">
-	<header class="sidebar-header">
-		<h1>Map Animation</h1>
-		<p class="lede">Drop keyframes on a map, hit play.</p>
-	</header>
-
 	<!-- 1. Map style — always available -->
 	<details class="sub-panel" bind:open={mapStyleOpen}>
 		<summary>Map style</summary>
@@ -116,16 +111,6 @@
 		gap: 0.6rem;
 		box-sizing: border-box;
 	}
-	.sidebar-header h1 {
-		margin: 0;
-		font-size: 1.15rem;
-	}
-	.sidebar-header .lede {
-		margin: 0.15rem 0 0;
-		color: #888;
-		font-size: 12px;
-	}
-
 	.sub-panel {
 		border: 1px solid #222;
 		border-radius: 4px;

@@ -12,6 +12,7 @@
 	import Sidebar from '#lib/components/Sidebar.svelte';
 	import Timeline from '#lib/components/Timeline.svelte';
 	import Toolbar from '#lib/components/Toolbar.svelte';
+	import TopBar from '#lib/components/TopBar.svelte';
 
 	const store = new AnimationStore();
 	let urlError = $state<string | null>(null);
@@ -77,6 +78,8 @@
 		</div>
 	{/if}
 
+	<TopBar {store} />
+
 	<div class="body">
 		<Sidebar {store} />
 
@@ -86,9 +89,8 @@
 					<MapStage {store} editMode={EDIT_MODE} />
 					{#if store.keyframes.length === 0}
 						<div class="empty-overlay">
-							Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or open the
-							<strong>⋯</strong>
-							menu and pick <strong>Load example</strong>.
+							Compose a shot, then click <strong>+ Add</strong> in the Keyframe group. Or pick
+							<strong>Load example</strong> from the <strong>File</strong> menu.
 						</div>
 					{/if}
 				</div>
@@ -152,7 +154,7 @@
 		}
 	}
 
-	/* Top half of the viewport: sidebar on the left, main column (map +
+	/* Middle of the viewport: sidebar on the left, main column (map +
 	   toolbar) on the right. Timeline sits below this row, full width. */
 	.body {
 		flex: 1 1 auto;
