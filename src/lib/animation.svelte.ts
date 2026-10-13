@@ -6,6 +6,7 @@ import {
 	cameraOf,
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
+	DEFAULT_MAP_PROJECTION,
 	normalizeLayerGroups,
 	normalizeSun,
 	SCHEMA_VERSION
@@ -19,6 +20,7 @@ import type {
 	CameraState,
 	Keyframe,
 	MapLayerGroup,
+	MapProjection,
 	MapStyleId,
 	MapTheme,
 	PathStyle,
@@ -163,6 +165,7 @@ export class AnimationStore {
 	buildings3d = $state(false);
 	/** Position of the sun; unset = the map's standard lighting. */
 	sun = $state<Sun | undefined>(undefined);
+	projection = $state<MapProjection>(DEFAULT_MAP_PROJECTION);
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
@@ -187,7 +190,7 @@ export class AnimationStore {
 			? (this.annotations[this.selectedAnnotationIndex] ?? null)
 			: null
 	);
-	sampledCamera = $derived(sampleAt(this.keyframes, this.currentTime));
+	sampledCamera = $derived(sampleAt(this.keyframes, this.currentTime, this.projection));
 	/**
 	 * Everything `buildMapStyle` needs. A new object whenever one of the
 	 * fields changes, which is what makes MapStage rebuild the style.
@@ -199,6 +202,7 @@ export class AnimationStore {
 		hiddenLayers: this.hiddenLayers,
 		buildings3d: this.buildings3d,
 		sun: this.sun,
+		projection: this.projection,
 		terrain: this.terrain,
 		sky: this.sky
 	});
@@ -442,6 +446,7 @@ export class AnimationStore {
 		this.hiddenLayers = normalizeLayerGroups(anim.hiddenLayers ?? []);
 		this.buildings3d = anim.buildings3d ?? false;
 		this.sun = normalizeSun(anim.sun);
+		this.projection = anim.projection ?? DEFAULT_MAP_PROJECTION;
 		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
 		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
@@ -463,6 +468,7 @@ export class AnimationStore {
 			...(this.hiddenLayers.length > 0 && { hiddenLayers: [...this.hiddenLayers] }),
 			...(this.buildings3d && { buildings3d: true }),
 			...(this.sun && { sun: { ...this.sun } }),
+			...(this.projection !== DEFAULT_MAP_PROJECTION && { projection: this.projection }),
 			terrain: this.terrain,
 			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),

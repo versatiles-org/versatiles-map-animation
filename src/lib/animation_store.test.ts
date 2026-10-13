@@ -571,6 +571,29 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.sun).toBeUndefined();
 	});
 
+	it('serialises the projection only for the globe, and samples the camera in it', () => {
+		const s = new AnimationStore();
+		expect(s.toAnimation()).not.toHaveProperty('projection');
+		s.loadFromAnimation({
+			...s.toAnimation(),
+			keyframes: [
+				{ t: 0, lng: 0, lat: 60, zoom: 2, pitch: 0, bearing: 0, roll: 0, path: 'linear' },
+				{ t: 4, lng: 40, lat: 0, zoom: 3, pitch: 0, bearing: 0, roll: 0 }
+			]
+		});
+		s.seekTo(2);
+		const mercator = s.sampledCamera;
+		s.projection = 'globe';
+		expect(s.mapStyleOptions.projection).toBe('globe');
+		expect(s.toAnimation().projection).toBe('globe');
+		expect(s.sampledCamera?.zoom).not.toBeCloseTo(mercator!.zoom, 2);
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.projection).toBe('globe');
+		s2.reset();
+		expect(s2.projection).toBe('mercator');
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

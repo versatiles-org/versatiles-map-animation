@@ -1,10 +1,12 @@
 import { FIELD_SPECS } from './url_state/annotation_codec';
 import {
 	ANIMATION_DEFAULTS,
+	DEFAULT_MAP_PROJECTION,
 	ANNOTATION_STYLE_KEYS,
 	isAnnotationIcon,
 	isAspectRatio,
 	isLabelPosition,
+	isMapProjection,
 	isMapStyleId,
 	isMapTheme,
 	isPathStyle,
@@ -125,6 +127,8 @@ export function validateAnimation(input: unknown): Animation {
 		...(hiddenLayers.length > 0 && { hiddenLayers }),
 		...(obj.buildings3d === true && { buildings3d: true }),
 		...(sun && { sun }),
+		...(isMapProjection(obj.projection) &&
+			obj.projection !== DEFAULT_MAP_PROJECTION && { projection: obj.projection }),
 		terrain,
 		sky,
 		keyframes,

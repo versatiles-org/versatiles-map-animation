@@ -338,6 +338,30 @@ export function normalizeSun(value: unknown): Sun | undefined {
 	};
 }
 
+/**
+ * How the earth is drawn. Pinned and append-only: the URL codec stores the
+ * index. `globe` is MapLibre's globe, which turns into Mercator as you zoom
+ * in (fully from zoom 12), so close-up shots look the same in both.
+ */
+export const MAP_PROJECTIONS = ['mercator', 'globe'] as const;
+export type MapProjection = (typeof MAP_PROJECTIONS)[number];
+export const DEFAULT_MAP_PROJECTION: MapProjection = 'mercator';
+export const MAP_PROJECTION_LABELS: Record<MapProjection, string> = {
+	mercator: 'Mercator',
+	globe: 'Globe'
+};
+
+export function isMapProjection(value: unknown): value is MapProjection {
+	return typeof value === 'string' && (MAP_PROJECTIONS as readonly string[]).includes(value);
+}
+
+/**
+ * Web Mercator ends here. The camera centre stays inside ±this latitude on
+ * the globe too: it is what the URL codec can store, and MapLibre sizes the
+ * globe by the Mercator scale at the centre, which has no meaning past it.
+ */
+export const MAX_CAMERA_LATITUDE = 85.051129;
+
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'OSM',
 	satellite: 'Satellite'
@@ -850,6 +874,8 @@ export interface Animation {
 	 * buildings and the terrain's hillshade react to it, both on the OSM map.
 	 */
 	sun?: Sun;
+	/** Unset means `mercator`. Also decides how the camera travels between keyframes. */
+	projection?: MapProjection;
 	terrain: boolean;
 	/** Renders the maplibre atmospheric sky behind the horizon (visible at pitch). */
 	sky: boolean;

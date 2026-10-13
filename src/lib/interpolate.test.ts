@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { easeInOut, interpolateKeyframes, lerp, lerpAngle, sampleAt } from './interpolate';
+import {
+	easeInOut,
+	fromGlobeZoom,
+	interpolateKeyframes,
+	lerp,
+	lerpAngle,
+	sampleAt,
+	toGlobeZoom
+} from './interpolate';
 import type { Keyframe } from './types';
 
 describe('easeInOut', () => {
@@ -134,5 +142,93 @@ describe('sampleAt', () => {
 	it('returns exactly the kf at its own t', () => {
 		const out = sampleAt(kfs, 0);
 		expect(out?.lng).toBe(0);
+	});
+});
+
+describe('globe projection', () => {
+	const kf = (t: number, lng: number, lat: number, zoom: number, path?: Keyframe['path']) =>
+		({ t, lng, lat, zoom, pitch: 0, bearing: 0, roll: 0, ...(path && { path }) }) as Keyframe;
+
+	it('globe zoom is the zoom at the equator and grows towards the poles', () => {
+		expect(toGlobeZoom(3, 0)).toBe(3);
+		expect(toGlobeZoom(3, 60)).toBeCloseTo(4, 10); // cos 60° = ½ → twice the size
+		expect(toGlobeZoom(3, -60)).toBeCloseTo(4, 10);
+		expect(fromGlobeZoom(toGlobeZoom(2.5, 47), 47)).toBeCloseTo(2.5, 10);
+		// Past the Mercator edge MapLibre keeps the size it has at the edge.
+		expect(toGlobeZoom(3, 89)).toBe(toGlobeZoom(3, 85.051129));
+	});
+
+	it('hits both keyframes exactly', () => {
+		const a = kf(0, -21.9, 64.1, 1.5);
+		const b = kf(4, 36.8, -1.3, 2.68);
+		for (const path of ['arc', 'linear'] as const) {
+			const from = { ...a, path };
+			expect(interpolateKeyframes(from, b, 0, 'globe')).toMatchObject({
+				lng: -21.9,
+				lat: 64.1,
+				zoom: 1.5
+			});
+			expect(interpolateKeyframes(from, b, 1, 'globe')).toMatchObject({
+				lng: 36.8,
+				lat: -1.3,
+				zoom: 2.68
+			});
+		}
+	});
+
+	it('a linear move between equally sized globes keeps the globe size, unlike Mercator', () => {
+		const a = kf(0, 0, 60, 2, 'linear');
+		const b = kf(4, 40, 0, 3); // same globe zoom: 2 + log2(1 / cos 60°) = 3
+		for (const alpha of [0.2, 0.5, 0.8]) {
+			const cam = interpolateKeyframes(a, b, alpha, 'globe');
+			expect(toGlobeZoom(cam.zoom, cam.lat)).toBeCloseTo(3, 10);
+		}
+		const mercator = interpolateKeyframes(a, b, 0.5);
+		expect(mercator.zoom).toBeCloseTo(2.5, 10);
+		expect(toGlobeZoom(mercator.zoom, mercator.lat)).not.toBeCloseTo(3, 1);
+	});
+
+	it('an arc follows the great circle, which bulges towards the pole', () => {
+		const a = kf(0, -60, 50, 3);
+		const b = kf(4, 60, 50, 3);
+		const mid = interpolateKeyframes(a, b, 0.5, 'globe');
+		expect(mid.lng).toBeCloseTo(0, 6);
+		// Great-circle midpoint: tan(lat) = tan 50° / cos 60°.
+		expect(mid.lat).toBeCloseTo(
+			(Math.atan(Math.tan((50 * Math.PI) / 180) / 0.5) * 180) / Math.PI,
+			6
+		);
+		// In Mercator the same move stays on the 50th parallel.
+		expect(interpolateKeyframes(a, b, 0.5).lat).toBeCloseTo(50, 6);
+		// Like any arc it rises on the way: the globe is smallest in the middle.
+		expect(toGlobeZoom(mid.zoom, mid.lat)).toBeLessThan(toGlobeZoom(3, 50));
+	});
+
+	it('a route over the pole stays within the latitudes the camera can hold', () => {
+		const a = kf(0, 10, 80, 2);
+		const b = kf(4, -170, 80, 2);
+		for (const alpha of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+			const cam = interpolateKeyframes(a, b, alpha, 'globe');
+			expect(Math.abs(cam.lat)).toBeLessThanOrEqual(85.051129);
+			expect(Number.isFinite(cam.zoom)).toBe(true);
+			expect(Number.isFinite(cam.lng)).toBe(true);
+		}
+	});
+
+	it('copes with antipodes and with a pure zoom', () => {
+		const anti = interpolateKeyframes(kf(0, 0, 0, 2), kf(4, 180, 0, 2), 0.5, 'globe');
+		expect(
+			Number.isFinite(anti.lng) && Number.isFinite(anti.lat) && Number.isFinite(anti.zoom)
+		).toBe(true);
+		const zoomOnly = interpolateKeyframes(kf(0, 10, 50, 2), kf(4, 10, 50, 6), 0.5, 'globe');
+		expect(zoomOnly).toMatchObject({ lng: 10, lat: 50 });
+		expect(zoomOnly.zoom).toBeCloseTo(4, 10);
+	});
+
+	it('sampleAt passes the projection on and defaults to Mercator', () => {
+		const kfs = [kf(0, 0, 60, 2, 'linear'), kf(4, 40, 0, 3)];
+		expect(sampleAt(kfs, 2)).toEqual(interpolateKeyframes(kfs[0], kfs[1], 0.5, 'mercator'));
+		expect(sampleAt(kfs, 2, 'globe')).toEqual(interpolateKeyframes(kfs[0], kfs[1], 0.5, 'globe'));
+		expect(sampleAt(kfs, 2, 'globe')).not.toEqual(sampleAt(kfs, 2));
 	});
 });

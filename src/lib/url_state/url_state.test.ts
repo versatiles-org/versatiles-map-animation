@@ -4,6 +4,7 @@ import { base64UrlToBytes } from '../codec';
 import {
 	ASPECT_RATIOS,
 	MAP_LAYER_GROUPS,
+	MAP_PROJECTIONS,
 	MAP_THEMES,
 	SCHEMA_VERSION,
 	type Animation
@@ -622,5 +623,37 @@ describe('sun option', () => {
 			encodeAnimation({ ...example, sun: { direction: -90.4, altitude: 120 } })
 		);
 		expect(decoded?.sun).toEqual({ direction: 270, altitude: 90 });
+	});
+});
+
+describe('projection option', () => {
+	it('costs nothing for Mercator and no extra byte for the globe', () => {
+		const plain = encodeAnimation(example);
+		expect(encodeAnimation({ ...example, projection: 'mercator' })).toBe(plain);
+		expect(decodeAnimation(plain)).not.toHaveProperty('projection');
+		const globe = encodeAnimation({ ...example, projection: 'globe' });
+		expect(globe).not.toBe(plain);
+		expect(base64UrlToBytes(globe).length).toBeLessThanOrEqual(base64UrlToBytes(plain).length + 1);
+	});
+
+	it('round-trips, also next to other options', () => {
+		expect(decodeAnimation(encodeAnimation({ ...example, projection: 'globe' }))?.projection).toBe(
+			'globe'
+		);
+		const decoded = decodeAnimation(
+			encodeAnimation({
+				...example,
+				projection: 'globe',
+				sun: { direction: 135, altitude: 20 },
+				hiddenLayers: ['pois']
+			})
+		);
+		expect(decoded?.projection).toBe('globe');
+		expect(decoded?.sun).toEqual({ direction: 135, altitude: 20 });
+		expect(decoded?.hiddenLayers).toEqual(['pois']);
+	});
+
+	it('stores the index into MAP_PROJECTIONS, so the list is append-only', () => {
+		expect(MAP_PROJECTIONS).toEqual(['mercator', 'globe']);
 	});
 });

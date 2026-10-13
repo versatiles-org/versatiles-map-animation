@@ -7,6 +7,8 @@
 		LABEL_SWITCH_LAYER_GROUPS,
 		MAP_LAYER_GROUP_LABELS,
 		MAP_LAYER_GROUPS,
+		MAP_PROJECTION_LABELS,
+		MAP_PROJECTIONS,
 		MAP_STYLE_IDS,
 		MAP_STYLE_LABELS,
 		MAP_THEME_LOOKALIKES_START,
@@ -90,6 +92,17 @@
 		<select bind:value={store.style}>
 			{#each MAP_STYLE_IDS as id (id)}
 				<option value={id}>{MAP_STYLE_LABELS[id]}</option>
+			{/each}
+		</select>
+	</label>
+	<label
+		class="row"
+		title="Globe shows the earth as a sphere and turns into Mercator as you zoom in (from zoom 12 on both look the same)"
+	>
+		<span class="lbl">Projection</span>
+		<select bind:value={store.projection}>
+			{#each MAP_PROJECTIONS as projection (projection)}
+				<option value={projection}>{MAP_PROJECTION_LABELS[projection]}</option>
 			{/each}
 		</select>
 	</label>

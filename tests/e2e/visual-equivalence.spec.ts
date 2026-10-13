@@ -108,6 +108,76 @@ test.describe('viewport-size invariance at fixed aspect ratio', () => {
 	});
 });
 
+/**
+ * Globe: Reykjavík (zoom 1.5) → Nairobi (zoom 2.68) on a linear path, 4 s.
+ * Both ends show the globe at the same size, so it must keep that size on
+ * the way — which only holds if the camera is interpolated for the globe.
+ */
+const GLOBE_HASH = 'AhQUdZLg2iDofDT-QD7eRQ7wYACAQA';
+
+/** Screen positions of a few places, as fractions of the map's width. */
+async function projectedPlaces(page: Page): Promise<[number, number][]> {
+	return page.evaluate(() => {
+		const m = window.__viewer_map!;
+		const w = m.getContainer().clientWidth;
+		const c = m.getCenter();
+		return (
+			[
+				[0, 0],
+				[10, 0],
+				[0, 10],
+				[-10, -10]
+			] as const
+		).map(([dLng, dLat]) => {
+			const p = m.project([c.lng + dLng, c.lat + dLat]);
+			return [p.x / w, p.y / w] as [number, number];
+		});
+	});
+}
+
+/** Radius of the globe in px, as MapLibre sizes it: ∝ 2^zoom / cos(centre latitude). */
+async function globeSize(page: Page): Promise<number> {
+	return page.evaluate(() => {
+		const m = window.__viewer_map!;
+		return Math.pow(2, m.getZoom()) / Math.cos((m.getCenter().lat * Math.PI) / 180);
+	});
+}
+
+test.describe('globe projection', () => {
+	test('`?t=` seeks: the camera is where the animation is at that time', async ({ page }) => {
+		await openViewer(page, 1280, 720, GLOBE_HASH, 0);
+		const start = await page.evaluate(() => window.__viewer_map!.getCenter().lat);
+		await openViewer(page, 1280, 720, GLOBE_HASH, 2);
+		const middle = await page.evaluate(() => window.__viewer_map!.getCenter().lat);
+		expect(start).toBeCloseTo(64.1, 1);
+		expect(middle).toBeCloseTo(31.4, 1);
+	});
+
+	test('the globe keeps its size while the camera travels between equally sized views', async ({
+		page
+	}) => {
+		const sizes: number[] = [];
+		for (const t of [0, 1, 2, 3, 4]) {
+			await openViewer(page, 1280, 720, GLOBE_HASH, t);
+			expect(await page.evaluate(() => window.__viewer_map!.getProjection()?.type)).toBe('globe');
+			sizes.push(await globeSize(page));
+		}
+		// Zoom is stored with two decimals, so the two ends differ by up to ~1 %.
+		expect(Math.max(...sizes) / Math.min(...sizes)).toBeLessThan(1.02);
+	});
+
+	test('640x360 and 1280x720 show the same framing', async ({ page }) => {
+		await openViewer(page, 640, 360, GLOBE_HASH, 2);
+		const small = await projectedPlaces(page);
+		await openViewer(page, 1280, 720, GLOBE_HASH, 2);
+		const large = await projectedPlaces(page);
+		for (let i = 0; i < small.length; i++) {
+			expect(small[i][0]).toBeCloseTo(large[i][0], 4);
+			expect(small[i][1]).toBeCloseTo(large[i][1], 4);
+		}
+	});
+});
+
 test.describe('annotation layer setup', () => {
 	test('loading the annotated demo does not raise a maplibre style error', async ({ page }) => {
 		const errors: string[] = [];

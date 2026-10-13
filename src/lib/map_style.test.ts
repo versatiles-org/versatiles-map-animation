@@ -208,6 +208,20 @@ describe('sun', () => {
 	});
 });
 
+describe('projection', () => {
+	it('is Mercator unless the globe is asked for, on both maps', () => {
+		for (const style of ['colorful', 'satellite'] as const) {
+			expect(buildBaseStyle({ ...base, style }).projection).toEqual({ type: 'mercator' });
+			expect(buildBaseStyle({ ...base, style, projection: 'mercator' })).toEqual(
+				buildBaseStyle({ ...base, style })
+			);
+			expect(buildBaseStyle({ ...base, style, projection: 'globe' }).projection).toEqual({
+				type: 'globe'
+			});
+		}
+	});
+});
+
 describe('buildMapStyle', () => {
 	const tileJson = (path: string) => ({
 		tilejson: '3.0.0',

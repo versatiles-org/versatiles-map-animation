@@ -32,7 +32,9 @@ import { bool, type Codec, enumOf, struct, uint, vuint } from '../codec';
 import {
 	ASPECT_RATIOS,
 	DEFAULT_ASPECT_RATIO,
+	DEFAULT_MAP_PROJECTION,
 	MAP_LAYER_GROUPS,
+	MAP_PROJECTIONS,
 	MAP_STYLE_IDS,
 	MAP_THEMES
 } from '../types';
@@ -40,6 +42,7 @@ import type {
 	AnnotationStyle,
 	AspectRatio,
 	MapLayerGroup,
+	MapProjection,
 	MapStyleId,
 	MapTheme,
 	Sun
@@ -54,6 +57,8 @@ const styleCodec = enumOf(MAP_STYLE_IDS as readonly [MapStyleId, ...MapStyleId[]
 const aspectRatioCodec = enumOf(ASPECT_RATIOS as readonly [AspectRatio, ...AspectRatio[]]);
 // 5 bits: room for 32 themes, so appending to MAP_THEMES keeps old links valid.
 const themeCodec = enumOf(MAP_THEMES as readonly [MapTheme, ...MapTheme[]], 5);
+// 2 bits: room for 4 projections.
+const projectionCodec = enumOf(MAP_PROJECTIONS as readonly [MapProjection, ...MapProjection[]], 2);
 
 /**
  * Hidden layer groups as a bitmask: bit i set = `MAP_LAYER_GROUPS[i]` is
@@ -112,6 +117,7 @@ type WireAnimation = {
 	hiddenLayers?: MapLayerGroup[];
 	buildings3d?: boolean;
 	sun?: Sun;
+	projection?: MapProjection;
 };
 
 // ---------------------------------------------------------------------------
@@ -190,6 +196,15 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => sunCodec.encode(v.sun!, w),
 		decode: (v, r) => {
 			v.sun = sunCodec.decode(r);
+		}
+	},
+	{
+		bit: 7,
+		label: 'projection',
+		shouldEmit: (v) => v.projection !== undefined && v.projection !== DEFAULT_MAP_PROJECTION,
+		encode: (v, w) => projectionCodec.encode(v.projection!, w),
+		decode: (v, r) => {
+			v.projection = projectionCodec.decode(r);
 		}
 	}
 ];

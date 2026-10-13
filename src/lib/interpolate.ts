@@ -1,4 +1,10 @@
-import { cameraOf, type CameraState, type Keyframe } from './types';
+import {
+	cameraOf,
+	MAX_CAMERA_LATITUDE,
+	type CameraState,
+	type Keyframe,
+	type MapProjection
+} from './types';
 
 /** Standard cubic ease-in-out on [0, 1]. */
 export function easeInOut(t: number): number {
@@ -72,32 +78,22 @@ function zoomAtWidth(w: number): number {
 	return Math.log2(360 / w);
 }
 
-function vanWijkSample(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number): ZoomedPosition {
-	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
-	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
-
-	const dlng = shortestLngDelta(kfA.lng, kfB.lng);
-	const my0 = latToMercatorY(kfA.lat);
-	const my1 = latToMercatorY(kfB.lat);
-	const dmy = my1 - my0;
-
-	const w0 = widthAtZoom(kfA.zoom);
-	const w1 = widthAtZoom(kfB.zoom);
-	const u_dist = Math.hypot(dlng, dmy);
-
+/**
+ * The van Wijk trajectory itself, free of any projection: travelling a ground
+ * distance `uDist` while the visible width goes from `w0` to `w1` (same
+ * units), where are we at `alpha` — how far along (`du`) and how wide (`w`)?
+ */
+function vanWijk(uDist: number, w0: number, w1: number, alpha: number): { du: number; w: number } {
 	// Pure zoom (no horizontal travel): geometric interpolation in width keeps
 	// the apparent zoom rate constant, which is what users expect.
-	if (u_dist < 1e-9) {
-		const w = w0 * Math.pow(w1 / w0, alpha);
-		return { lng: kfA.lng, lat: kfA.lat, zoom: zoomAtWidth(w) };
-	}
+	if (uDist < 1e-9) return { du: 0, w: w0 * Math.pow(w1 / w0, alpha) };
 
 	const rho = RHO;
 	const rho2 = rho * rho;
 	const rho4 = rho2 * rho2;
 
-	const b0 = (w1 * w1 - w0 * w0 + rho4 * u_dist * u_dist) / (2 * w0 * rho2 * u_dist);
-	const b1 = (w1 * w1 - w0 * w0 - rho4 * u_dist * u_dist) / (2 * w1 * rho2 * u_dist);
+	const b0 = (w1 * w1 - w0 * w0 + rho4 * uDist * uDist) / (2 * w0 * rho2 * uDist);
+	const b1 = (w1 * w1 - w0 * w0 - rho4 * uDist * uDist) / (2 * w1 * rho2 * uDist);
 	const r0 = Math.log(-b0 + Math.sqrt(b0 * b0 + 1));
 	const r1 = Math.log(-b1 + Math.sqrt(b1 * b1 + 1));
 	const S = (r1 - r0) / rho;
@@ -107,27 +103,161 @@ function vanWijkSample(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number):
 	const sinh_r0 = Math.sinh(r0);
 	const arg = rho * s + r0;
 
-	const du = (w0 / rho2) * (cosh_r0 * Math.tanh(arg) - sinh_r0);
-	const w = (w0 * cosh_r0) / Math.cosh(arg);
+	return {
+		du: (w0 / rho2) * (cosh_r0 * Math.tanh(arg) - sinh_r0),
+		w: (w0 * cosh_r0) / Math.cosh(arg)
+	};
+}
 
-	const dirLng = dlng / u_dist;
-	const dirMy = dmy / u_dist;
+function vanWijkSample(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number): ZoomedPosition {
+	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
+	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
 
-	const lng = normalizeLng(kfA.lng + du * dirLng);
-	const lat = mercatorYToLat(my0 + du * dirMy);
+	const dlng = shortestLngDelta(kfA.lng, kfB.lng);
+	const my0 = latToMercatorY(kfA.lat);
+	const my1 = latToMercatorY(kfB.lat);
+	const dmy = my1 - my0;
+	const u_dist = Math.hypot(dlng, dmy);
+
+	const { du, w } = vanWijk(u_dist, widthAtZoom(kfA.zoom), widthAtZoom(kfB.zoom), alpha);
+	if (u_dist < 1e-9) return { lng: kfA.lng, lat: kfA.lat, zoom: zoomAtWidth(w) };
+
+	const lng = normalizeLng(kfA.lng + (du * dlng) / u_dist);
+	const lat = mercatorYToLat(my0 + (du * dmy) / u_dist);
 	return { lng, lat, zoom: zoomAtWidth(w) };
 }
 
-export function interpolateKeyframes(kfA: Keyframe, kfB: Keyframe, alpha: number): CameraState {
+// ---------------------------------------------------------------------------
+// Globe
+// ---------------------------------------------------------------------------
+//
+// MapLibre sizes the globe so that the map *at the centre* has the scale
+// Mercator has there at the same zoom: radius ∝ 2^zoom / cos(lat). A camera
+// that keeps its zoom while moving towards a pole therefore sees the globe
+// grow. What stays put on screen is the "globe zoom" below — the zoom the
+// same globe size has at the equator — so that is what gets interpolated,
+// and the trajectory follows the great circle instead of the straight line
+// of the Mercator plane.
+
+const DEG = Math.PI / 180;
+
+function clampLat(lat: number): number {
+	return Math.max(-MAX_CAMERA_LATITUDE, Math.min(MAX_CAMERA_LATITUDE, lat));
+}
+
+/** log2 of the factor by which the globe is bigger at `lat` than at the equator, zoom being equal. */
+function globeZoomShift(lat: number): number {
+	return -Math.log2(Math.cos(clampLat(lat) * DEG));
+}
+
+/** MapLibre zoom → size of the globe, as the zoom that size has at the equator. */
+export function toGlobeZoom(zoom: number, lat: number): number {
+	return zoom + globeZoomShift(lat);
+}
+
+/** Inverse of `toGlobeZoom`. */
+export function fromGlobeZoom(globeZoom: number, lat: number): number {
+	return globeZoom - globeZoomShift(lat);
+}
+
+type Vec3 = [number, number, number];
+
+function toVector(lng: number, lat: number): Vec3 {
+	const cosLat = Math.cos(lat * DEG);
+	return [cosLat * Math.cos(lng * DEG), cosLat * Math.sin(lng * DEG), Math.sin(lat * DEG)];
+}
+
+/** Point at fraction `f` of the great circle from A to B, spanning `angle` radians. */
+function greatCirclePoint(
+	a: Vec3,
+	b: Vec3,
+	angle: number,
+	f: number
+): { lng: number; lat: number } {
+	const sin = Math.sin(angle);
+	const ka = Math.sin((1 - f) * angle) / sin;
+	const kb = Math.sin(f * angle) / sin;
+	const x = ka * a[0] + kb * b[0];
+	const y = ka * a[1] + kb * b[1];
+	const z = ka * a[2] + kb * b[2];
+	return { lng: Math.atan2(y, x) / DEG, lat: Math.atan2(z, Math.hypot(x, y)) / DEG };
+}
+
+function globeArcSample(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: number): ZoomedPosition {
+	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
+	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
+
+	const a = toVector(kfA.lng, kfA.lat);
+	const b = toVector(kfB.lng, kfB.lat);
+	const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+	const angle = Math.acos(dot);
+	const { du, w } = vanWijk(
+		angle / DEG,
+		widthAtZoom(toGlobeZoom(kfA.zoom, kfA.lat)),
+		widthAtZoom(toGlobeZoom(kfB.zoom, kfB.lat)),
+		alpha
+	);
+
+	let pos: { lng: number; lat: number };
+	if (angle < 1e-9) {
+		pos = { lng: kfA.lng, lat: kfA.lat };
+	} else if (Math.PI - angle < 1e-6) {
+		// Antipodes: every great circle connects them, so there is no "the"
+		// route. Fall back to the plain lng/lat line.
+		const f = du / (angle / DEG);
+		pos = {
+			lng: normalizeLng(kfA.lng + shortestLngDelta(kfA.lng, kfB.lng) * f),
+			lat: lerp(kfA.lat, kfB.lat, f)
+		};
+	} else {
+		pos = greatCirclePoint(a, b, angle, du / (angle / DEG));
+	}
+	// A route over a pole leaves the latitudes the camera can sit at.
+	const lat = clampLat(pos.lat);
+	return { lng: pos.lng, lat, zoom: fromGlobeZoom(zoomAtWidth(w), lat) };
+}
+
+function globeLinearSample(
+	kfA: ZoomedPosition,
+	kfB: ZoomedPosition,
+	alpha: number
+): ZoomedPosition {
+	if (alpha <= 0) return { lng: kfA.lng, lat: kfA.lat, zoom: kfA.zoom };
+	if (alpha >= 1) return { lng: kfB.lng, lat: kfB.lat, zoom: kfB.zoom };
+	const lat = lerp(kfA.lat, kfB.lat, alpha);
+	const globeZoom = lerp(toGlobeZoom(kfA.zoom, kfA.lat), toGlobeZoom(kfB.zoom, kfB.lat), alpha);
+	return {
+		lng: normalizeLng(kfA.lng + shortestLngDelta(kfA.lng, kfB.lng) * alpha),
+		lat,
+		zoom: fromGlobeZoom(globeZoom, lat)
+	};
+}
+
+/**
+ * `projection` picks the geometry the camera travels in — see the Globe
+ * section above. The keyframes themselves mean the same in both.
+ */
+export function interpolateKeyframes(
+	kfA: Keyframe,
+	kfB: Keyframe,
+	alpha: number,
+	projection: MapProjection = 'mercator'
+): CameraState {
 	const eased = easeInOut(alpha);
 	// `path` lives on the *origin* keyframe and describes the shape of the
 	// trajectory leaving it. `linear` is a direct lerp through
 	// (lng, lat, zoom) — the right choice for tiny moves where van Wijk's
 	// out-and-back arc feels theatrical.
 	const useArc = (kfA.path ?? 'arc') !== 'linear';
-	const { lng, lat, zoom } = useArc
-		? vanWijkSample(kfA, kfB, eased)
-		: linearLngLatZoom(kfA, kfB, eased);
+	const onGlobe = projection === 'globe';
+	const sample = useArc
+		? onGlobe
+			? globeArcSample
+			: vanWijkSample
+		: onGlobe
+			? globeLinearSample
+			: linearLngLatZoom;
+	const { lng, lat, zoom } = sample(kfA, kfB, eased);
 	return {
 		lng,
 		lat,
@@ -154,7 +284,11 @@ function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: numbe
  * Returns null if the array is empty. Holds the first/last keyframe outside
  * the defined range (US-defined "hold last frame" behavior).
  */
-export function sampleAt(keyframes: Keyframe[], t: number): CameraState | null {
+export function sampleAt(
+	keyframes: Keyframe[],
+	t: number,
+	projection: MapProjection = 'mercator'
+): CameraState | null {
 	if (keyframes.length === 0) return null;
 	if (keyframes.length === 1 || t <= keyframes[0].t) return cameraOf(keyframes[0]);
 	const last = keyframes[keyframes.length - 1];
@@ -165,7 +299,7 @@ export function sampleAt(keyframes: Keyframe[], t: number): CameraState | null {
 		if (t >= a.t && t <= b.t) {
 			const span = b.t - a.t;
 			const alpha = span > 0 ? (t - a.t) / span : 0;
-			return interpolateKeyframes(a, b, alpha);
+			return interpolateKeyframes(a, b, alpha, projection);
 		}
 	}
 	return cameraOf(last);

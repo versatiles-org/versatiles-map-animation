@@ -103,6 +103,13 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(validateAnimation(minimalAnim)).not.toHaveProperty('sun');
 	});
 
+	it('reads a known projection and leaves the default out', () => {
+		expect(validateAnimation({ ...minimalAnim, projection: 'globe' }).projection).toBe('globe');
+		for (const projection of ['mercator', 'albers', 1, null]) {
+			expect(validateAnimation({ ...minimalAnim, projection })).not.toHaveProperty('projection');
+		}
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

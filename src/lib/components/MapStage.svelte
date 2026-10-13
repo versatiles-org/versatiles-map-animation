@@ -27,6 +27,7 @@
 		DEFAULT_LABEL_POSITION,
 		DEFAULT_MAP_THEMES,
 		MAP_REFERENCE_WIDTH,
+		MAX_CAMERA_LATITUDE,
 		type Annotation,
 		type CameraState,
 		type LabelPosition
@@ -337,9 +338,16 @@
 	let shownStyleOptions: MapStyleOptions | null = null;
 
 	onMount(async () => {
+		// Building the style waits for the TileJSON. Whatever changes in the
+		// meantime (the viewer's `?t=` seek, an early click in the editor) finds
+		// no map to act on, so read options and camera only once it is done.
+		let initialOptions: MapStyleOptions;
+		let style: maplibregl.StyleSpecification;
+		do {
+			initialOptions = untrack(() => store.mapStyleOptions);
+			style = await buildMapStyle(initialOptions);
+		} while (initialOptions !== untrack(() => store.mapStyleOptions));
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
-		const initialOptions = untrack(() => store.mapStyleOptions);
-		const style = await buildMapStyle(initialOptions);
 		// Compute the zoom offset from the container directly — `zoomOffset()`
 		// can't run yet because `map` doesn't exist.
 		const initialOffset =
@@ -366,6 +374,7 @@
 			maxTileCacheZoomLevels: 20,
 			refreshExpiredTiles: false
 		});
+		if (initialOptions.projection === 'globe') map.setTransformConstrain(constrainGlobe);
 		if (testMode) {
 			(window as unknown as { __viewer_map: maplibregl.Map }).__viewer_map = map;
 		}
@@ -470,6 +479,26 @@
 		const cam = store.sampledCamera;
 		if (!cam || !map) return;
 		applyCamera(cam);
+	});
+
+	/**
+	 * On the globe MapLibre lets the centre slide past the Mercator edge up to
+	 * the pole, how far depending on zoom and viewport. Keep it inside the
+	 * latitudes a keyframe can hold, so what the editor shows is what gets
+	 * stored. Zoom limits are those of MapLibre's own globe constraint.
+	 */
+	const constrainGlobe: maplibregl.TransformConstrainFunction = (lngLat, zoom) => {
+		const lat = Math.max(-MAX_CAMERA_LATITUDE, Math.min(MAX_CAMERA_LATITUDE, lngLat.lat));
+		const minZoom = (map?.getMinZoom() ?? -2) + Math.log2(Math.cos((lat * Math.PI) / 180));
+		return {
+			center: lat === lngLat.lat ? lngLat : new maplibregl.LngLat(lngLat.lng, lat),
+			zoom: Math.max(minZoom, Math.min(map?.getMaxZoom() ?? 22, zoom))
+		};
+	};
+	$effect(() => {
+		const onGlobe = store.projection === 'globe';
+		if (!map || !initialStyleApplied) return;
+		map.setTransformConstrain(onGlobe ? constrainGlobe : null);
 	});
 
 	// effect: rebuild the map style whenever one of its options changes.

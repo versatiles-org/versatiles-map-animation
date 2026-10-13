@@ -22,6 +22,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 ### Map style
 
 - Style: OSM vector map or `satellite`.
+- Projection: Mercator (default) or globe. On the globe the camera travels along great circles and the globe keeps its size while it turns; it blends into Mercator as you zoom in. The camera centre stays within ±85.05° latitude, so the poles are in view but never dead centre.
 - Theme: 24 colour themes for the OSM map — `colorful` (default), `natural`, `muted`, `gray`, `toner`, each with a `-dark` variant, plus lookalikes of other well-known maps. On satellite the theme colours the overlay.
 - Toggle all labels and icons (or, for satellite, the OSM overlay on top).
 - Switch individual layer groups on and off: land cover, water, roads, transit, buildings, sites, airports, boundaries, names, POIs, road markings.
@@ -89,6 +90,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"labels": true, // all names and symbols (OSM map) or overlay (satellite)
 	"hiddenLayers": ["buildings", "pois"], // optional: layer groups switched off, see MAP_LAYER_GROUPS in src/lib/types.ts
 	"buildings3d": false, // optional: buildings as 3D blocks (OSM map only)
+	"projection": "mercator", // optional: "mercator" | "globe"
 	"sun": { "direction": 210, "altitude": 60 }, // optional: where the light comes from, in whole degrees (clockwise from north, above the horizon)
 	"terrain": false,
 	"sky": false,

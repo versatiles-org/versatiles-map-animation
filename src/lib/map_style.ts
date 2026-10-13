@@ -4,7 +4,7 @@ import type {
 	SpriteSpecification,
 	StyleSpecification
 } from 'maplibre-gl';
-import { DEFAULT_MAP_THEMES, type Animation } from './types';
+import { DEFAULT_MAP_PROJECTION, DEFAULT_MAP_THEMES, type Animation } from './types';
 
 /**
  * The animation-level fields that decide what the base map style looks like.
@@ -13,7 +13,15 @@ import { DEFAULT_MAP_THEMES, type Animation } from './types';
  */
 export type MapStyleOptions = Pick<
 	Animation,
-	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'buildings3d' | 'sun' | 'terrain' | 'sky'
+	| 'style'
+	| 'theme'
+	| 'labels'
+	| 'hiddenLayers'
+	| 'buildings3d'
+	| 'sun'
+	| 'projection'
+	| 'terrain'
+	| 'sky'
 >;
 
 type HillshadePaint = NonNullable<HillshadeLayerSpecification['paint']>;
@@ -148,9 +156,13 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 	const theme = options.theme ?? DEFAULT_MAP_THEMES[id];
 	// `layers` option of the builders: every hidden group set to `false`.
 	const hidden = Object.fromEntries((options.hiddenLayers ?? []).map((group) => [group, false]));
-	// The builders default to the `globe` projection; our camera maths, URL
-	// state and renderer all assume Web Mercator, so pin it explicitly.
-	const common = { urls: { base: TILES_BASE_URL }, sky: false, projection: 'mercator' } as const;
+	// The builders default to the `globe` projection; ours is Web Mercator
+	// unless the animation asks for the globe, so always set it explicitly.
+	const common = {
+		urls: { base: TILES_BASE_URL },
+		sky: false,
+		projection: options.projection ?? DEFAULT_MAP_PROJECTION
+	} as const;
 	switch (id) {
 		case 'colorful':
 			// "Labels off" strips every symbol layer (place names, POIs,
