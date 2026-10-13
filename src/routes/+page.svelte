@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
 	import { AnimationStore } from '#lib/animation.svelte.ts';
-	import { aspectRatioValue } from '#lib/types.ts';
+	import { History } from '#lib/history.svelte.ts';
+	import { aspectRatioValue, type Animation } from '#lib/types.ts';
 	import {
 		clearUrlHash,
 		readAnimationFromStorage,
@@ -44,6 +45,31 @@
 		clearUrlHash();
 	}
 
+	// Undo and redo. A change becomes a step once the animation has been left
+	// alone for a moment, so dragging a keyframe or a slider is one step and
+	// not one per pixel.
+	const history = new History<Animation>();
+	history.record(store.toAnimation());
+	const HISTORY_PAUSE_MS = 400;
+	let unrecorded: Animation | null = null;
+	let historyTimer: ReturnType<typeof setTimeout> | undefined;
+	function recordStep() {
+		if (historyTimer) clearTimeout(historyTimer);
+		if (unrecorded) history.record(unrecorded);
+		unrecorded = null;
+	}
+	function undo() {
+		// What was changed just now is a step too, and the one to take back.
+		recordStep();
+		const anim = history.undo();
+		if (anim) store.restoreAnimation(anim);
+	}
+	function redo() {
+		recordStep();
+		const anim = history.redo();
+		if (anim) store.restoreAnimation(anim);
+	}
+
 	let urlTimer: ReturnType<typeof setTimeout> | undefined;
 	$effect(() => {
 		// Serialising here (not inside the timer) is what makes the effect track
@@ -55,10 +81,32 @@
 			writeAnimationToUrl(anim);
 			writeAnimationToStorage(anim);
 		}, 250);
+		unrecorded = anim;
+		if (historyTimer) clearTimeout(historyTimer);
+		historyTimer = setTimeout(recordStep, HISTORY_PAUSE_MS);
 		return () => {
 			if (urlTimer) clearTimeout(urlTimer);
 		};
 	});
+
+	/** Is the key meant for a field the user is typing in? */
+	function isTyping(e: KeyboardEvent): boolean {
+		const target = e.target as HTMLElement | null;
+		return (
+			target?.matches(
+				'input:not([type="range"], [type="checkbox"], [type="radio"], [type="color"]), textarea, select, [contenteditable="true"]'
+			) ?? false
+		);
+	}
+	function handleKeydown(e: KeyboardEvent) {
+		if (isTyping(e)) return;
+		const key = e.key.toLowerCase();
+		if ((e.metaKey || e.ctrlKey) && !e.altKey && (key === 'z' || key === 'y')) {
+			e.preventDefault();
+			if (key === 'y' || e.shiftKey) redo();
+			else undo();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -70,6 +118,8 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <main class="page">
 	{#if urlError}
 		<div class="banner" role="alert">
@@ -80,7 +130,7 @@
 		</div>
 	{/if}
 
-	<TopBar {store} />
+	<TopBar {store} canUndo={history.canUndo} canRedo={history.canRedo} onUndo={undo} onRedo={redo} />
 
 	<div class="body">
 		<Sidebar {store} />

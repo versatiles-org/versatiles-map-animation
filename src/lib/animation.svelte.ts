@@ -566,6 +566,27 @@ export class AnimationStore {
 		this.isPlaying = false;
 	}
 
+	/**
+	 * Put back an earlier state of this animation (undo, redo). Unlike
+	 * `loadFromAnimation`, which starts on something new, the editor stays
+	 * where it is: the playhead and what is selected are kept as far as they
+	 * still exist.
+	 */
+	restoreAnimation(anim: Animation): void {
+		const { currentTime, selectedIndex, selectedAnnotationIndex, selectedMoveStart } = this;
+		this.loadFromAnimation(anim);
+		this.currentTime = Math.min(currentTime, this.totalDuration);
+		if (selectedIndex !== null && selectedIndex < this.keyframes.length) {
+			this.selectedIndex = selectedIndex;
+		}
+		if (selectedAnnotationIndex !== null && selectedAnnotationIndex < this.annotations.length) {
+			this.selectedAnnotationIndex = selectedAnnotationIndex;
+		}
+		if (this.moves.some((move) => move.start === selectedMoveStart)) {
+			this.selectedMoveStart = selectedMoveStart;
+		}
+	}
+
 	toAnimation(): Animation {
 		return {
 			version: SCHEMA_VERSION,

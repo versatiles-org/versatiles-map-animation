@@ -673,6 +673,28 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s.selectedMove).toBeNull();
 	});
 
+	it('restores an earlier state and stays where the editor was', () => {
+		const s = new AnimationStore();
+		const kf = (t: number) => ({ t, lng: t * 10, lat: 0, zoom: 5, pitch: 0, bearing: 0, roll: 0 });
+		s.loadFromAnimation({ ...s.toAnimation(), keyframes: [kf(0), kf(2), kf(4)] });
+		const before = s.toAnimation();
+		s.selectAt(2);
+		s.seekTo(3);
+		s.deleteAt(2);
+		s.restoreAnimation(before);
+		expect(s.keyframes).toHaveLength(3);
+		expect(s.currentTime).toBe(3);
+		// What no longer exists is not selected, and the playhead stays inside.
+		s.selectAt(2);
+		s.seekTo(4);
+		s.restoreAnimation({ ...before, keyframes: [kf(0), kf(2)] });
+		expect(s.selectedIndex).toBeNull();
+		expect(s.currentTime).toBe(2);
+		s.selectMove(0);
+		s.restoreAnimation(before);
+		expect(s.selectedMove?.start).toBe(0);
+	});
+
 	it('sets how a stop eases, and drops it with the default or on a waypoint', () => {
 		const s = new AnimationStore();
 		const kf = (t: number) => ({ t, lng: t * 10, lat: 0, zoom: 5, pitch: 0, bearing: 0, roll: 0 });

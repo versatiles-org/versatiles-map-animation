@@ -188,7 +188,7 @@
 
 	/**
 	 * How far the pointer has to travel before a press on a keyframe becomes
-	 * a drag. A click is rarely perfectly still, and there is no undo.
+	 * a drag. A click is rarely perfectly still, and should not move anything.
 	 */
 	const DRAG_THRESHOLD_PX = 4;
 

@@ -15,7 +15,23 @@
 	import Icon from './Icon.svelte';
 	import VideoDialog from './VideoDialog.svelte';
 
-	let { store }: { store: AnimationStore } = $props();
+	let {
+		store,
+		canUndo,
+		canRedo,
+		onUndo,
+		onRedo
+	}: {
+		store: AnimationStore;
+		canUndo: boolean;
+		canRedo: boolean;
+		onUndo: () => void;
+		onRedo: () => void;
+	} = $props();
+
+	/** The key that goes with Z for undo: ⌘ on a Mac, Ctrl elsewhere. */
+	const MOD =
+		typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
 	let fileInput: HTMLInputElement;
 	let menuEl = $state<HTMLDetailsElement | undefined>(undefined);
@@ -139,6 +155,27 @@
 		</div>
 	</details>
 
+	<div class="history" role="group" aria-label="Undo and redo">
+		<button
+			type="button"
+			onclick={onUndo}
+			disabled={!canUndo}
+			aria-label="Undo"
+			title="Undo ({MOD}Z)"
+		>
+			<Icon name="undo" />
+		</button>
+		<button
+			type="button"
+			onclick={onRedo}
+			disabled={!canRedo}
+			aria-label="Redo"
+			title="Redo ({MOD === '⌘' ? '⇧⌘Z' : 'Ctrl+Y'})"
+		>
+			<Icon name="redo" />
+		</button>
+	</div>
+
 	<div class="spacer"></div>
 
 	{#if status}
@@ -217,6 +254,7 @@
 	.spacer {
 		flex: 1 1 auto;
 	}
+	.history,
 	.outputs {
 		display: flex;
 		gap: 0.25rem;

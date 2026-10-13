@@ -19,6 +19,8 @@
 		check: { stroke: 'M3 8.5l3.2 3.2L13 4.8' },
 		copy: { stroke: 'M6 6h7.5v7.5H6z M10 6V2.5H2.5V10H6' },
 		// Back to where it was: an arrow turning counter-clockwise.
+		undo: { stroke: 'M5.5 3.5 2.5 6.5l3 3 M2.5 6.5h7a3.5 3.5 0 0 1 0 7H6' },
+		redo: { stroke: 'M10.5 3.5l3 3-3 3 M13.5 6.5h-7a3.5 3.5 0 0 0 0 7H10' },
 		reset: { stroke: 'M3.6 5.6A5 5 0 1 1 3 8 M3.2 2.4v3.3h3.3' },
 		// The corners of a viewfinder around its centre: "what the map shows now".
 		view: {
