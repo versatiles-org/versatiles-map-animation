@@ -287,18 +287,40 @@
 		const alpha = 0.55 + (0.45 * (speed - SPEED_FAST)) / (SPEED_VERY_FAST - SPEED_FAST);
 		return `rgba(255, 165, 40, ${alpha.toFixed(2)})`;
 	}
-	function speedTint(move: Move): { peak: number; gradient: string | null } {
+	/** Moments per move at which its speed is measured. */
+	const SPEED_SAMPLES = 64;
+	function speedTint(move: Move): { profile: number[]; peak: number; gradient: string | null } {
 		const from = departureOf(store.keyframes[move.start]);
 		const to = store.keyframes[move.end].t;
-		const profile = speedProfile(store.keyframes, store.projection, from, to);
+		const profile = speedProfile(store.keyframes, store.projection, from, to, SPEED_SAMPLES);
 		const peak = Math.max(0, ...profile);
-		if (peak < SPEED_FAST) return { peak, gradient: null };
+		if (peak < SPEED_FAST) return { profile, peak, gradient: null };
 		const stops = profile.map(
 			(speed, i) => `${speedColor(speed)} ${(((i + 0.5) / profile.length) * 100).toFixed(1)}%`
 		);
-		return { peak, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
+		return { profile, peak, gradient: `linear-gradient(to right, ${stops.join(', ')})` };
 	}
 	const speedTints = $derived(store.moves.map(speedTint));
+	/**
+	 * The speed that reaches the top of a band. The same for every move, so
+	 * their curves compare: a little above the peak of the fastest one — but
+	 * not so low that an animation that hardly moves looks like it races.
+	 */
+	const speedScale = $derived(
+		1.1 * Math.max(SPEED_FAST / 3, ...speedTints.map((tint) => tint.peak))
+	);
+	/**
+	 * The speed of a move over its time as the outline of an area, in a box
+	 * as wide as the profile is long and 1 high (y points down, as in SVG).
+	 */
+	function speedCurve(profile: number[]): string {
+		if (profile.length === 0) return '';
+		const y = (speed: number) => (1 - Math.min(1, speed / speedScale)).toFixed(3);
+		// Each value is the speed over one interval: drawn at its middle, and
+		// carried on level to the two ends of the move.
+		const points = profile.map((speed, i) => `L${i + 0.5},${y(speed)}`).join('');
+		return `M0,1L0,${y(profile[0])}${points}L${profile.length},${y(profile.at(-1)!)}L${profile.length},1Z`;
+	}
 	function speedNote(peak: number): string {
 		if (peak < SPEED_FAST) return '';
 		const word = peak >= SPEED_VERY_FAST ? 'very fast' : 'fast';
@@ -464,6 +486,16 @@
 					move.kind
 				]}"
 			>
+				{#if tint}
+					<svg
+						class="curve-of-speed"
+						viewBox="0 0 {tint.profile.length} 1"
+						preserveAspectRatio="none"
+						aria-hidden="true"
+					>
+						<path d={speedCurve(tint.profile)} />
+					</svg>
+				{/if}
 				<!-- One icon per stretch between two keyframes: a move through
 				     waypoints shows its curve between each pair of them. -->
 				{#each { length: move.end - move.start }, s (s)}
@@ -751,6 +783,24 @@
 		@container (max-width: 40px) {
 			:global(svg) {
 				display: none;
+			}
+		}
+		/* How fast the picture moves over the time of the move, as an area
+		   behind the icons — see `speedCurve`. */
+		.curve-of-speed {
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+
+			path {
+				fill: currentColor;
+				fill-opacity: 0.22;
+				stroke: currentColor;
+				stroke-opacity: 0.7;
+				stroke-width: 1;
+				vector-effect: non-scaling-stroke;
 			}
 		}
 		/* Strip that marks where the picture moves too fast — see `speedTint`. */

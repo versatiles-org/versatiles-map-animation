@@ -152,7 +152,18 @@ describe('speedProfile', () => {
 	it('halves when the same move takes twice as long', () => {
 		const quick = Math.max(...speedProfile([kf(0, 0), kf(2, 1)], 'mercator', 0, 2));
 		const slow = Math.max(...speedProfile([kf(0, 0), kf(4, 1)], 'mercator', 0, 4));
-		expect(quick / slow).toBeCloseTo(2, 6);
+		// Measured over a frame, which is a larger part of the quick move.
+		expect(quick / slow).toBeCloseTo(2, 3);
+	});
+
+	it('does not read higher with fewer samples, also while the camera zooms', () => {
+		const dive = [kf(0, 0, { zoom: 2 }), kf(4, 1, { zoom: 12 })];
+		const peak = (samples: number) => Math.max(...speedProfile(dive, 'mercator', 0, 4, samples));
+		// Few samples may miss the fastest moment, but never exaggerate it.
+		for (const samples of [8, 16, 64]) {
+			expect(peak(samples)).toBeLessThan(peak(256) * 1.001);
+			expect(peak(samples)).toBeGreaterThan(peak(256) * 0.7);
+		}
 	});
 
 	it('is flat through evenly spaced waypoints', () => {

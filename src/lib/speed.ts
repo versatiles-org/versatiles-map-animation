@@ -4,9 +4,15 @@ import type { Keyframe, MapProjection } from './types';
 
 export { screenSpeed, SPEED_FAST, SPEED_VERY_FAST } from './screen_speed';
 
+/** The longest stretch of time a speed is measured over, in seconds: a frame of video. */
+const SPEED_FRAME = 1 / 60;
+
 /**
  * The speed of the picture at `samples` evenly spaced moments between the
- * times `from` and `to` of an animation.
+ * times `from` and `to` of an animation: at the middle of each of that many
+ * intervals, over the frame around it. Not over the whole interval — while
+ * the camera zooms, how far the picture has moved after a long step says
+ * little about how fast it moves, and reads far too high.
  */
 export function speedProfile(
 	keyframes: Keyframe[],
@@ -17,12 +23,13 @@ export function speedProfile(
 ): number[] {
 	const step = (to - from) / samples;
 	if (!(step > 0)) return [];
+	const dt = Math.min(step, SPEED_FRAME);
 	const out: number[] = [];
-	let prev = sampleAt(keyframes, from, projection);
-	for (let i = 1; i <= samples; i++) {
-		const next = sampleAt(keyframes, from + i * step, projection);
-		out.push(prev && next ? screenSpeed(prev, next, step) : 0);
-		prev = next;
+	for (let i = 0; i < samples; i++) {
+		const start = from + (i + 0.5) * step - dt / 2;
+		const prev = sampleAt(keyframes, start, projection);
+		const next = sampleAt(keyframes, start + dt, projection);
+		out.push(prev && next ? screenSpeed(prev, next, dt) : 0);
 	}
 	return out;
 }
