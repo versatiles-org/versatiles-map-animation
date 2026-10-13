@@ -19,6 +19,23 @@ updates:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
 
+  # The renderer's own dependencies (render/package.json): Playwright, which
+  # the image installs with `npm ci`. A new Playwright brings a new Chromium,
+  # so such an update can change the rendered picture, and the browser may
+  # need a system library that is not yet on the list in render/Dockerfile.
+  - package-ecosystem: npm
+    directory: '/render'
+    schedule:
+      interval: weekly
+    groups:
+      npm-render:
+        patterns:
+          - '*'
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+
   # The base images of the renderer image (render/Dockerfile).
   - package-ecosystem: docker
     directory: '/render'
