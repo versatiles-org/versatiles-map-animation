@@ -3,9 +3,10 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import type { PathStyle } from '../types';
+	import { DEFAULT_PATH, PATH_STYLE_LABELS, PATH_STYLES } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
+	import PathIcon from './PathIcon.svelte';
 	import VideoDialog from './VideoDialog.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -137,6 +138,11 @@
 
 	const hasSelection = $derived(store.selectedIndex !== null);
 	const hasKeyframes = $derived(store.keyframes.length > 0);
+	// The path belongs to the segment *leaving* the selected keyframe.
+	const pathDisabled = $derived(
+		!hasSelection || store.selectedIndex === store.keyframes.length - 1
+	);
+	const selectedPath = $derived(store.selectedKeyframe?.path ?? DEFAULT_PATH);
 	const canPlay = $derived(store.keyframes.length >= 2);
 </script>
 
@@ -162,28 +168,34 @@
 		>
 			✕ Delete
 		</button>
-		<label
-			class="control-label path-picker"
-			title="Trajectory from the selected keyframe to the next one. Arc and Linear come to rest at each keyframe; consecutive Spline segments fly through their keyframes without stopping."
+		<div
+			class="path-picker"
+			role="radiogroup"
+			aria-label="Path from the selected keyframe to the next one"
+			title={pathDisabled
+				? hasSelection
+					? 'The last keyframe has no path leaving it'
+					: 'Select a keyframe to set the path leaving it'
+				: undefined}
 		>
 			<span class="lbl">Path →</span>
-			<select
-				value={store.selectedKeyframe?.path ?? 'arc'}
-				disabled={!hasSelection || store.selectedIndex === store.keyframes.length - 1}
-				onchange={(e) => {
-					if (store.selectedIndex !== null) {
-						store.setKeyframePath(
-							store.selectedIndex,
-							(e.currentTarget as HTMLSelectElement).value as PathStyle
-						);
-					}
-				}}
-			>
-				<option value="arc">⌒ Arc</option>
-				<option value="linear">— Linear</option>
-				<option value="spline">∿ Spline</option>
-			</select>
-		</label>
+			{#each PATH_STYLES as path (path)}
+				<button
+					type="button"
+					role="radio"
+					aria-checked={!pathDisabled && selectedPath === path}
+					class:active={!pathDisabled && selectedPath === path}
+					disabled={pathDisabled}
+					title={PATH_STYLE_LABELS[path][1]}
+					onclick={() => {
+						if (store.selectedIndex !== null) store.setKeyframePath(store.selectedIndex, path);
+					}}
+				>
+					<PathIcon {path} />
+					{PATH_STYLE_LABELS[path][0]}
+				</button>
+			{/each}
+		</div>
 	</div>
 
 	<div class="group" role="group" aria-label="Annotation">
@@ -316,22 +328,16 @@
 			letter-spacing: 0.06em;
 			color: #777;
 		}
-		select {
-			padding: 0.3rem 0.45rem;
-			background: rgba(255, 255, 255, 0.06);
-			border: 1px solid #333;
-			border-radius: 4px;
-			color: #ddd;
-			font-size: 13px;
-			font-family: inherit;
-			cursor: pointer;
+		button {
+			display: inline-flex;
+			align-items: center;
+			gap: 0.3rem;
+			padding: 0.4rem 0.55rem;
 
-			&:hover:not(:disabled) {
+			&.active {
+				background: rgba(74, 158, 255, 0.2);
 				border-color: #4a9eff;
-			}
-			&:disabled {
-				opacity: 0.4;
-				cursor: not-allowed;
+				color: #fff;
 			}
 		}
 	}

@@ -48,6 +48,15 @@ export const MAP_REFERENCE_WIDTH = 1280;
 export const PATH_STYLES = ['arc', 'linear', 'spline'] as const;
 export type PathStyle = (typeof PATH_STYLES)[number];
 export const DEFAULT_PATH: PathStyle = 'arc';
+/** Name and one-line explanation of each trajectory type, for pickers and tooltips. */
+export const PATH_STYLE_LABELS: Record<PathStyle, readonly [string, string]> = {
+	arc: ['Arc', 'Smooth zoom-and-pan that rises on long moves. Comes to rest at each keyframe.'],
+	linear: ['Linear', 'Straight move, best for short distances. Comes to rest at each keyframe.'],
+	spline: [
+		'Spline',
+		'One flowing curve: consecutive Spline segments fly through their keyframes without stopping.'
+	]
+};
 
 export function isPathStyle(value: unknown): value is PathStyle {
 	return typeof value === 'string' && (PATH_STYLES as readonly string[]).includes(value);
