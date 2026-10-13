@@ -3,10 +3,12 @@ import type { Animation } from './types';
 /**
  * 15-second flight westward across Corsica's Monte Cinto massif — the
  * highest range in the Mediterranean. The camera enters from the east just
- * north of the Asco valley, banks WSW to face the spine of the massif,
- * holds there for three seconds, and then tracks across the range before
- * pulling out toward the western coast. Used by the editor's
- * "★ Load example" menu item.
+ * north of the Asco valley, banks WSW to face the spine of the massif and
+ * holds there for three seconds. The second half is one continuous move:
+ * it tracks across the range through two waypoints at an even speed and
+ * only comes to rest at the western coast. Used by the editor's
+ * "★ Load example" menu item — and so a tour of what a path is made of: a
+ * plain move between two stops, a hold, and a move through waypoints.
  *
  * Annotations mark the two summits in view during the hold: they fade in
  * as the camera arrives and out as it leaves.
@@ -39,28 +41,37 @@ export const EXAMPLE_ANIMATION: Animation = {
 			bearing: -111.39718159357824,
 			roll: 0,
 			path: 'linear',
-			// Rest on the view of the massif while the two summit labels show.
 			hold: 3
 		},
 		{
-			t: 9,
+			t: 8,
+			lng: 8.972740905521619,
+			lat: 42.44433144334781,
+			zoom: 12.491358374148188,
+			pitch: 78.10676998329694,
+			bearing: -107.46341213301957,
+			roll: 0,
+			waypoint: true
+		},
+		{
+			t: 10,
 			lng: 8.927959249318633,
 			lat: 42.42334184667922,
 			zoom: 13.037343523200418,
 			pitch: 76.86376111628292,
 			bearing: -107.19999999999982,
 			roll: 0,
-			path: 'linear'
+			waypoint: true
 		},
 		{
 			t: 12,
-			lng: 8.889387884480328,
-			lat: 42.39070248767513,
-			zoom: 13.037343523200418,
-			pitch: 55.85460418718874,
-			bearing: -120.88520077304912,
+			lng: 8.86269699265597,
+			lat: 42.382048859918086,
+			zoom: 13.198243989916337,
+			pitch: 53.801869957155205,
+			bearing: -120.00086500982898,
 			roll: 0,
-			path: 'linear'
+			waypoint: true
 		},
 		{
 			t: 15,

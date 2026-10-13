@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { EXAMPLE_ANIMATION } from './example_animation';
+import { sampleAt } from './interpolate';
 import { screenSpeed, SPEED_FAST, SPEED_VERY_FAST, speedProfile } from './speed';
 import type { CameraState, Keyframe } from './types';
 
@@ -40,17 +42,66 @@ describe('screenSpeed', () => {
 		expect(north / equator).toBeCloseTo(1, 4);
 	});
 
-	it('counts zooming and turning too, and takes the short way round', () => {
-		// One zoom level per second: the edge moves ln 2 × half a frame.
-		expect(screenSpeed(cam(), cam({ zoom: 1 }), 1)).toBeCloseTo(Math.LN2 / 2, 9);
-		expect(screenSpeed(cam({ zoom: 1 }), cam(), 1)).toBeCloseTo(Math.LN2 / 2, 9);
-		// A quarter turn per second: the edge swings π/2 × half a frame.
-		expect(screenSpeed(cam(), cam({ bearing: 90 }), 1)).toBeCloseTo(Math.PI / 4, 9);
-		expect(screenSpeed(cam({ bearing: 170 }), cam({ bearing: -170 }), 1)).toBeCloseTo(
-			screenSpeed(cam(), cam({ bearing: 20 }), 1),
-			9
+	// Root mean square distance of the measuring grid from the frame centre, in
+	// frame widths: what one radian of turning, or a factor e of zooming, moves.
+	const GRID_RADIUS =
+		Math.sqrt((2 * 640 ** 2 + 2 * 320 ** 2) / 5 + (120 ** 2 + 240 ** 2 + 360 ** 2) / 4) / 1280;
+
+	it('counts zooming, turning and rolling by how far they move the picture', () => {
+		const dt = 1e-4;
+		// Zooming scales the picture around its centre: ln 2 per zoom level.
+		expect(screenSpeed(cam(), cam({ zoom: dt }), dt)).toBeCloseTo(GRID_RADIUS * Math.LN2, 3);
+		expect(screenSpeed(cam({ zoom: dt }), cam(), dt)).toBeCloseTo(GRID_RADIUS * Math.LN2, 3);
+		// Turning and rolling swing it around its centre.
+		const perDegree = (GRID_RADIUS * Math.PI) / 180;
+		expect(screenSpeed(cam(), cam({ bearing: dt }), dt)).toBeCloseTo(perDegree, 4);
+		expect(screenSpeed(cam(), cam({ roll: dt }), dt)).toBeCloseTo(perDegree, 4);
+		// …by the short way round.
+		expect(screenSpeed(cam({ bearing: 179.99 }), cam({ bearing: -179.99 }), 1)).toBeCloseTo(
+			screenSpeed(cam(), cam({ bearing: 0.02 }), 1),
+			6
 		);
-		expect(screenSpeed(cam(), cam({ roll: 90 }), 1)).toBeCloseTo(Math.PI / 4, 9);
+	});
+
+	it('counts tilting, and the rush of the foreground under a tilted camera', () => {
+		// Tilting moves the picture too, though less than turning by the same angle.
+		const tilt = screenSpeed(cam({ pitch: 40 }), cam({ pitch: 41 }), 1);
+		expect(tilt).toBeGreaterThan(0.001);
+		expect(tilt).toBeLessThan(screenSpeed(cam({ pitch: 40 }), cam({ pitch: 40, bearing: 1 }), 1));
+		// The same flight straight ahead moves the picture more the steeper the
+		// camera looks at the horizon: the ground close to it is magnified.
+		const ahead = (pitch: number) =>
+			screenSpeed(cam({ zoom: 10, pitch }), cam({ zoom: 10, pitch, lat: 0.001 }), 1);
+		expect(ahead(60)).toBeGreaterThan(ahead(0));
+		expect(ahead(80)).toBeGreaterThan(ahead(60) * 1.2);
+		// Flat, a flight sideways is as fast as one ahead; tilted it is not.
+		const sideways = (pitch: number) =>
+			screenSpeed(cam({ zoom: 10, pitch }), cam({ zoom: 10, pitch, lng: 0.001 }), 1);
+		expect(sideways(0)).toBeCloseTo(ahead(0), 6);
+		expect(Math.abs(sideways(75) / ahead(75) - 1)).toBeGreaterThan(0.2);
+	});
+
+	it('agrees with MapLibre: values measured in the browser on the example flight', () => {
+		// Measured by projecting the same grid of screen points through the real
+		// map at t − 0.05 s and t + 0.05 s, in px/s on a 1280 × 720 frame.
+		const measured: [number, number][] = [
+			[6.25, 158],
+			[7.75, 629],
+			[9.25, 617],
+			[10.75, 651],
+			[13.25, 627],
+			[14.75, 158]
+		];
+		for (const [t, pxPerSecond] of measured) {
+			const a = sampleAt(EXAMPLE_ANIMATION.keyframes, t - 0.05)!;
+			const b = sampleAt(EXAMPLE_ANIMATION.keyframes, t + 0.05)!;
+			expect((screenSpeed(a, b, 0.1) * 1280) / pxPerSecond).toBeCloseTo(1, 1);
+		}
+	});
+
+	it('stays finite when the camera looks along the ground', () => {
+		const flat = screenSpeed(cam({ pitch: 90 }), cam({ pitch: 90, lat: 0.001, bearing: 5 }), 1);
+		expect(Number.isFinite(flat)).toBe(true);
 	});
 
 	it('has thresholds in a sensible order', () => {
