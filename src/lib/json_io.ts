@@ -3,6 +3,8 @@ import {
 	ANIMATION_DEFAULTS,
 	DEFAULT_MAP_PROJECTION,
 	ANNOTATION_STYLE_KEYS,
+	convertLegacySplinePaths,
+	LEGACY_SPLINE_PATH,
 	isAnnotationIcon,
 	isAspectRatio,
 	isDefaultScreenAnchor,
@@ -88,13 +90,13 @@ export function validateAnimation(input: unknown): Animation {
 	if (!Array.isArray(obj.keyframes)) {
 		throw new Error('Invalid file: "keyframes" missing or not an array.');
 	}
-	const keyframes: Keyframe[] = obj.keyframes.map((raw, i) => {
+	const rawKeyframes = obj.keyframes.map((raw, i) => {
 		if (!raw || typeof raw !== 'object') {
 			throw new Error(`Keyframe ${i}: not an object.`);
 		}
 		const o = raw as Record<string, unknown>;
 		const ctx = `Keyframe ${i}`;
-		const kf: Keyframe = {
+		const kf: Parameters<typeof convertLegacySplinePaths>[0][number] = {
 			t: requiredNum(o, 't', ctx),
 			lng: requiredNum(o, 'lng', ctx),
 			lat: requiredNum(o, 'lat', ctx),
@@ -103,9 +105,11 @@ export function validateAnimation(input: unknown): Animation {
 			bearing: requiredNum(o, 'bearing', ctx),
 			roll: requiredNum(o, 'roll', ctx)
 		};
-		if (isPathStyle(o.path)) kf.path = o.path;
+		if (isPathStyle(o.path) || o.path === LEGACY_SPLINE_PATH) kf.path = o.path;
+		if (o.waypoint === true) kf.waypoint = true;
 		return kf;
 	});
+	const keyframes: Keyframe[] = convertLegacySplinePaths(rawKeyframes);
 	const annotations: Annotation[] = Array.isArray(obj.annotations)
 		? obj.annotations.map((raw, i) => validateAnnotation(raw, i))
 		: [];

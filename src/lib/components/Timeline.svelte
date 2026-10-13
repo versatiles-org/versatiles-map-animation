@@ -348,10 +348,11 @@
 				type="button"
 				class="marker"
 				class:selected={store.selectedIndex === i}
+				class:waypoint={kf.waypoint}
 				style="left: {pct(kf.t)}%"
 				onpointerdown={(e) => startDragMarker(e, i)}
-				title="Keyframe {i + 1} at {fmt(kf.t)}s"
-				aria-label="Keyframe {i + 1}"
+				title="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1} at {fmt(kf.t)}s"
+				aria-label="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1}"
 			>
 				<span class="diamond"></span>
 			</button>
@@ -559,6 +560,13 @@
 
 		&.selected .diamond {
 			background: #ffd24a;
+		}
+		/* A waypoint is flown through, so it is a small round dot instead of
+		   the diamond the camera rests on. */
+		&.waypoint .diamond {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
 		}
 	}
 	.diamond {

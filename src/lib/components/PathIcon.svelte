@@ -2,10 +2,11 @@
 	import type { PathStyle } from '../types';
 
 	/**
-	 * Pictogram of a trajectory type: how the camera gets from one keyframe
-	 * (dot) to the next. Drawn in `currentColor`, sized by the `size` prop.
+	 * Pictograms of the camera-path vocabulary: the two travel styles of a
+	 * move, and the two kinds of keyframe. Drawn in `currentColor`, sized by
+	 * the `size` prop.
 	 */
-	let { path, size = 16 }: { path: PathStyle; size?: number } = $props();
+	let { icon, size = 16 }: { icon: PathStyle | 'stop' | 'waypoint'; size?: number } = $props();
 </script>
 
 <svg
@@ -20,19 +21,23 @@
 	stroke-linejoin="round"
 	aria-hidden="true"
 >
-	{#if path === 'arc'}
-		<!-- Up and over: the zoom-out-and-back of the smooth zoom-and-pan. -->
+	{#if icon === 'arc'}
+		<!-- Up and over: the rise and descent of a long move. -->
 		<path d="M2.5 12.5 C2.5 1.5 13.5 1.5 13.5 12.5" />
-		<circle class="dot" cx="2.5" cy="12.5" r="1.6" />
-		<circle class="dot" cx="13.5" cy="12.5" r="1.6" />
-	{:else if path === 'linear'}
-		<path d="M2.5 12.5 L13.5 3.5" />
-		<circle class="dot" cx="2.5" cy="12.5" r="1.6" />
-		<circle class="dot" cx="13.5" cy="3.5" r="1.6" />
+		<circle class="solid" cx="2.5" cy="12.5" r="1.6" />
+		<circle class="solid" cx="13.5" cy="12.5" r="1.6" />
+	{:else if icon === 'linear'}
+		<path d="M2.5 8 H13.5" />
+		<circle class="solid" cx="2.5" cy="8" r="1.6" />
+		<circle class="solid" cx="13.5" cy="8" r="1.6" />
+	{:else if icon === 'stop'}
+		<!-- The path arrives at the keyframe and leaves it again: a rest. -->
+		<path d="M1 8 H3.5 M12.5 8 H15" />
+		<path class="solid" d="M8 4 L12 8 L8 12 L4 8 Z" />
 	{:else}
-		<!-- One curve flowing through a keyframe in the middle. -->
+		<!-- One curve flowing through the keyframe. -->
 		<path d="M2 11.5 C4 3 6.5 3 8 8 S12 13 14 4.5" />
-		<circle class="dot" cx="8" cy="8" r="1.6" />
+		<circle class="solid" cx="8" cy="8" r="1.8" />
 	{/if}
 </svg>
 
@@ -41,7 +46,7 @@
 		display: block;
 		flex: none;
 	}
-	.dot {
+	.solid {
 		fill: currentColor;
 		stroke: none;
 	}

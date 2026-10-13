@@ -138,10 +138,29 @@
 
 	const hasSelection = $derived(store.selectedIndex !== null);
 	const hasKeyframes = $derived(store.keyframes.length > 0);
-	// The path belongs to the segment *leaving* the selected keyframe.
-	const pathDisabled = $derived(
-		!hasSelection || store.selectedIndex === store.keyframes.length - 1
-	);
+	const KEYFRAME_TYPES = [
+		['stop', 'Stop', 'The camera comes to rest on this view.'],
+		[
+			'waypoint',
+			'Waypoint',
+			'The camera flies through this view without stopping. As first or last keyframe: the animation starts or ends in motion.'
+		]
+	] as const;
+	const isWaypoint = $derived(store.selectedKeyframe?.waypoint === true);
+	/**
+	 * Why the travel style cannot be set right now, or `null` when it can.
+	 * The style belongs to the move leaving the selected stop, and only a
+	 * move that goes straight to the next stop has one.
+	 */
+	const moveStyleBlocked = $derived.by(() => {
+		const i = store.selectedIndex;
+		if (i === null) return 'Select a stop to set how the camera travels from it';
+		if (i === store.keyframes.length - 1) return 'No move leaves the last keyframe';
+		if (isWaypoint || store.keyframes[i + 1]?.waypoint) {
+			return 'This move runs through waypoints and follows the curve through them';
+		}
+		return null;
+	});
 	const selectedPath = $derived(store.selectedKeyframe?.path ?? DEFAULT_PATH);
 	const canPlay = $derived(store.keyframes.length >= 2);
 </script>
@@ -169,29 +188,52 @@
 			✕ Delete
 		</button>
 		<div
-			class="path-picker"
+			class="choice"
 			role="radiogroup"
-			aria-label="Path from the selected keyframe to the next one"
-			title={pathDisabled
-				? hasSelection
-					? 'The last keyframe has no path leaving it'
-					: 'Select a keyframe to set the path leaving it'
-				: undefined}
+			aria-label="Keyframe type"
+			title={hasSelection ? undefined : 'Select a keyframe to set its type'}
 		>
-			<span class="lbl">Path →</span>
-			{#each PATH_STYLES as path (path)}
+			{#each KEYFRAME_TYPES as [type, label, hint] (type)}
+				{@const active = hasSelection && isWaypoint === (type === 'waypoint')}
 				<button
 					type="button"
 					role="radio"
-					aria-checked={!pathDisabled && selectedPath === path}
-					class:active={!pathDisabled && selectedPath === path}
-					disabled={pathDisabled}
+					aria-checked={active}
+					class:active
+					disabled={!hasSelection}
+					title={hint}
+					onclick={() => {
+						if (store.selectedIndex !== null) {
+							store.setKeyframeWaypoint(store.selectedIndex, type === 'waypoint');
+						}
+					}}
+				>
+					<PathIcon icon={type} />
+					{label}
+				</button>
+			{/each}
+		</div>
+		<div
+			class="choice"
+			role="radiogroup"
+			aria-label="Travel style of the move leaving the selected keyframe"
+			title={moveStyleBlocked ?? undefined}
+		>
+			<span class="lbl">Move →</span>
+			{#each PATH_STYLES as path (path)}
+				{@const active = moveStyleBlocked === null && selectedPath === path}
+				<button
+					type="button"
+					role="radio"
+					aria-checked={active}
+					class:active
+					disabled={moveStyleBlocked !== null}
 					title={PATH_STYLE_LABELS[path][1]}
 					onclick={() => {
 						if (store.selectedIndex !== null) store.setKeyframePath(store.selectedIndex, path);
 					}}
 				>
-					<PathIcon {path} />
+					<PathIcon icon={path} />
 					{PATH_STYLE_LABELS[path][0]}
 				</button>
 			{/each}
@@ -314,7 +356,7 @@
 		color: #777;
 		margin-right: 0.15rem;
 	}
-	.path-picker {
+	.choice {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.3rem;

@@ -234,17 +234,18 @@ function globeLinearSample(
 }
 
 // ---------------------------------------------------------------------------
-// Spline
+// Moves through waypoints
 // ---------------------------------------------------------------------------
 //
-// `arc` and `linear` ease every segment on its own, so the camera comes to
-// rest at each keyframe. A `spline` segment is instead one piece of a curve
-// through time: a cubic Hermite segment whose end velocities come from the
-// neighbouring keyframes (Catmull-Rom), so position *and* speed are
-// continuous where two spline segments meet. Where a run of spline segments
-// starts or ends there is no spline neighbour; the velocity there is zero,
-// which is the ease-in / ease-out and also what the other path types expect
-// at their ends.
+// A move from one stop straight to the next is eased on its own (`arc` or
+// `linear` above), so the camera rests at both ends. A waypoint is a
+// keyframe the camera flies through, so the segments on either side of it
+// are pieces of one curve through time: cubic Hermite segments whose
+// velocity at a waypoint is the slope between its two neighbours
+// (Catmull-Rom). Position *and* speed are then continuous there. At a stop
+// the velocity is zero, which is the ease-in / ease-out. A waypoint with no
+// neighbour beyond it — the first or last keyframe — keeps the velocity of
+// its one segment, so the animation starts or ends in motion.
 
 /** Indices of the angles in a spline vector: they wrap, so they get unwrapped. */
 const SPLINE_ANGLES = [0, 4, 5];
@@ -296,9 +297,12 @@ function splineSample(
 	const n = next && unwrapFrom(b, toSplineVector(next, onGlobe));
 
 	const h = kfB.t - kfA.t;
-	// Velocity at a keyframe: the slope between its two neighbours.
-	const slope = (from: number[] | null, to: number[], dt: number, i: number) =>
-		from && dt > 0 ? (to[i] - from[i]) / dt : 0;
+	const slope = (from: number, to: number, dt: number) => (dt > 0 ? (to - from) / dt : 0);
+	// Velocity of component `i` at each end — see the section comment.
+	const velocityA = (i: number) =>
+		!kfA.waypoint ? 0 : p && prev ? slope(p[i], b[i], kfB.t - prev.t) : slope(a[i], b[i], h);
+	const velocityB = (i: number) =>
+		!kfB.waypoint ? 0 : n && next ? slope(a[i], n[i], next.t - kfA.t) : slope(a[i], b[i], h);
 
 	const u = alpha;
 	const u2 = u * u;
@@ -308,11 +312,9 @@ function splineSample(
 	const h01 = -2 * u3 + 3 * u2;
 	const h11 = u3 - u2;
 
-	const v = a.map((_, i) => {
-		const va = slope(p, b, prev ? kfB.t - prev.t : 0, i);
-		const vb = n ? slope(a, n, next ? next.t - kfA.t : 0, i) : 0;
-		return h00 * a[i] + h10 * h * va + h01 * b[i] + h11 * h * vb;
-	});
+	const v = a.map(
+		(_, i) => h00 * a[i] + h10 * h * velocityA(i) + h01 * b[i] + h11 * h * velocityB(i)
+	);
 
 	const lat = onGlobe ? clampLat(v[1]) : mercatorYToLat(v[1]);
 	return {
@@ -330,9 +332,8 @@ function splineSample(
  * `projection` picks the geometry the camera travels in — see the Globe
  * section above. The keyframes themselves mean the same in both.
  *
- * `neighbours` only matters for a `spline` segment: the keyframes before
- * `kfA` and after `kfB` if the curve continues through them. Without them
- * the segment eases in and out like the other path types.
+ * `neighbours` only matter next to a waypoint: the keyframe before `kfA`
+ * if `kfA` is one, the keyframe after `kfB` if `kfB` is one.
  */
 export function interpolateKeyframes(
 	kfA: Keyframe,
@@ -341,8 +342,7 @@ export function interpolateKeyframes(
 	projection: MapProjection = 'mercator',
 	neighbours: { prev?: Keyframe | null; next?: Keyframe | null } = {}
 ): CameraState {
-	const path = kfA.path ?? 'arc';
-	if (path === 'spline') {
+	if (kfA.waypoint || kfB.waypoint) {
 		const clamped = Math.max(0, Math.min(1, alpha));
 		return splineSample(
 			neighbours.prev ?? null,
@@ -353,6 +353,7 @@ export function interpolateKeyframes(
 			projection
 		);
 	}
+	const path = kfA.path ?? 'arc';
 	const eased = easeInOut(alpha);
 	// `path` lives on the *origin* keyframe and describes the shape of the
 	// trajectory leaving it. `linear` is a direct lerp through
@@ -409,9 +410,9 @@ export function sampleAt(
 		if (t >= a.t && t <= b.t) {
 			const span = b.t - a.t;
 			const alpha = span > 0 ? (t - a.t) / span : 0;
-			// A spline segment continues into its neighbour if that is one too.
-			const prev = i > 0 && keyframes[i - 1].path === 'spline' ? keyframes[i - 1] : null;
-			const next = b.path === 'spline' && i + 2 < keyframes.length ? keyframes[i + 2] : null;
+			// The curve through a waypoint needs the keyframe beyond it.
+			const prev = a.waypoint && i > 0 ? keyframes[i - 1] : null;
+			const next = b.waypoint && i + 2 < keyframes.length ? keyframes[i + 2] : null;
 			return interpolateKeyframes(a, b, alpha, projection, { prev, next });
 		}
 	}

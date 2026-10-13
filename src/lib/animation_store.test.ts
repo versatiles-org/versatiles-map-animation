@@ -607,6 +607,28 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.anchor).toEqual({ x: 0.5, y: 0.5 });
 	});
 
+	it('turns a keyframe into a waypoint and back, keeping it through a save', () => {
+		const s = new AnimationStore();
+		const kf = (t: number) => ({ t, lng: t * 10, lat: 0, zoom: 5, pitch: 0, bearing: 0, roll: 0 });
+		s.loadFromAnimation({ ...s.toAnimation(), keyframes: [kf(0), kf(1), kf(2)] });
+		s.seekTo(1);
+		const resting = s.sampledCamera;
+		s.setKeyframeWaypoint(1, true);
+		expect(s.keyframes[1].waypoint).toBe(true);
+		expect(s.toAnimation().keyframes[1].waypoint).toBe(true);
+		// Same view at the keyframe itself; the difference is the speed around it.
+		expect(s.sampledCamera).toMatchObject({ lng: resting!.lng, lat: resting!.lat });
+		s.seekTo(1.2);
+		const flying = s.sampledCamera!.lng;
+		s.setKeyframeWaypoint(1, false);
+		expect(s.keyframes[1]).not.toHaveProperty('waypoint');
+		expect(s.sampledCamera!.lng).toBeLessThan(flying);
+		// Retiming keeps the flag on the keyframe it belongs to.
+		s.setKeyframeWaypoint(1, true);
+		s.setKeyframeTime(1, 5);
+		expect(s.keyframes.map((k) => k.waypoint === true)).toEqual([false, false, true]);
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

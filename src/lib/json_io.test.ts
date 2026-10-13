@@ -124,6 +124,34 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		}
 	});
 
+	it('reads waypoints, and converts the former spline path into them', () => {
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		const read = (keyframes: object[]) =>
+			validateAnimation({ ...minimalAnim, keyframes }).keyframes;
+
+		const flagged = read([kf(0), kf(1, { waypoint: true }), kf(2, { waypoint: 'yes' }), kf(3)]);
+		expect(flagged.map((k) => k.waypoint)).toEqual([undefined, true, undefined, undefined]);
+
+		const legacy = read([
+			kf(0, { path: 'spline' }),
+			kf(1, { path: 'spline' }),
+			kf(2, { path: 'arc' }),
+			kf(3, { path: 'spline' }),
+			kf(4)
+		]);
+		expect(legacy.map((k) => k.waypoint === true)).toEqual([false, true, false, false, false]);
+		expect(legacy.map((k) => k.path)).toEqual(['linear', 'linear', 'arc', 'linear', undefined]);
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

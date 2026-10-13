@@ -697,30 +697,77 @@ describe('anchor option', () => {
 	});
 });
 
-describe('spline path', () => {
-	it('round-trips next to the other path types and costs no extra byte', () => {
-		const paths = ['spline', 'spline', 'linear', 'arc'] as const;
-		const withPaths = (list: readonly ('arc' | 'linear' | 'spline')[]): Animation => ({
-			...example,
-			keyframes: list.map((path, i) => ({
-				t: i,
-				lng: 10 + i,
-				lat: 50,
-				zoom: 8,
-				pitch: 0,
-				bearing: 0,
-				roll: 0,
-				...(path !== 'arc' && { path })
-			}))
-		});
-		const decoded = decodeAnimation(encodeAnimation(withPaths(paths)));
-		expect(decoded?.keyframes.map((k) => k.path ?? 'arc')).toEqual(paths);
-		expect(encodeAnimation(withPaths(paths)).length).toBe(
-			encodeAnimation(withPaths(['linear', 'linear', 'linear', 'arc'])).length
-		);
+describe('waypoints', () => {
+	const flight = (waypoints: boolean[]): Animation => ({
+		...example,
+		keyframes: waypoints.map((waypoint, i) => ({
+			t: i,
+			lng: 10 + i,
+			lat: 50,
+			zoom: 8,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...(waypoint && { waypoint })
+		}))
 	});
 
-	it('stores the index into PATH_STYLES, so the list is append-only', () => {
-		expect(PATH_STYLES).toEqual(['arc', 'linear', 'spline']);
+	it('cost nothing when every keyframe is a stop, and one bit per keyframe otherwise', () => {
+		const stops = base64UrlToBytes(encodeAnimation(flight([false, false, false, false])));
+		const mixed = base64UrlToBytes(encodeAnimation(flight([false, true, true, false])));
+		expect(mixed.length).toBeLessThanOrEqual(stops.length + 1);
+		for (const kf of decodeAnimation(encodeAnimation(flight([false, false])))!.keyframes) {
+			expect(kf).not.toHaveProperty('waypoint');
+		}
+	});
+
+	it('round-trip in any position, also first and last', () => {
+		for (const flags of [
+			[false, true, true, false],
+			[true, false, false, true],
+			[true, true, true, true],
+			[false, true, false, true, false, true, false, true, false, true]
+		]) {
+			const decoded = decodeAnimation(encodeAnimation(flight(flags)));
+			expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual(flags);
+		}
+	});
+
+	it('round-trip next to the travel style and other options', () => {
+		const anim = flight([false, true, false]);
+		anim.keyframes[2].path = 'linear';
+		const decoded = decodeAnimation(encodeAnimation({ ...anim, projection: 'globe' }));
+		expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual([false, true, false]);
+		expect(decoded?.keyframes[2].path).toBe('linear');
+		expect(decoded?.projection).toBe('globe');
+	});
+});
+
+describe('legacy spline path', () => {
+	// Links written while `spline` was a path style, four keyframes each.
+	const ALL_SPLINE = 'AhQkdTA4mHYp_W49h0-_RLrmZhcRVP4afjw8y1ENueLHIAfwvcPKErqKcancNU1YAAAA';
+	const FIRST_SPLINE = 'AhQkdTA4mHYp_W69h0-_RLrmZhcRVD-Gn48PMtRDbnixyAH8L3DyhK6inGp3DVNWAAAA';
+
+	it('a keyframe between two spline segments becomes a waypoint', () => {
+		const decoded = decodeAnimation(ALL_SPLINE);
+		expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual([false, true, true, false]);
+		expect(decoded?.keyframes.every((k) => k.path === 'linear')).toBe(true);
+	});
+
+	it('a lone spline segment becomes a Stay-low move between two stops', () => {
+		const decoded = decodeAnimation(FIRST_SPLINE);
+		expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual([
+			false,
+			false,
+			false,
+			false
+		]);
+		expect(decoded?.keyframes.map((k) => k.path ?? 'arc')).toEqual(['linear', 'arc', 'arc', 'arc']);
+	});
+
+	it('is never written again', () => {
+		const reencoded = decodeAnimation(encodeAnimation(decodeAnimation(ALL_SPLINE)!));
+		expect(reencoded).toEqual(decodeAnimation(ALL_SPLINE));
+		expect(PATH_STYLES).toEqual(['arc', 'linear']);
 	});
 });

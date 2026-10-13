@@ -133,6 +133,8 @@ type WireAnimation = {
 	sun?: Sun;
 	projection?: MapProjection;
 	anchor?: ScreenAnchor;
+	/** One flag per keyframe, in order: is it a waypoint? */
+	waypoints?: boolean[];
 };
 
 // ---------------------------------------------------------------------------
@@ -229,6 +231,21 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => anchorCodec.encode(v.anchor!, w),
 		decode: (v, r) => {
 			v.anchor = anchorCodec.decode(r);
+		}
+	},
+	{
+		// One bit per keyframe. The keyframes come earlier in the struct, so
+		// the decoder knows how many bits to read. Kept out of the keyframe
+		// codec so a build from before waypoints still reads the link — it
+		// just shows every keyframe as a stop.
+		bit: 9,
+		label: 'waypoints',
+		shouldEmit: (v) => v.waypoints !== undefined && v.waypoints.some(Boolean),
+		encode: (v, w) => {
+			for (let i = 0; i < v.keyframes.length; i++) bool.encode(v.waypoints![i] === true, w);
+		},
+		decode: (v, r) => {
+			v.waypoints = v.keyframes.map(() => bool.decode(r));
 		}
 	}
 ];

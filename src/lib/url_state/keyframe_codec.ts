@@ -11,8 +11,8 @@
  */
 
 import { BitReader, BitWriter, type Codec, enumOf, uint, vsint, vuint } from '../codec';
-import { DEFAULT_PATH, PATH_STYLES } from '../types';
-import type { Keyframe, PathStyle } from '../types';
+import { convertLegacySplinePaths, DEFAULT_PATH } from '../types';
+import type { Keyframe } from '../types';
 import { lngLatToMercator, mercatorToLngLat, zoomBits } from './mercator';
 
 // ---------------------------------------------------------------------------
@@ -64,9 +64,13 @@ const rollCodec = makeAngleCodec();
 // when V1 shipped. That list is pinned here — never extend it.
 const pathCodecV1 = enumOf(['arc', 'linear']);
 
-// V2 stores `path` as a fixed 2-bit index into `PATH_STYLES`, so the list
-// can grow to four entries without changing the encoding.
-const pathCodecV2 = enumOf(PATH_STYLES as readonly [PathStyle, ...PathStyle[]], 2);
+// V2 stores `path` as a fixed 2-bit index into this list. It is pinned and
+// append-only (one slot is left). `spline` is no longer written: it was a
+// path style before waypoints existed and is converted when decoded — see
+// `convertLegacySplinePaths`.
+const WIRE_PATH_STYLES = ['arc', 'linear', 'spline'] as const;
+type WirePathStyle = (typeof WIRE_PATH_STYLES)[number];
+const pathCodecV2 = enumOf(WIRE_PATH_STYLES, 2);
 
 // ---------------------------------------------------------------------------
 // Wire format
@@ -80,7 +84,7 @@ export interface WireKeyframe {
 	pitch: number;
 	bearing: number;
 	roll: number;
-	path: PathStyle;
+	path: WirePathStyle;
 }
 
 const KEYFRAME_DEFAULTS: WireKeyframe = {
@@ -130,7 +134,7 @@ function decodeMercatorAxisDelta(prev: number, zoom: number, r: BitReader): numb
  * position when zoom precision increases, so the precision context shift
  * is handled implicitly.
  */
-function makeKeyframesCodec(pathCodec: Codec<PathStyle>): Codec<WireKeyframe[]> {
+function makeKeyframesCodec(pathCodec: Codec<WirePathStyle>): Codec<WireKeyframe[]> {
 	return {
 		encode(arr, w) {
 			w.frame('[length]', () => vuint.encode(arr.length, w));
@@ -251,17 +255,24 @@ export function normalizeKeyframe(kf: Keyframe): WireKeyframe {
 	};
 }
 
-export function denormalizeKeyframe(wire: WireKeyframe): Keyframe {
-	const { lng, lat } = mercatorToLngLat(wire.mx, wire.my);
-	const kf: Keyframe = {
-		t: wire.t,
-		lng,
-		lat,
-		zoom: wire.zoom,
-		pitch: wire.pitch,
-		bearing: wire.bearing,
-		roll: wire.roll
-	};
-	if (wire.path !== DEFAULT_PATH) kf.path = wire.path;
-	return kf;
+/**
+ * Wire keyframes back to keyframes. Takes the whole list because a legacy
+ * `spline` path turns into waypoints depending on its neighbours.
+ */
+export function denormalizeKeyframes(wire: WireKeyframe[]): Keyframe[] {
+	return convertLegacySplinePaths(
+		wire.map((w) => {
+			const { lng, lat } = mercatorToLngLat(w.mx, w.my);
+			return {
+				t: w.t,
+				lng,
+				lat,
+				zoom: w.zoom,
+				pitch: w.pitch,
+				bearing: w.bearing,
+				roll: w.roll,
+				...(w.path !== DEFAULT_PATH && { path: w.path })
+			};
+		})
+	);
 }

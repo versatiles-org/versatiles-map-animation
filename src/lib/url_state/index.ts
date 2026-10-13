@@ -35,7 +35,7 @@ import {
 	FORMAT_TAG_BINARY_V2
 } from './animation_codec';
 import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
-import { denormalizeKeyframe, normalizeKeyframe } from './keyframe_codec';
+import { denormalizeKeyframes, normalizeKeyframe } from './keyframe_codec';
 
 const HASH_KEY = 'kf';
 const STORAGE_KEY = 'versatiles-map-animation';
@@ -64,7 +64,8 @@ function buildWire(anim: Animation): Wire {
 		// The wire holds whole degrees in fixed ranges.
 		sun: normalizeSun(anim.sun),
 		projection: anim.projection,
-		anchor: normalizeScreenAnchor(anim.anchor)
+		anchor: normalizeScreenAnchor(anim.anchor),
+		waypoints: anim.keyframes.map((kf) => kf.waypoint === true)
 	};
 }
 
@@ -82,7 +83,9 @@ function fromWire(wire: Wire): Animation {
 			wire.projection !== DEFAULT_MAP_PROJECTION && { projection: wire.projection }),
 		terrain: wire.terrain,
 		sky: wire.sky,
-		keyframes: wire.keyframes.map(denormalizeKeyframe),
+		keyframes: denormalizeKeyframes(wire.keyframes).map((kf, i) =>
+			wire.waypoints?.[i] ? { ...kf, waypoint: true } : kf
+		),
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
 		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,

@@ -44,19 +44,46 @@ export const ASPECT_RATIO_LABELS: Record<AspectRatio, string> = {
  */
 export const MAP_REFERENCE_WIDTH = 1280;
 
-/** Pinned and append-only: the URL codec stores the index (2 bits, so one more fits). */
-export const PATH_STYLES = ['arc', 'linear', 'spline'] as const;
+/**
+ * How the camera travels on a move from one stop straight to the next:
+ * `arc` rises and descends on long distances (van Wijk's smooth
+ * zoom-and-pan), `linear` keeps to the altitude of its two ends. A move that
+ * runs through waypoints follows the curve through them instead.
+ */
+export const PATH_STYLES = ['arc', 'linear'] as const;
 export type PathStyle = (typeof PATH_STYLES)[number];
 export const DEFAULT_PATH: PathStyle = 'arc';
-/** Name and one-line explanation of each trajectory type, for pickers and tooltips. */
+/** Name and one-line explanation of each travel style, for pickers and tooltips. */
 export const PATH_STYLE_LABELS: Record<PathStyle, readonly [string, string]> = {
-	arc: ['Arc', 'Smooth zoom-and-pan that rises on long moves. Comes to rest at each keyframe.'],
-	linear: ['Linear', 'Straight move, best for short distances. Comes to rest at each keyframe.'],
-	spline: [
-		'Spline',
-		'One flowing curve: consecutive Spline segments fly through their keyframes without stopping.'
+	arc: ['Fly over', 'Rises and descends on long moves, like a flight. The default.'],
+	linear: [
+		'Stay low',
+		'Travels straight between the two views without rising. Best for short moves.'
 	]
 };
+
+/**
+ * For a short while `'spline'` was a third path style: consecutive spline
+ * segments flew through the keyframes between them. Waypoints say the same
+ * thing on the keyframe itself. Links and files from that time are
+ * converted on load: a keyframe between two spline segments becomes a
+ * waypoint, and what is left of `'spline'` becomes `'linear'`, the style it
+ * resembled on its own.
+ */
+export const LEGACY_SPLINE_PATH = 'spline';
+export function convertLegacySplinePaths(
+	keyframes: (Omit<Keyframe, 'path'> & { path?: PathStyle | typeof LEGACY_SPLINE_PATH })[]
+): Keyframe[] {
+	const isSpline = (i: number) => keyframes[i]?.path === LEGACY_SPLINE_PATH;
+	return keyframes.map((kf, i) => {
+		const { path, ...rest } = kf;
+		const out: Keyframe = { ...rest };
+		if (path === LEGACY_SPLINE_PATH) out.path = 'linear';
+		else if (path !== undefined) out.path = path;
+		if (isSpline(i - 1) && isSpline(i) && i < keyframes.length - 1) out.waypoint = true;
+		return out;
+	});
+}
 
 export function isPathStyle(value: unknown): value is PathStyle {
 	return typeof value === 'string' && (PATH_STYLES as readonly string[]).includes(value);
@@ -473,15 +500,19 @@ export interface Keyframe {
 	/** -180..180 degrees */
 	roll: number;
 	/**
-	 * Shape of the trajectory leaving this keyframe — i.e., the path used to
-	 * interpolate from this keyframe to the *next* one. `arc` (default) uses
-	 * van Wijk smooth zoom-and-pan; `linear` lerps each field directly. Both
-	 * come to rest at every keyframe. `spline` does not: consecutive spline
-	 * segments form one flowing curve through their keyframes, and the camera
-	 * only eases in and out where that run of segments starts and ends.
-	 * Ignored for the last keyframe.
+	 * Travel style of the move that starts at this keyframe — see
+	 * `PATH_STYLES`. Only used on a stop whose move goes straight to the next
+	 * stop; ignored on waypoints, on moves through waypoints and on the last
+	 * keyframe.
 	 */
 	path?: PathStyle;
+	/**
+	 * A stop (the default) is a view the camera comes to rest on. A waypoint
+	 * is one it flies through: it shapes the route and never causes a pause.
+	 * The keyframes from one stop to the next form one move. A waypoint as
+	 * first or last keyframe makes the animation start or end in motion.
+	 */
+	waypoint?: boolean;
 }
 
 export type CameraState = Omit<Keyframe, 't' | 'path'>;

@@ -233,8 +233,8 @@ describe('globe projection', () => {
 	});
 });
 
-describe('spline path', () => {
-	const kf = (t: number, lng: number, lat = 0, extra: Partial<Keyframe> = {}): Keyframe => ({
+describe('waypoints', () => {
+	const stop = (t: number, lng: number, lat = 0, extra: Partial<Keyframe> = {}): Keyframe => ({
 		t,
 		lng,
 		lat,
@@ -242,60 +242,71 @@ describe('spline path', () => {
 		pitch: 0,
 		bearing: 0,
 		roll: 0,
-		path: 'spline',
 		...extra
 	});
+	const via = (t: number, lng: number, lat = 0, extra: Partial<Keyframe> = {}): Keyframe =>
+		stop(t, lng, lat, { waypoint: true, ...extra });
 	/** Speed in degrees of longitude per second around time `t`. */
 	const speed = (kfs: Keyframe[], t: number, dt = 1e-4) =>
 		(sampleAt(kfs, t + dt)!.lng - sampleAt(kfs, t - dt)!.lng) / (2 * dt);
 
-	// Four keyframes in a row, one second and ten degrees apart.
-	const row = [kf(0, 0), kf(1, 10), kf(2, 20), kf(3, 30)];
+	// One move through two waypoints: four keyframes, one second and ten degrees apart.
+	const row = [stop(0, 0), via(1, 10), via(2, 20), stop(3, 30)];
 
 	it('passes through every keyframe', () => {
 		for (const k of row) expect(sampleAt(row, k.t)).toMatchObject({ lng: k.lng, lat: 0, zoom: 5 });
 	});
 
-	it('does not stop at the keyframes in between, unlike arc and linear', () => {
+	it('does not stop at a waypoint, but does at a stop', () => {
 		expect(speed(row, 1)).toBeCloseTo(10, 3);
 		expect(speed(row, 2)).toBeCloseTo(10, 3);
 		for (const path of ['arc', 'linear'] as const) {
-			const stopping = row.map((k) => ({ ...k, path }));
+			const stopping = row.map((k) => stop(k.t, k.lng, 0, { path }));
 			expect(Math.abs(speed(stopping, 1))).toBeLessThan(0.01);
 		}
 	});
 
-	it('moves at constant speed between evenly spaced keyframes', () => {
+	it('moves at constant speed between evenly spaced waypoints', () => {
 		for (const t of [1.1, 1.5, 1.9]) expect(speed(row, t)).toBeCloseTo(10, 6);
 		expect(sampleAt(row, 1.5)!.lng).toBeCloseTo(15, 9);
 	});
 
-	it('eases in at the start of the run and out at its end', () => {
+	it('eases in at the stop the move starts from and out at the one it ends on', () => {
 		expect(Math.abs(speed(row, 0.001, 1e-4))).toBeLessThan(0.1);
 		expect(Math.abs(speed(row, 2.999, 1e-4))).toBeLessThan(0.1);
 		expect(speed(row, 0.5)).toBeGreaterThan(5);
 	});
 
-	it('comes to rest where it meets a segment of another type', () => {
-		// spline, spline, then arc: the run ends at the third keyframe.
-		const mixed = [kf(0, 0), kf(1, 10), kf(2, 20, 0, { path: 'arc' }), kf(3, 30)];
+	it('a stop between two moves is a rest, whatever the moves are', () => {
+		// Move through a waypoint, stop, then a plain move.
+		const mixed = [stop(0, 0), via(1, 10), stop(2, 20), stop(3, 30)];
 		expect(speed(mixed, 1)).toBeGreaterThan(5);
 		expect(Math.abs(speed(mixed, 2))).toBeLessThan(0.01);
-		// arc, then spline: the run starts at the second keyframe.
-		const late = [kf(0, 0, 0, { path: 'arc' }), kf(1, 10), kf(2, 20), kf(3, 30)];
+		// Plain move, stop, then a move through a waypoint.
+		const late = [stop(0, 0), stop(1, 10), via(2, 20), stop(3, 30)];
 		expect(Math.abs(speed(late, 1))).toBeLessThan(0.01);
 		expect(speed(late, 2)).toBeGreaterThan(5);
 	});
 
-	it('a single spline segment eases in and out like a smoothstep', () => {
-		const two = [kf(0, 0), kf(2, 10)];
-		expect(sampleAt(two, 1)!.lng).toBeCloseTo(5, 9);
-		expect(sampleAt(two, 0.5)!.lng).toBeCloseTo(10 * (3 * 0.25 ** 2 - 2 * 0.25 ** 3), 9);
-		expect(interpolateKeyframes(two[0], two[1], 0.25).lng).toBeCloseTo(sampleAt(two, 0.5)!.lng, 12);
+	it('ignores the travel style on a move through waypoints', () => {
+		const styled = row.map((k) => ({ ...k, path: 'linear' as const }));
+		for (const t of [0.3, 1.5, 2.7]) expect(sampleAt(styled, t)).toEqual(sampleAt(row, t));
 	});
 
-	it('respects uneven timing: speed is continuous across a keyframe', () => {
-		const uneven = [kf(0, 0), kf(1, 10), kf(4, 20), kf(5, 30)];
+	it('a waypoint as first keyframe starts in motion, as last keyframe ends in motion', () => {
+		const flying = [via(0, 0), via(1, 10), via(2, 20), via(3, 30)];
+		for (const t of [0.001, 0.5, 1.5, 2.5, 2.999]) expect(speed(flying, t)).toBeCloseTo(10, 4);
+		// Only two keyframes, both waypoints: one move at constant speed.
+		const two = [via(0, 0), via(2, 10)];
+		expect(sampleAt(two, 0.5)!.lng).toBeCloseTo(2.5, 9);
+		// Starts in motion, ends at rest.
+		const landing = [via(0, 0), stop(2, 10)];
+		expect(speed(landing, 0.001)).toBeCloseTo(5, 1);
+		expect(Math.abs(speed(landing, 1.999))).toBeLessThan(0.1);
+	});
+
+	it('respects uneven timing: speed is continuous across a waypoint', () => {
+		const uneven = [stop(0, 0), via(1, 10), via(4, 20), stop(5, 30)];
 		const before = (sampleAt(uneven, 1)!.lng - sampleAt(uneven, 1 - 1e-5)!.lng) / 1e-5;
 		const after = (sampleAt(uneven, 1 + 1e-5)!.lng - sampleAt(uneven, 1)!.lng) / 1e-5;
 		expect(before).toBeCloseTo(after, 2);
@@ -304,10 +315,10 @@ describe('spline path', () => {
 
 	it('takes the short way across the antimeridian and around the compass', () => {
 		const wrap = [
-			kf(0, 160, 0, { bearing: 160 }),
-			kf(1, 170, 0, { bearing: 170 }),
-			kf(2, -180, 0, { bearing: -180 }),
-			kf(3, -170, 0, { bearing: -170 })
+			stop(0, 160, 0, { bearing: 160 }),
+			via(1, 170, 0, { bearing: 170 }),
+			via(2, -180, 0, { bearing: -180 }),
+			stop(3, -170, 0, { bearing: -170 })
 		];
 		const mid = sampleAt(wrap, 1.5)!;
 		expect(mid.lng).toBeCloseTo(175, 6);
@@ -320,7 +331,7 @@ describe('spline path', () => {
 
 	it('curves through a corner instead of turning on the spot', () => {
 		// East, then north: at the corner the camera is already heading north-east.
-		const corner = [kf(0, 0, 0), kf(1, 10, 0), kf(2, 10, 10), kf(3, 10, 20)];
+		const corner = [stop(0, 0, 0), via(1, 10, 0), via(2, 10, 10), stop(3, 10, 20)];
 		const justBefore = sampleAt(corner, 0.99)!;
 		const justAfter = sampleAt(corner, 1.01)!;
 		expect(justAfter.lng - justBefore.lng).toBeGreaterThan(0);
@@ -329,10 +340,10 @@ describe('spline path', () => {
 
 	it('keeps the pitch inside what the camera can do', () => {
 		const tilt = [
-			kf(0, 0, 0, { pitch: 0 }),
-			kf(1, 1, 0, { pitch: 85 }),
-			kf(2, 2, 0, { pitch: 88 }),
-			kf(3, 3, 0, { pitch: 0 })
+			stop(0, 0, 0, { pitch: 0 }),
+			via(1, 1, 0, { pitch: 85 }),
+			via(2, 2, 0, { pitch: 88 }),
+			stop(3, 3, 0, { pitch: 0 })
 		];
 		for (let t = 0; t <= 3; t += 0.05) {
 			const { pitch } = sampleAt(tilt, t)!;
@@ -343,10 +354,10 @@ describe('spline path', () => {
 
 	it('on the globe keeps the globe size between equally sized keyframes', () => {
 		const globe = [
-			kf(0, 0, 60, { zoom: 2 }),
-			kf(1, 20, 40, { zoom: fromGlobeZoom(3, 40) }),
-			kf(2, 40, 0, { zoom: 3 }),
-			kf(3, 60, -30, { zoom: fromGlobeZoom(3, -30) })
+			stop(0, 0, 60, { zoom: 2 }),
+			via(1, 20, 40, { zoom: fromGlobeZoom(3, 40) }),
+			via(2, 40, 0, { zoom: 3 }),
+			stop(3, 60, -30, { zoom: fromGlobeZoom(3, -30) })
 		];
 		for (const t of [0.5, 1, 1.5, 2.5]) {
 			const cam = sampleAt(globe, t, 'globe')!;

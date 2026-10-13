@@ -251,7 +251,7 @@ export class AnimationStore {
 		this.selectedIndex = adjustIndexAfterDelete(this.selectedIndex, index);
 	}
 
-	/** Set the trajectory style used to reach this keyframe from the previous one. */
+	/** Set the travel style of the move that starts at this keyframe. */
 	setKeyframePath(index: number, path: PathStyle): void {
 		if (index < 0 || index >= this.keyframes.length) return;
 		const kf = this.keyframes[index];
@@ -259,6 +259,16 @@ export class AnimationStore {
 		const updated: Keyframe = { ...kf };
 		if (path === 'arc') delete updated.path;
 		else updated.path = path;
+		this.keyframes = replaceAt(this.keyframes, index, updated);
+	}
+
+	/** Make a keyframe a waypoint (the camera flies through) or a stop (it rests). */
+	setKeyframeWaypoint(index: number, waypoint: boolean): void {
+		const kf = this.keyframes[index];
+		if (!kf) return;
+		const updated: Keyframe = { ...kf };
+		if (waypoint) updated.waypoint = true;
+		else delete updated.waypoint;
 		this.keyframes = replaceAt(this.keyframes, index, updated);
 	}
 
