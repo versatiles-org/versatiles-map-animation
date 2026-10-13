@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Modal that builds a `docker run` command line for rendering the current
-	 * animation to a video file via the standalone `versatiles-map-animation`
+	 * animation to a video file via the standalone `versatiles-map-animator`
 	 * container image. The user picks format, quality, width and FPS; height
 	 * is derived from the animation's aspect ratio. The encoded animation is
 	 * passed on the URL fragment, so it ships with the command line. The

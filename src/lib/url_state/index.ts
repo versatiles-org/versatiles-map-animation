@@ -39,6 +39,8 @@ import { denormalizeAnnotation, normalizeAnnotation } from './annotation_codec';
 import { denormalizeKeyframes, normalizeKeyframe } from './keyframe_codec';
 
 const HASH_KEY = 'kf';
+// The repository's former name. It stays: under a new key nobody would find
+// the animation they were last working on.
 const STORAGE_KEY = 'versatiles-map-animation';
 
 // ---------------------------------------------------------------------------

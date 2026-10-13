@@ -1,12 +1,12 @@
 {
-	"name": "versatiles-map-animation",
+	"name": "versatiles-map-animator",
 	"version": "0.1.0",
 	"description": "Prototype tool for composing map camera animations on a timeline (VersaTiles).",
 	"private": true,
 	"type": "module",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/versatiles-org/versatiles-map-animation.git"
+		"url": "git+https://github.com/versatiles-org/versatiles-map-animator.git"
 	},
 	"license": "MIT",
 	"imports": {
@@ -18,8 +18,8 @@
 		"check:svelte": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "npm run format && npm run check:svelte && npm run lint && npm run test",
 		"dev": "vite dev",
-		"docker:build": "docker build -f render/Dockerfile -t versatiles-map-animation .",
-		"docker:build:gpu": "docker build -f render/Dockerfile --build-arg GPU=true -t versatiles-map-animation:gpu .",
+		"docker:build": "docker build -f render/Dockerfile -t versatiles-map-animator .",
+		"docker:build:gpu": "docker build -f render/Dockerfile --build-arg GPU=true -t versatiles-map-animator:gpu .",
 		"format:check": "prettier --log-level=warn --check .",
 		"format": "prettier --log-level=warn --write .",
 		"inspect": "tsx scripts/inspect-hash.ts",

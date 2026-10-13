@@ -8,7 +8,7 @@
 
 import { DEFAULT_FORMAT, DEFAULT_QUALITY, FORMATS, QUALITIES } from '../../render/formats.mjs';
 
-export const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation:latest';
+export const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animator:latest';
 
 export { DEFAULT_FORMAT, DEFAULT_QUALITY };
 

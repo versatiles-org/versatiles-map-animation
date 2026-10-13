@@ -12,7 +12,7 @@ Every push to `main` builds and publishes a fresh image to GitHub Container
 Registry (see `.github/workflows/docker.yml`):
 
 ```sh
-docker pull ghcr.io/versatiles-org/versatiles-map-animation:latest
+docker pull ghcr.io/versatiles-org/versatiles-map-animator:latest
 ```
 
 Tags published: `latest` (default branch), `main` (branch name), `sha-<short>`
@@ -24,22 +24,22 @@ Tags published: `latest` (default branch), `main` (branch name), `sha-<short>`
 npm run docker:build
 ```
 
-This runs `docker build -f render/Dockerfile -t versatiles-map-animation .`
+This runs `docker build -f render/Dockerfile -t versatiles-map-animator .`
 from the repository root (the Dockerfile expects to see both `package.json`
 and `render/` in the build context) and leaves you with a local image named
-`versatiles-map-animation`. Use that name in place of
-`ghcr.io/versatiles-org/versatiles-map-animation:latest` in the commands
+`versatiles-map-animator`. Use that name in place of
+`ghcr.io/versatiles-org/versatiles-map-animator:latest` in the commands
 below, and drop `--pull always` if you copied a command from the editor:
 with it Docker looks for an image of that name online and fails.
 
 `npm run docker:build:gpu` builds the variant with the GPU drivers for
-[`--gpu`](#gpu), as `versatiles-map-animation:gpu`.
+[`--gpu`](#gpu), as `versatiles-map-animator:gpu`.
 
 ## Render an animation
 
 ```sh
 docker run --rm -it -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  ghcr.io/versatiles-org/versatiles-map-animator:latest \
   --hash 'AVYwwcnDgAOpi_xtYMyLSDIWRAFfkF3...' \
   --width 1920 \
   --fps 30 \
@@ -55,7 +55,7 @@ You can also pass a full URL with `--url` and the renderer will extract the hash
 
 ```sh
 docker run --rm -it -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  ghcr.io/versatiles-org/versatiles-map-animator:latest \
   --url 'https://example.org/#kf=AVYw...' \
   --output animation.mp4
 ```
@@ -106,7 +106,7 @@ apply to `mp4`.
 
 ```sh
 docker run --rm -it -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  ghcr.io/versatiles-org/versatiles-map-animator:latest \
   --hash 'AVYw...' --width 1920 --format ffv1 --output animation.mkv
 ```
 
@@ -131,12 +131,12 @@ access to the GPU:
 ```sh
 # NVIDIA (needs the NVIDIA Container Toolkit on the host)
 docker run --rm -it --gpus all -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu \
+  ghcr.io/versatiles-org/versatiles-map-animator:latest-gpu \
   --hash 'AVYw...' --width 1920 --gpu --output animation.mp4
 
 # Intel or AMD
 docker run --rm -it --device /dev/dri -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu \
+  ghcr.io/versatiles-org/versatiles-map-animator:latest-gpu \
   --hash 'AVYw...' --width 1920 --gpu --output animation.mp4
 ```
 

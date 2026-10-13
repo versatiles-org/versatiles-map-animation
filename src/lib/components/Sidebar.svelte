@@ -124,7 +124,7 @@
 
 	<footer class="sidebar-footer">
 		<a
-			href="https://github.com/versatiles-org/versatiles-map-animation"
+			href="https://github.com/versatiles-org/versatiles-map-animator"
 			target="_blank"
 			rel="noopener noreferrer"
 			title="Source code on GitHub"

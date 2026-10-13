@@ -20,7 +20,7 @@ const base: RenderSettings = {
 	quality: 'standard'
 };
 const PREFIX =
-	'docker run --rm -it --pull always -v "$PWD:/out" ghcr.io/versatiles-org/versatiles-map-animation:latest';
+	'docker run --rm -it --pull always -v "$PWD:/out" ghcr.io/versatiles-org/versatiles-map-animator:latest';
 
 describe('choices of the export dialog', () => {
 	it('offers exactly the formats and quality levels the renderer has, each with its own wording', () => {

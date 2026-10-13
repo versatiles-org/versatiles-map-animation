@@ -1,8 +1,8 @@
-# versatiles-map-animation
+# versatiles-map-animator
 
-[![CI](https://github.com/versatiles-org/versatiles-map-animation/actions/workflows/ci.yml/badge.svg)](https://github.com/versatiles-org/versatiles-map-animation/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/versatiles-org/versatiles-map-animation/branch/main/graph/badge.svg)](https://codecov.io/gh/versatiles-org/versatiles-map-animation)
-[![License: MIT](https://img.shields.io/github/license/versatiles-org/versatiles-map-animation)](./LICENSE)
+[![CI](https://github.com/versatiles-org/versatiles-map-animator/actions/workflows/ci.yml/badge.svg)](https://github.com/versatiles-org/versatiles-map-animator/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/versatiles-org/versatiles-map-animator/branch/main/graph/badge.svg)](https://codecov.io/gh/versatiles-org/versatiles-map-animator)
+[![License: MIT](https://img.shields.io/github/license/versatiles-org/versatiles-map-animator)](./LICENSE)
 
 Prototype tool for composing camera animations on a VersaTiles map and previewing them in the browser. Long-term goal: feed the same data model into a headless renderer for TV-grade map animations.
 
@@ -49,7 +49,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 ### Sharing & rendering
 
 - **Share by URL** — the entire animation (style, theme, terrain, sky, annotations, per-animation default style, scale, aspect ratio) is encoded into the URL hash with a bit-packed binary codec; any tester with the link sees the same animation.
-- **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animation/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
+- **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animator/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
 - **Local persistence** — the latest animation is mirrored to `localStorage`, so a reload without a hash restores it.
 - **Export / import as JSON** for archival or hand-off.
 - **Examples** — the editor's _Examples_ menu loads ready-made animations. They are the `.json` files in [`src/lib/examples/`](src/lib/examples/): to add one, export an animation as JSON, put the file there and give it a `"title"` and a `"description"` at the top.
@@ -57,7 +57,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
   ```sh
   docker run --rm -it --pull always -v "$PWD:/out" \
-    ghcr.io/versatiles-org/versatiles-map-animation:latest \
+    ghcr.io/versatiles-org/versatiles-map-animator:latest \
     --hash '<URL-hash payload>' --width 1920 --fps 30 --output animation.mp4
   ```
 

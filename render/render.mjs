@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Offline renderer for versatiles-map-animation.
+ * Offline renderer for versatiles-map-animator.
  *
  * Drives the static /view page frame-by-frame in headless Chromium with
  * software-WebGL (SwiftShader), captures each frame as PNG, and pipes the

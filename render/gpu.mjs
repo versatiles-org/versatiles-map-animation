@@ -59,7 +59,7 @@ export function noGpuDriversMessage() {
 	return [
 		'--gpu was given, but this image has no GPU drivers.',
 		'Use the image whose tag ends in "-gpu", for example',
-		'  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu',
+		'  ghcr.io/versatiles-org/versatiles-map-animator:latest-gpu',
 		'or build it yourself with `--build-arg GPU=true`.',
 		'Leave out --gpu to render in software.'
 	].join('\n');
