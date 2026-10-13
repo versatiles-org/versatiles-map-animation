@@ -7,6 +7,7 @@ import {
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
 	normalizeLayerGroups,
+	normalizeSun,
 	SCHEMA_VERSION
 } from './types';
 import type {
@@ -20,7 +21,8 @@ import type {
 	MapLayerGroup,
 	MapStyleId,
 	MapTheme,
-	PathStyle
+	PathStyle,
+	Sun
 } from './types';
 
 /**
@@ -159,6 +161,8 @@ export class AnimationStore {
 	hiddenLayers = $state<MapLayerGroup[]>([]);
 	/** Buildings as 3D blocks (OSM map only). */
 	buildings3d = $state(false);
+	/** Position of the sun; unset = the map's standard lighting. */
+	sun = $state<Sun | undefined>(undefined);
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
@@ -194,6 +198,7 @@ export class AnimationStore {
 		labels: this.labels,
 		hiddenLayers: this.hiddenLayers,
 		buildings3d: this.buildings3d,
+		sun: this.sun,
 		terrain: this.terrain,
 		sky: this.sky
 	});
@@ -436,6 +441,7 @@ export class AnimationStore {
 		this.labels = anim.labels ?? ANIMATION_DEFAULTS.labels;
 		this.hiddenLayers = normalizeLayerGroups(anim.hiddenLayers ?? []);
 		this.buildings3d = anim.buildings3d ?? false;
+		this.sun = normalizeSun(anim.sun);
 		this.terrain = anim.terrain ?? ANIMATION_DEFAULTS.terrain;
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
 		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
@@ -456,6 +462,7 @@ export class AnimationStore {
 			labels: this.labels,
 			...(this.hiddenLayers.length > 0 && { hiddenLayers: [...this.hiddenLayers] }),
 			...(this.buildings3d && { buildings3d: true }),
+			...(this.sun && { sun: { ...this.sun } }),
 			terrain: this.terrain,
 			sky: this.sky,
 			keyframes: this.keyframes.map((kf) => ({ ...kf })),

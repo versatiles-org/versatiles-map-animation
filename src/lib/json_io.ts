@@ -9,6 +9,7 @@ import {
 	isMapTheme,
 	isPathStyle,
 	normalizeLayerGroups,
+	normalizeSun,
 	SCHEMA_VERSION,
 	type Animation,
 	type Annotation,
@@ -115,6 +116,7 @@ export function validateAnimation(input: unknown): Animation {
 		obj.defaultAnnotation && typeof obj.defaultAnnotation === 'object'
 			? validatePartialAnnotation(obj.defaultAnnotation as Record<string, unknown>)
 			: {};
+	const sun = normalizeSun(obj.sun);
 	return {
 		version: SCHEMA_VERSION,
 		style,
@@ -122,6 +124,7 @@ export function validateAnimation(input: unknown): Animation {
 		labels,
 		...(hiddenLayers.length > 0 && { hiddenLayers }),
 		...(obj.buildings3d === true && { buildings3d: true }),
+		...(sun && { sun }),
 		terrain,
 		sky,
 		keyframes,

@@ -558,6 +558,19 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.buildings3d).toBe(false);
 	});
 
+	it('serialises the sun only when it is set', () => {
+		const s = new AnimationStore();
+		expect(s.toAnimation()).not.toHaveProperty('sun');
+		s.sun = { direction: 135, altitude: 20 };
+		expect(s.mapStyleOptions.sun).toEqual({ direction: 135, altitude: 20 });
+		expect(s.toAnimation().sun).toEqual({ direction: 135, altitude: 20 });
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.sun).toEqual({ direction: 135, altitude: 20 });
+		s2.reset();
+		expect(s2.sun).toBeUndefined();
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

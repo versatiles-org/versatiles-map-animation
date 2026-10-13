@@ -3,6 +3,7 @@
 	import {
 		ASPECT_RATIOS,
 		DEFAULT_MAP_THEMES,
+		DEFAULT_SUN,
 		LABEL_SWITCH_LAYER_GROUPS,
 		MAP_LAYER_GROUP_LABELS,
 		MAP_LAYER_GROUPS,
@@ -13,7 +14,8 @@
 		mapThemeLabel,
 		SATELLITE_OVERLAY_LAYER_GROUPS,
 		type MapLayerGroup,
-		type MapTheme
+		type MapTheme,
+		type Sun
 	} from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -57,6 +59,21 @@
 				? 'The Buildings layer is hidden'
 				: null
 	);
+
+	// The sun only shows on what has relief: 3D buildings and the hillshade
+	// that comes with the terrain, both on the OSM map.
+	const sunBlocked = $derived(
+		onSatellite
+			? 'The sun lights 3D buildings and terrain shading, which only the OSM map has'
+			: !store.terrain && (!store.buildings3d || buildings3dBlocked !== null)
+				? 'Switch on 3D buildings or Terrain to see the sun'
+				: null
+	);
+	function setSun(part: keyof Sun, e: Event): void {
+		if (!store.sun) return;
+		const value = Number((e.currentTarget as HTMLInputElement).value);
+		store.sun = { ...store.sun, [part]: value };
+	}
 </script>
 
 <div class="map-style-control" role="group" aria-label="Map style">
@@ -154,6 +171,53 @@
 	</label>
 	<label
 		class="row checkbox"
+		class:blocked={sunBlocked !== null}
+		title={sunBlocked ??
+			'Set where the light comes from. It shades 3D buildings and the terrain. Off = standard lighting.'}
+	>
+		<input
+			type="checkbox"
+			checked={store.sun !== undefined}
+			disabled={sunBlocked !== null}
+			onchange={(e) => (store.sun = e.currentTarget.checked ? { ...DEFAULT_SUN } : undefined)}
+		/>
+		<span>Sun</span>
+	</label>
+	{#if store.sun}
+		<div class="sun" class:blocked={sunBlocked !== null}>
+			<label
+				class="row"
+				title="Compass direction the light comes from: 0° north, 90° east, 180° south, 270° west"
+			>
+				<span class="lbl">Direction</span>
+				<input
+					type="range"
+					min="0"
+					max="359"
+					step="1"
+					value={store.sun.direction}
+					disabled={sunBlocked !== null}
+					oninput={(e) => setSun('direction', e)}
+				/>
+				<span class="val">{store.sun.direction}°</span>
+			</label>
+			<label class="row" title="Height of the sun above the horizon: 0° horizon, 90° overhead">
+				<span class="lbl">Altitude</span>
+				<input
+					type="range"
+					min="0"
+					max="90"
+					step="1"
+					value={store.sun.altitude}
+					disabled={sunBlocked !== null}
+					oninput={(e) => setSun('altitude', e)}
+				/>
+				<span class="val">{store.sun.altitude}°</span>
+			</label>
+		</div>
+	{/if}
+	<label
+		class="row checkbox"
 		title="Render an atmospheric sky behind the horizon. Only visible when the camera is pitched."
 	>
 		<input type="checkbox" bind:checked={store.sky} />
@@ -206,6 +270,25 @@
 		gap: 0.3rem 0.6rem;
 		margin-top: 0.4rem;
 		padding-left: 0.2rem;
+	}
+	.sun {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding-left: 0.2rem;
+
+		.row {
+			display: grid;
+			grid-template-columns: 3.6rem 1fr 2.2rem;
+		}
+		input {
+			min-width: 0;
+			accent-color: #4a9eff;
+		}
+		.val {
+			text-align: right;
+			font-variant-numeric: tabular-nums;
+		}
 	}
 	.blocked {
 		opacity: 0.45;

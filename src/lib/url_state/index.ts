@@ -17,7 +17,7 @@
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
-import { ANIMATION_DEFAULTS, SCHEMA_VERSION } from '../types';
+import { ANIMATION_DEFAULTS, normalizeSun, SCHEMA_VERSION } from '../types';
 import type { Animation } from '../types';
 import {
 	AnimationCodec,
@@ -53,7 +53,9 @@ function buildWire(anim: Animation): Wire {
 		defaultAnnotation: anim.defaultAnnotation,
 		theme: anim.theme,
 		hiddenLayers: anim.hiddenLayers,
-		buildings3d: anim.buildings3d
+		buildings3d: anim.buildings3d,
+		// The wire holds whole degrees in fixed ranges.
+		sun: normalizeSun(anim.sun)
 	};
 }
 
@@ -66,6 +68,7 @@ function fromWire(wire: Wire): Animation {
 		...(wire.hiddenLayers !== undefined &&
 			wire.hiddenLayers.length > 0 && { hiddenLayers: wire.hiddenLayers }),
 		...(wire.buildings3d && { buildings3d: true }),
+		...(wire.sun && { sun: wire.sun }),
 		terrain: wire.terrain,
 		sky: wire.sky,
 		keyframes: wire.keyframes.map(denormalizeKeyframe),

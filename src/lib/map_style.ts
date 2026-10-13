@@ -1,5 +1,9 @@
 import { inlineSources, osm, satellite } from '@versatiles/style';
-import type { SpriteSpecification, StyleSpecification } from 'maplibre-gl';
+import type {
+	HillshadeLayerSpecification,
+	SpriteSpecification,
+	StyleSpecification
+} from 'maplibre-gl';
 import { DEFAULT_MAP_THEMES, type Animation } from './types';
 
 /**
@@ -9,8 +13,10 @@ import { DEFAULT_MAP_THEMES, type Animation } from './types';
  */
 export type MapStyleOptions = Pick<
 	Animation,
-	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'buildings3d' | 'terrain' | 'sky'
+	'style' | 'theme' | 'labels' | 'hiddenLayers' | 'buildings3d' | 'sun' | 'terrain' | 'sky'
 >;
+
+type HillshadePaint = NonNullable<HillshadeLayerSpecification['paint']>;
 
 const TILES_BASE_URL = 'https://tiles.versatiles.org';
 
@@ -107,6 +113,35 @@ export async function buildMapStyle(options: MapStyleOptions): Promise<StyleSpec
 	}
 }
 
+/**
+ * True when the two option sets differ in nothing but the position of a sun
+ * that is on in both. MapStage then moves the light with `sunPatch` instead
+ * of reloading the whole style, so dragging a sun slider stays smooth.
+ */
+export function onlySunMoved(prev: MapStyleOptions, next: MapStyleOptions): boolean {
+	if (!prev.sun || !next.sun) return false;
+	const rest = (o: MapStyleOptions) => JSON.stringify({ ...o, sun: null });
+	return rest(prev) === rest(next);
+}
+
+/**
+ * The parts of the style a sun position ends up in: the global light and
+ * the illumination of every hillshade layer. Read from a freshly built
+ * style, so it can never drift from what a full rebuild would produce.
+ */
+export function sunPatch(options: MapStyleOptions): {
+	light: StyleSpecification['light'];
+	hillshade: { id: string; paint: HillshadePaint }[];
+} {
+	const style = buildBaseStyle(options);
+	return {
+		light: style.light,
+		hillshade: style.layers
+			.filter((l) => l.type === 'hillshade')
+			.map((l) => ({ id: l.id, paint: l.paint ?? {} }))
+	};
+}
+
 /** The style as the builders write it, with no I/O: sources are TileJSON references. */
 export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 	const { style: id, labels, terrain, sky } = options;
@@ -125,6 +160,9 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 					osm({
 						...common,
 						theme,
+						// Fixed to the map, not the screen: the sun stays in its
+						// compass direction while the camera turns.
+						...(options.sun && { sun: { ...options.sun, anchor: 'map' as const } }),
 						layers: labels ? hidden : { ...hidden, labels: false, icons: false, pois: false },
 						features: {
 							terrain,

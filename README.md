@@ -27,6 +27,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Switch individual layer groups on and off: land cover, water, roads, transit, buildings, sites, airports, boundaries, names, POIs, road markings.
 - Optional 3D buildings with their real heights (OSM map, from zoom 14).
 - Optional 3D terrain (with hillshade).
+- Optional sun position (compass direction and height above the horizon) that lights the 3D buildings and the terrain's hillshade.
 - Optional atmospheric sky (visible when the camera is pitched).
 - Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
 
@@ -88,6 +89,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"labels": true, // all names and symbols (OSM map) or overlay (satellite)
 	"hiddenLayers": ["buildings", "pois"], // optional: layer groups switched off, see MAP_LAYER_GROUPS in src/lib/types.ts
 	"buildings3d": false, // optional: buildings as 3D blocks (OSM map only)
+	"sun": { "direction": 210, "altitude": 60 }, // optional: where the light comes from, in whole degrees (clockwise from north, above the horizon)
 	"terrain": false,
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize

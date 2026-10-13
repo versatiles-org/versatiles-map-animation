@@ -90,6 +90,19 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(validateAnimation(minimalAnim)).not.toHaveProperty('hiddenLayers');
 	});
 
+	it('reads a sun, normalised to whole degrees, and drops anything malformed', () => {
+		expect(
+			validateAnimation({ ...minimalAnim, sun: { direction: 135, altitude: 20 } }).sun
+		).toEqual({ direction: 135, altitude: 20 });
+		expect(
+			validateAnimation({ ...minimalAnim, sun: { direction: 365.2, altitude: -5 } }).sun
+		).toEqual({ direction: 5, altitude: 0 });
+		for (const sun of [true, 'noon', { direction: 90 }, { direction: '90', altitude: 20 }, null]) {
+			expect(validateAnimation({ ...minimalAnim, sun })).not.toHaveProperty('sun');
+		}
+		expect(validateAnimation(minimalAnim)).not.toHaveProperty('sun');
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

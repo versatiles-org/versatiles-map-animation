@@ -36,7 +36,14 @@ import {
 	MAP_STYLE_IDS,
 	MAP_THEMES
 } from '../types';
-import type { AnnotationStyle, AspectRatio, MapLayerGroup, MapStyleId, MapTheme } from '../types';
+import type {
+	AnnotationStyle,
+	AspectRatio,
+	MapLayerGroup,
+	MapStyleId,
+	MapTheme,
+	Sun
+} from '../types';
 import { annotationsCodec, defaultAnnotationCodec } from './annotation_codec';
 import { keyframesCodecV1, keyframesCodecV2 } from './keyframe_codec';
 
@@ -64,6 +71,15 @@ const hiddenLayersCodec: Codec<MapLayerGroup[]> = {
 		const mask = r.readBits(HIDDEN_LAYERS_BITS);
 		return MAP_LAYER_GROUPS.filter((_, i) => mask & (1 << i));
 	}
+};
+
+/** Sun position in whole degrees: 9 bits of direction (0–359), 7 of altitude (0–90). */
+const sunCodec: Codec<Sun> = {
+	encode: (sun, w) => {
+		w.writeBits(sun.direction, 9);
+		w.writeBits(sun.altitude, 7);
+	},
+	decode: (r) => ({ direction: r.readBits(9) % 360, altitude: Math.min(90, r.readBits(7)) })
 };
 
 /** Animation-level scale: vuint of round(scale*100). Default 1.0 → 100. */
@@ -95,6 +111,7 @@ type WireAnimation = {
 	theme?: MapTheme;
 	hiddenLayers?: MapLayerGroup[];
 	buildings3d?: boolean;
+	sun?: Sun;
 };
 
 // ---------------------------------------------------------------------------
@@ -164,6 +181,15 @@ const OPTIONS: AnimOption[] = [
 		encode: () => {},
 		decode: (v) => {
 			v.buildings3d = true;
+		}
+	},
+	{
+		bit: 6,
+		label: 'sun',
+		shouldEmit: (v) => v.sun !== undefined,
+		encode: (v, w) => sunCodec.encode(v.sun!, w),
+		decode: (v, r) => {
+			v.sun = sunCodec.decode(r);
 		}
 	}
 ];

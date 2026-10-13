@@ -1,6 +1,12 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { osm, satellite } from '@versatiles/style';
-import { buildBaseStyle, buildMapStyle, type MapStyleOptions } from './map_style';
+import {
+	buildBaseStyle,
+	buildMapStyle,
+	onlySunMoved,
+	sunPatch,
+	type MapStyleOptions
+} from './map_style';
 import {
 	MAP_LAYER_GROUPS,
 	MAP_THEME_LOOKALIKES_START,
@@ -146,6 +152,59 @@ describe('3D buildings', () => {
 	it('is ignored on satellite', () => {
 		const sat: MapStyleOptions = { ...base, style: 'satellite' };
 		expect(buildBaseStyle({ ...sat, buildings3d: true })).toEqual(buildBaseStyle(sat));
+	});
+});
+
+describe('sun', () => {
+	const sun = { direction: 135, altitude: 20 };
+	const relief: MapStyleOptions = { ...base, terrain: true, buildings3d: true };
+
+	it('leaves the style without a light when unset', () => {
+		expect(buildBaseStyle(relief).light).toBeUndefined();
+	});
+
+	it('writes a map-anchored light: azimuth as given, polar angle measured from overhead', () => {
+		const light = buildBaseStyle({ ...relief, sun }).light;
+		expect(light?.anchor).toBe('map');
+		expect(light?.position).toEqual([1.15, 135, 70]);
+	});
+
+	it('turns the hillshade of the terrain to the same sun', () => {
+		const paint = sunPatch({ ...relief, sun }).hillshade.map((h) => h.paint);
+		expect(paint).toHaveLength(1);
+		expect(paint[0]['hillshade-illumination-direction']).toBe(135);
+		expect(paint[0]['hillshade-illumination-altitude']).toBe(20);
+		expect(sunPatch({ ...base, sun }).hillshade).toEqual([]);
+	});
+
+	it('is ignored on satellite', () => {
+		const sat: MapStyleOptions = { ...relief, style: 'satellite' };
+		expect(buildBaseStyle({ ...sat, sun })).toEqual(buildBaseStyle(sat));
+	});
+
+	it('patching the light and the hillshade is all a moved sun changes', () => {
+		const from = buildBaseStyle({ ...relief, sun: { direction: 300, altitude: 80 } });
+		const to = buildBaseStyle({ ...relief, sun });
+		const patch = sunPatch({ ...relief, sun });
+		from.light = patch.light;
+		for (const { id, paint } of patch.hillshade) {
+			const layer = from.layers.find((l) => l.id === id);
+			if (layer?.type === 'hillshade') layer.paint = paint;
+		}
+		expect(from).toEqual(to);
+	});
+
+	it('onlySunMoved is true only for a moved sun and nothing else', () => {
+		const lit = { ...relief, sun };
+		expect(onlySunMoved(lit, { ...lit, sun: { direction: 10, altitude: 5 } })).toBe(true);
+		expect(onlySunMoved(relief, lit)).toBe(false);
+		expect(onlySunMoved(lit, relief)).toBe(false);
+		expect(onlySunMoved(lit, { ...lit, sun: { direction: 10, altitude: 5 }, terrain: false })).toBe(
+			false
+		);
+		expect(
+			onlySunMoved(lit, { ...lit, sun: { direction: 10, altitude: 5 }, hiddenLayers: ['pois'] })
+		).toBe(false);
 	});
 });
 

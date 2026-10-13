@@ -10,7 +10,7 @@
 		type AnimationStore
 	} from '../animation.svelte';
 	import { isDarkPalette } from '@versatiles/style';
-	import { buildMapStyle } from '../map_style';
+	import { buildMapStyle, onlySunMoved, sunPatch, type MapStyleOptions } from '../map_style';
 	import {
 		ANNOTATION_ICON_OFFSETS,
 		ANNOTATION_ICON_ROTATION_OFFSETS,
@@ -328,10 +328,18 @@
 	}
 
 	let initialStyleApplied = false;
+	const SUN_HILLSHADE_PROPERTIES = [
+		'hillshade-illumination-direction',
+		'hillshade-illumination-altitude'
+	] as const;
+	// The options of the style the map currently shows, or `null` while a
+	// style is still loading — see the style effect below.
+	let shownStyleOptions: MapStyleOptions | null = null;
 
 	onMount(async () => {
 		const initialCam = untrack(() => store.sampledCamera) ?? DEFAULT_INITIAL_VIEW;
-		const style = await buildMapStyle(untrack(() => store.mapStyleOptions));
+		const initialOptions = untrack(() => store.mapStyleOptions);
+		const style = await buildMapStyle(initialOptions);
 		// Compute the zoom offset from the container directly — `zoomOffset()`
 		// can't run yet because `map` doesn't exist.
 		const initialOffset =
@@ -414,6 +422,7 @@
 			// MapLibre from updating transform.elevation each frame.
 			map?.setCenterElevation(0);
 			setupAnnotationLayer();
+			shownStyleOptions ??= initialOptions;
 			// Expose the map instance for the offline renderer (see render/).
 			if (new URLSearchParams(window.location.search).get('render') === '1') {
 				(window as unknown as { __map: unknown }).__map = map;
@@ -470,7 +479,19 @@
 	$effect(() => {
 		const options = store.mapStyleOptions;
 		if (!map || !initialStyleApplied) return;
+		// A sun that only moved is patched into the loaded style: a full
+		// reload on every step of a slider would make the map flicker.
+		if (shownStyleOptions && onlySunMoved(shownStyleOptions, options)) {
+			const { light, hillshade } = sunPatch(options);
+			if (light) map.setLight(light);
+			for (const { id, paint } of hillshade) {
+				for (const key of SUN_HILLSHADE_PROPERTIES) map.setPaintProperty(id, key, paint[key]);
+			}
+			shownStyleOptions = options;
+			return;
+		}
 		let cancelled = false;
+		shownStyleOptions = null;
 		buildMapStyle(options).then((newStyle) => {
 			if (cancelled || !map) return;
 			// setStyle({ diff: false }) wipes our custom source/layer along with
@@ -480,6 +501,7 @@
 			map.once('style.load', () => {
 				if (cancelled) return;
 				setupAnnotationLayer();
+				shownStyleOptions = options;
 			});
 		});
 		return () => {

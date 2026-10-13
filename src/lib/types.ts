@@ -307,6 +307,37 @@ export function normalizeLayerGroups(groups: readonly unknown[]): MapLayerGroup[
 	return MAP_LAYER_GROUPS.filter((g) => groups.includes(g));
 }
 
+/**
+ * Where the light comes from. It shades the walls of 3D buildings and the
+ * hillshade of the terrain; a flat map without either looks the same under
+ * any sun.
+ */
+export interface Sun {
+	/** Compass direction the light comes from, in degrees clockwise from north (0–359). */
+	direction: number;
+	/** Height above the horizon in degrees (0 = on the horizon, 90 = overhead). */
+	altitude: number;
+}
+
+/** What the "Sun" switch starts with: a mid-afternoon sun in the south-west. */
+export const DEFAULT_SUN: Sun = { direction: 210, altitude: 60 };
+
+/**
+ * Whole degrees, direction wrapped into 0–359 and altitude clamped to 0–90 —
+ * the resolution the URL codec stores. `undefined` for anything that is not
+ * a pair of finite numbers.
+ */
+export function normalizeSun(value: unknown): Sun | undefined {
+	if (!value || typeof value !== 'object') return undefined;
+	const { direction, altitude } = value as Record<string, unknown>;
+	if (typeof direction !== 'number' || !Number.isFinite(direction)) return undefined;
+	if (typeof altitude !== 'number' || !Number.isFinite(altitude)) return undefined;
+	return {
+		direction: ((Math.round(direction) % 360) + 360) % 360,
+		altitude: Math.min(90, Math.max(0, Math.round(altitude)))
+	};
+}
+
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'OSM',
 	satellite: 'Satellite'
@@ -814,6 +845,11 @@ export interface Animation {
 	 * Buildings appear from zoom 14, so that is where the blocks show up.
 	 */
 	buildings3d?: boolean;
+	/**
+	 * Position of the sun. Unset means the map's standard lighting. Only 3D
+	 * buildings and the terrain's hillshade react to it, both on the OSM map.
+	 */
+	sun?: Sun;
 	terrain: boolean;
 	/** Renders the maplibre atmospheric sky behind the horizon (visible at pitch). */
 	sky: boolean;

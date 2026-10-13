@@ -585,3 +585,42 @@ describe('buildings3d option', () => {
 		expect(decoded?.hiddenLayers).toEqual(['pois']);
 	});
 });
+
+describe('sun option', () => {
+	it('costs two bytes when set and nothing when unset', () => {
+		const plain = base64UrlToBytes(encodeAnimation(example));
+		const lit = base64UrlToBytes(
+			encodeAnimation({ ...example, sun: { direction: 0, altitude: 0 } })
+		);
+		expect(lit.length).toBe(plain.length + 2);
+		expect(decodeAnimation(encodeAnimation(example))).not.toHaveProperty('sun');
+	});
+
+	it('round-trips the whole range, also next to other options', () => {
+		for (const sun of [
+			{ direction: 0, altitude: 0 },
+			{ direction: 359, altitude: 90 },
+			{ direction: 210, altitude: 60 }
+		]) {
+			expect(decodeAnimation(encodeAnimation({ ...example, sun }))?.sun).toEqual(sun);
+		}
+		const decoded = decodeAnimation(
+			encodeAnimation({
+				...example,
+				sun: { direction: 135, altitude: 20 },
+				buildings3d: true,
+				theme: 'gray'
+			})
+		);
+		expect(decoded?.sun).toEqual({ direction: 135, altitude: 20 });
+		expect(decoded?.buildings3d).toBe(true);
+		expect(decoded?.theme).toBe('gray');
+	});
+
+	it('stores whole degrees inside the valid ranges', () => {
+		const decoded = decodeAnimation(
+			encodeAnimation({ ...example, sun: { direction: -90.4, altitude: 120 } })
+		);
+		expect(decoded?.sun).toEqual({ direction: 270, altitude: 90 });
+	});
+});
