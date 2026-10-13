@@ -22,7 +22,7 @@
 	const EDIT_MODE = true;
 
 	// Composition aspect ratio drives the editor's `.map-area` CSS — see
-	// `MapStyleControl` for the picker. The numeric form is for `min(...)`
+	// `SceneSettings` for the picker. The numeric form is for `min(...)`
 	// width math; the slash-separated form for the CSS `aspect-ratio` property.
 	const aspectNum = $derived(aspectRatioValue(store.aspectRatio));
 	const aspectCss = $derived(store.aspectRatio.replace(':', ' / '));

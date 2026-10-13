@@ -1,26 +1,29 @@
 <script lang="ts">
 	/**
-	 * Editor sidebar. Four collapsible panels, each driven by an independent
+	 * Editor sidebar. Six collapsible panels, each driven by an independent
 	 * `open` state — except for "Annotation style", which is forced open when
 	 * an annotation is selected and forced closed (disabled) otherwise, since
 	 * it has nothing to style without a selection.
 	 *
-	 *   1. Map style              — open by default
-	 *   2. Annotation style       — open when a marker is selected, disabled otherwise
-	 *   3. Default annotation     — closed by default
-	 *   4. Markers (list)         — open by default
+	 *   1. Frame                  — closed by default; shows the aspect ratio
+	 *   2. Map                    — open by default; shows the base map
+	 *   3. 3D & light             — open by default
+	 *   4. Annotation style       — open when a marker is selected, disabled otherwise
+	 *   5. Default annotation     — closed by default
+	 *   6. Markers (list)         — open by default
 	 *
 	 * The previous `AnnotationPanel` router (which switched between
-	 * editor/list/defaults based on selection) is replaced by these four
+	 * editor/list/defaults based on selection) is replaced by these
 	 * always-present panels — the user controls visibility, not the
 	 * application.
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
+	import { MAP_STYLE_LABELS } from '../types';
 	import AnnotationEditor from './AnnotationEditor.svelte';
 	import AnnotationList from './AnnotationList.svelte';
 	import DefaultStyleEditor from './DefaultStyleEditor.svelte';
-	import MapStyleControl from './MapStyleControl.svelte';
+	import SceneSettings from './SceneSettings.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -28,21 +31,35 @@
 
 	// User-toggleable panel state. Initial values match the requested
 	// open-by-default set; the user can override by clicking the summary.
-	let mapStyleOpen = $state(true);
+	let frameOpen = $state(false);
+	let mapOpen = $state(true);
+	let reliefOpen = $state(true);
 	let defaultStyleOpen = $state(false);
 	let listOpen = $state(true);
 </script>
 
 <aside class="sidebar" aria-label="Editor sidebar">
-	<!-- 1. Map style — always available -->
-	<details class="sub-panel" bind:open={mapStyleOpen}>
-		<summary>Map style</summary>
+	<!-- 1–3. The animation as a whole — always available -->
+	<details class="sub-panel" bind:open={frameOpen}>
+		<summary>Frame <span class="value">{store.aspectRatio}</span></summary>
 		<div class="sub-body">
-			<MapStyleControl {store} />
+			<SceneSettings {store} section="frame" />
+		</div>
+	</details>
+	<details class="sub-panel" bind:open={mapOpen}>
+		<summary>Map <span class="value">{MAP_STYLE_LABELS[store.style]}</span></summary>
+		<div class="sub-body">
+			<SceneSettings {store} section="map" />
+		</div>
+	</details>
+	<details class="sub-panel" bind:open={reliefOpen}>
+		<summary>3D &amp; light</summary>
+		<div class="sub-body">
+			<SceneSettings {store} section="relief" />
 		</div>
 	</details>
 
-	<!-- 2. Annotation style — derived from selection. Force-open when a
+	<!-- 4. Annotation style — derived from selection. Force-open when a
 	     marker is selected, force-closed (and visually disabled) when none.
 	     Using `open={hasSelection}` rather than `bind:open` means clicks on
 	     a disabled summary can't open it. -->
@@ -62,7 +79,7 @@
 		</div>
 	</details>
 
-	<!-- 3. Default annotation style — always available; closed by default -->
+	<!-- 5. Default annotation style — always available; closed by default -->
 	<details class="sub-panel" bind:open={defaultStyleOpen}>
 		<summary>Default annotation style</summary>
 		<div class="sub-body">
@@ -70,7 +87,7 @@
 		</div>
 	</details>
 
-	<!-- 4. Marker list — always available; open by default -->
+	<!-- 6. Marker list — always available; open by default -->
 	<details class="sub-panel" bind:open={listOpen}>
 		<summary>Markers</summary>
 		<div class="sub-body">
@@ -141,6 +158,13 @@
 	}
 	.sub-panel[open] > summary::before {
 		transform: rotate(90deg);
+	}
+	/* What the panel is set to, readable while it is closed. */
+	.sub-panel > summary .value {
+		margin-left: auto;
+		color: #666;
+		text-transform: none;
+		letter-spacing: 0;
 	}
 	.sub-panel > summary:hover {
 		background: rgba(255, 255, 255, 0.04);
