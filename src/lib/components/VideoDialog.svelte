@@ -2,16 +2,26 @@
 	/**
 	 * Modal that builds a `docker run` command line for rendering the current
 	 * animation to a video file via the standalone `versatiles-map-animation`
-	 * container image. The user picks width and FPS; height is derived from
-	 * the animation's aspect ratio. The encoded animation is passed on the
-	 * URL fragment, so it ships with the command line.
+	 * container image. The user picks format, quality, width and FPS; height
+	 * is derived from the animation's aspect ratio. The encoded animation is
+	 * passed on the URL fragment, so it ships with the command line. The
+	 * command itself is put together in `render_command.ts`.
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
+	import {
+		buildRenderCommand,
+		DEFAULT_FORMAT,
+		DEFAULT_QUALITY,
+		DEFAULT_SHUTTER_ANGLE,
+		hasQualityLevels,
+		renderOutputName,
+		VIDEO_FORMATS,
+		VIDEO_QUALITIES
+	} from '../render_command';
 	import { aspectRatioValue } from '../types';
 	import { encodeAnimation } from '../url_state';
 
-	const RENDER_IMAGE = 'ghcr.io/versatiles-org/versatiles-map-animation:latest';
 	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
 	const VIDEO_FPS = [24, 25, 30, 50, 60] as const;
@@ -26,7 +36,6 @@
 	const MOTION_BLUR_MAX = 32;
 	const SHUTTER_ANGLE_MIN = 1;
 	const SHUTTER_ANGLE_MAX = 360;
-	const DEFAULT_SHUTTER_ANGLE = 180;
 
 	/** Round and clamp a number-input value; an empty or invalid field falls back. */
 	function clampInt(value: unknown, min: number, max: number, fallback: number): number {
@@ -46,6 +55,13 @@
 	let copied = $state(false);
 	let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
+	let videoFormat = $state(DEFAULT_FORMAT);
+	let videoQuality = $state(DEFAULT_QUALITY);
+	const formatChoice = $derived(
+		VIDEO_FORMATS.find((f) => f.id === videoFormat) ?? VIDEO_FORMATS[0]
+	);
+	const qualityChoice = $derived(VIDEO_QUALITIES.find((q) => q.id === videoQuality));
+	const outputName = $derived(renderOutputName(videoFormat));
 	let videoWidth = $state<VideoWidth>(1920);
 	let videoFps = $state<VideoFps>(30);
 	// Bound to number inputs, so they are `null` while a field is empty.
@@ -59,25 +75,18 @@
 	);
 	const videoHeight = $derived(Math.round(videoWidth / aspectRatioValue(store.aspectRatio)));
 
-	function buildCommand(): string {
-		const hash = encodeAnimation(store.toAnimation());
-		// Single-line so users can paste-and-run; --pull always keeps the image
-		// fresh; the working directory is mounted at /out so the MP4 lands next
-		// to where the user invoked the command. `--height` is derived from
-		// `--width` and the composition aspect ratio chosen in the editor.
-		// `-it` allocates a pseudo-TTY (line-buffered progress bars, colour) and
-		// keeps stdin open so the user can `Ctrl-C` to abort the render.
-		// `--motion-blur` is only emitted when the user picked > 1, and
-		// `--shutter-angle` only when it differs from the renderer's default,
-		// so the default snippet stays as short as before.
-		let blurFlag = '';
-		if (motionBlur > 1) {
-			blurFlag = ` --motion-blur ${motionBlur}`;
-			if (shutterAngle !== DEFAULT_SHUTTER_ANGLE) blurFlag += ` --shutter-angle ${shutterAngle}`;
-		}
-		return `docker run --rm -it --pull always -v "$PWD:/out" ${RENDER_IMAGE} --hash '${hash}' --width ${videoWidth} --height ${videoHeight} --fps ${videoFps}${blurFlag} --output animation.mp4`;
-	}
-	const command = $derived(buildCommand());
+	const command = $derived(
+		buildRenderCommand({
+			hash: encodeAnimation(store.toAnimation()),
+			width: videoWidth,
+			height: videoHeight,
+			fps: videoFps,
+			motionBlur,
+			shutterAngle,
+			format: videoFormat,
+			quality: videoQuality
+		})
+	);
 
 	async function copy() {
 		if (!inputEl) return;
@@ -102,6 +111,28 @@
 
 <div class="embed-panel" role="region" aria-label="Render to video">
 	<div class="video-row-1">
+		<label for="video-format" class="control-label" title="What kind of video file to write">
+			<span class="lbl">Format</span>
+			<select id="video-format" bind:value={videoFormat}>
+				{#each VIDEO_FORMATS as format (format.id)}
+					<option value={format.id}>{format.label}</option>
+				{/each}
+			</select>
+		</label>
+		{#if hasQualityLevels(videoFormat)}
+			<label
+				for="video-quality"
+				class="control-label"
+				title="How strongly the video is compressed: higher quality means a larger file"
+			>
+				<span class="lbl">Quality</span>
+				<select id="video-quality" bind:value={videoQuality}>
+					{#each VIDEO_QUALITIES as quality (quality.id)}
+						<option value={quality.id}>{quality.label}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 		<label for="video-width" class="control-label">
 			<span class="lbl">Resolution</span>
 			<select id="video-width" bind:value={videoWidth}>
@@ -153,8 +184,13 @@
 			</label>
 		{/if}
 		<span class="hint">
-			Renders this animation as MP4. Requires <strong>Docker</strong>; the file lands in the
-			directory you run the command from as <code>animation.mp4</code>.
+			<strong>{formatChoice.label}:</strong>
+			{formatChoice.description}
+			{#if hasQualityLevels(videoFormat) && qualityChoice?.description}
+				{qualityChoice.label} quality: {qualityChoice.description}
+			{/if}
+			Requires <strong>Docker</strong>; the file lands in the directory you run the command from as
+			<code>{outputName}</code>.
 			{#if motionBlur > 1}
 				Motion blur makes the render take {motionBlur}× as long.
 			{/if}

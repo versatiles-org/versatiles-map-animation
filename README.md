@@ -52,7 +52,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - **Embed** in a third-party page via a generated `<iframe>` snippet (16:9, fluid width). The viewer is served from `/view` and carries the same URL-hash payload. See [`embed-demo.html`](http://versatiles.org/versatiles-map-animation/embed-demo.html) for the iframe in real-page context with a copy-paste snippet.
 - **Local persistence** — the latest animation is mirrored to `localStorage`, so a reload without a hash restores it.
 - **Export / import as JSON** for archival or hand-off.
-- **Render to video** via the published Docker image (button in the editor copies the command). MP4 by default; `--format prores` for editing, `--format ffv1` or `--format animation` for lossless output, and `--quality high|standard|small` for the MP4 — see [`render/README.md`](render/README.md#formats):
+- **Render to video** via the published Docker image. The editor's **Export video…** dialog lets you pick format, quality, resolution, frame rate and motion blur and copies the command. MP4 by default; `--format prores` for editing, `--format ffv1` or `--format animation` for lossless output, and `--quality high|standard|small` for the MP4 — see [`render/README.md`](render/README.md#formats):
 
   ```sh
   docker run --rm -it --pull always -v "$PWD:/out" \
