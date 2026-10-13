@@ -790,43 +790,6 @@ describe('holds', () => {
 	});
 });
 
-describe('even speed', () => {
-	const flight = (evenAt: number[]): Animation => ({
-		...example,
-		keyframes: [0, 1.234, 2.5, 4, 5.75, 8].map((t, i) => ({
-			t,
-			lng: 10 + i,
-			lat: 50,
-			zoom: 8,
-			pitch: 0,
-			bearing: 0,
-			roll: 0,
-			...([1, 2, 4].includes(i) && { waypoint: true }),
-			...(evenAt.includes(i) && { evenSpeed: true })
-		}))
-	});
-
-	it('costs nothing when no move uses it', () => {
-		for (const kf of decodeAnimation(encodeAnimation(flight([])))!.keyframes) {
-			expect(kf).not.toHaveProperty('evenSpeed');
-		}
-		expect(encodeAnimation(flight([0])).length).toBeGreaterThanOrEqual(
-			encodeAnimation(flight([])).length
-		);
-	});
-
-	it('round-trips the flag and the times of the waypoints as they are', () => {
-		for (const evenAt of [[0], [3], [0, 3]]) {
-			const decoded = decodeAnimation(encodeAnimation(flight(evenAt)))!;
-			expect(decoded.keyframes.flatMap((k, i) => (k.evenSpeed ? [i] : []))).toEqual(evenAt);
-			expect(decoded.keyframes.map((k) => k.t)).toEqual([0, 1.234, 2.5, 4, 5.75, 8]);
-			expect(decoded.keyframes.map((k) => k.waypoint === true)).toEqual(
-				flight(evenAt).keyframes.map((k) => k.waypoint === true)
-			);
-		}
-	});
-});
-
 describe('legacy spline path', () => {
 	// Links written while `spline` was a path style, four keyframes each.
 	const ALL_SPLINE = 'AhQkdTA4mHYp_W49h0-_RLrmZhcRVP4afjw8y1ENueLHIAfwvcPKErqKcancNU1YAAAA';

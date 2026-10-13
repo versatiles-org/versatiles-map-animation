@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_ANIMATION } from './example_animation';
-import { sampleAt } from './interpolate';
 import { screenSpeed, SPEED_FAST, SPEED_VERY_FAST, speedProfile } from './speed';
 import type { CameraState, Keyframe } from './types';
 
@@ -81,21 +79,35 @@ describe('screenSpeed', () => {
 		expect(Math.abs(sideways(75) / ahead(75) - 1)).toBeGreaterThan(0.2);
 	});
 
-	it('agrees with MapLibre: values measured in the browser on the example flight', () => {
-		// Measured by projecting the same grid of screen points through the real
-		// map at t − 0.05 s and t + 0.05 s, in px/s on a 1280 × 720 frame.
-		const measured: [number, number][] = [
-			[6.25, 158],
-			[7.75, 629],
-			[9.25, 617],
-			[10.75, 651],
-			[13.25, 627],
-			[14.75, 158]
+	it('agrees with MapLibre: values measured in the browser', () => {
+		// Each pair was set on a real 1280 × 720 map; the same grid of screen
+		// points was unprojected under the first camera and projected under the
+		// second. The number is the root mean square of how far they moved, in px.
+		const measured: [Partial<CameraState>, Partial<CameraState>, number][] = [
+			[{ lng: 9, lat: 42.4, zoom: 12 }, { lng: 9.002, lat: 42.401, zoom: 12 }, 14.07],
+			[
+				{ lng: 9, lat: 42.4, zoom: 12, pitch: 75, bearing: -110 },
+				{ lng: 8.998, lat: 42.3995, zoom: 12.02, pitch: 75, bearing: -110 },
+				26.45
+			],
+			[
+				{ lng: 9, lat: 42.4, zoom: 13, pitch: 55, bearing: -120 },
+				{ lng: 8.999, lat: 42.3996, zoom: 13.01, pitch: 54, bearing: -119 },
+				22.39
+			],
+			[
+				{ lng: 9, lat: 42.4, zoom: 11, pitch: 60, bearing: 30, roll: 10 },
+				{ lng: 9, lat: 42.4, zoom: 11, pitch: 62, bearing: 33, roll: 12 },
+				45.89
+			],
+			[
+				{ lng: -70, lat: -33, zoom: 8, pitch: 40, bearing: 200 },
+				{ lng: -70.01, lat: -33.02, zoom: 8.05, pitch: 40, bearing: 201 },
+				30.16
+			]
 		];
-		for (const [t, pxPerSecond] of measured) {
-			const a = sampleAt(EXAMPLE_ANIMATION.keyframes, t - 0.05)!;
-			const b = sampleAt(EXAMPLE_ANIMATION.keyframes, t + 0.05)!;
-			expect((screenSpeed(a, b, 0.1) * 1280) / pxPerSecond).toBeCloseTo(1, 1);
+		for (const [a, b, px] of measured) {
+			expect((screenSpeed(cam(a), cam(b), 1) * 1280) / px).toBeCloseTo(1, 2);
 		}
 	});
 

@@ -190,8 +190,6 @@
 		e.preventDefault();
 		store.selectAt(index);
 		store.pause();
-		// A self-timed waypoint is placed by its move: it can be selected, not dragged.
-		if (store.selfTimed.has(index)) return;
 		// Dragging a keyframe re-seeks the playhead each frame, so it's a scrub
 		// in disguise — flag it so the editor's edit-mode chrome bows out and
 		// the user sees the real animation pose at the dragged time.
@@ -476,12 +474,9 @@
 				class="marker"
 				class:selected={store.selectedIndex === i}
 				class:waypoint={kf.waypoint}
-				class:self-timed={store.selfTimed.has(i)}
 				style="left: {pct(kf.t)}%"
 				onpointerdown={(e) => startDragMarker(e, i)}
-				title="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1} at {fmt(kf.t)}s{store.selfTimed.has(i)
-					? ' — timed by its move, which runs at even speed'
-					: ''}"
+				title="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1} at {fmt(kf.t)}s"
 				aria-label="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1}"
 			>
 				<span class="diamond"></span>
@@ -789,18 +784,6 @@
 			width: 10px;
 			height: 10px;
 			border-radius: 50%;
-		}
-		/* Timed by its move, so not draggable: a ring instead of a solid dot. */
-		&.self-timed {
-			cursor: pointer;
-		}
-		&.self-timed .diamond {
-			background: #1a1a1a;
-			border: 2px solid #4a9eff;
-			box-shadow: none;
-		}
-		&.self-timed.selected .diamond {
-			border-color: #ffd24a;
 		}
 	}
 	.diamond {

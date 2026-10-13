@@ -176,28 +176,6 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(() => read([kf(0, { hold: 'long' })])).toThrow();
 	});
 
-	it('reads evenSpeed only when it is exactly true', () => {
-		const kf = (t: number, extra: object = {}) => ({
-			t,
-			lng: t,
-			lat: 0,
-			zoom: 5,
-			pitch: 0,
-			bearing: 0,
-			roll: 0,
-			...extra
-		});
-		const kfs = validateAnimation({
-			...minimalAnim,
-			keyframes: [
-				kf(0, { evenSpeed: true }),
-				kf(1, { evenSpeed: 'yes' }),
-				kf(2, { evenSpeed: false })
-			]
-		}).keyframes;
-		expect(kfs.map((k) => k.evenSpeed)).toEqual([true, undefined, undefined]);
-	});
-
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

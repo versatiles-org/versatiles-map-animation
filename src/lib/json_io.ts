@@ -107,7 +107,6 @@ export function validateAnimation(input: unknown): Animation {
 		};
 		if (isPathStyle(o.path) || o.path === LEGACY_SPLINE_PATH) kf.path = o.path;
 		if (o.waypoint === true) kf.waypoint = true;
-		if (o.evenSpeed === true) kf.evenSpeed = true;
 		const hold = optionalNum(o, 'hold', ctx);
 		if (hold !== undefined && hold > 0 && !kf.waypoint) kf.hold = hold;
 		return kf;

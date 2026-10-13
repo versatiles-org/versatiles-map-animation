@@ -148,9 +148,6 @@
 	] as const;
 	const isWaypoint = $derived(store.selectedKeyframe?.waypoint === true);
 	const selectedMove = $derived(store.selectedMove);
-	const selectedMoveEven = $derived(
-		selectedMove !== null && store.keyframes[selectedMove.start]?.evenSpeed === true
-	);
 	const canPlay = $derived(store.keyframes.length >= 2);
 </script>
 
@@ -174,17 +171,6 @@
 				<span class="lbl">Move</span>
 				{#if selectedMove.kind === 'curve'}
 					<span class="note"><PathIcon icon="waypoint" /> Follows its waypoints</span>
-					<button
-						type="button"
-						aria-pressed={selectedMoveEven}
-						class:active={selectedMoveEven}
-						title={selectedMoveEven
-							? 'The camera travels this move at an even speed on screen, and its waypoints time themselves. Switch off to set their times by hand.'
-							: 'Let the camera travel this move at an even speed on screen. Its waypoints then time themselves.'}
-						onclick={() => store.setMoveEvenSpeed(selectedMove.start, !selectedMoveEven)}
-					>
-						Even speed
-					</button>
 				{:else}
 					{#each PATH_STYLES as path (path)}
 						{@const active = selectedMove.kind === path}

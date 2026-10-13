@@ -625,7 +625,6 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s.sampledCamera!.lng).toBeLessThan(flying);
 		// Retiming keeps the flag on the keyframe it belongs to.
 		s.setKeyframeWaypoint(1, true);
-		s.setMoveEvenSpeed(0, false);
 		s.setKeyframeTime(1, 5);
 		expect(s.keyframes.map((k) => k.waypoint === true)).toEqual([false, false, true]);
 	});
@@ -747,9 +746,7 @@ describe('AnimationStore - load/serialise', () => {
 			const s = load([kf(0), kf(2, { hold: 2 }), kf(6)]);
 			s.setKeyframeWaypoint(1, true);
 			expect(s.keyframes[1]).not.toHaveProperty('hold');
-			// The move's ends stay; the new waypoint times itself in between.
-			expect(times(s)[0]).toBe(0);
-			expect(times(s)[2]).toBe(6);
+			expect(times(s)).toEqual([0, 2, 6]);
 		});
 
 		it('keeps keyframes out of each other when one is retimed', () => {
@@ -771,107 +768,6 @@ describe('AnimationStore - load/serialise', () => {
 			s.seekTo(3);
 			s.addKeyframeFromCamera({ lng: 1, lat: 1, zoom: 1, pitch: 0, bearing: 0, roll: 0 });
 			expect(times(s)).toEqual([0, 2, 5]);
-		});
-	});
-
-	describe('even speed', () => {
-		const kf = (t: number, lng: number, extra: object = {}) => ({
-			t,
-			lng,
-			lat: 0,
-			zoom: 8,
-			pitch: 0,
-			bearing: 0,
-			roll: 0,
-			...extra
-		});
-		const load = (keyframes: object[], extra: object = {}) => {
-			const s = new AnimationStore();
-			s.loadFromAnimation({ ...s.toAnimation(), keyframes, ...extra } as never);
-			return s;
-		};
-		const times = (s: AnimationStore) => s.keyframes.map((k) => k.t);
-		// The second stretch is nine times as long as the first.
-		const route = () => [kf(0, 0), kf(5, 0.1), kf(10, 1)];
-
-		it('is switched on by the first waypoint put into a move, which then times itself', () => {
-			const s = load(route());
-			s.setKeyframeWaypoint(1, true);
-			expect(s.keyframes[0].evenSpeed).toBe(true);
-			expect([...s.selfTimed]).toEqual([1]);
-			expect(s.keyframes[1].t).toBeLessThan(3);
-			expect(times(s)[2]).toBe(10);
-			// A second waypoint in the same move does not touch the choice.
-			const s2 = load([...route(), kf(12, 2), kf(14, 3)]);
-			s2.setKeyframeWaypoint(1, true);
-			s2.setMoveEvenSpeed(0, false);
-			s2.setKeyframeWaypoint(2, true);
-			expect(s2.keyframes[0]).not.toHaveProperty('evenSpeed');
-			expect(s2.selfTimed.size).toBe(0);
-		});
-
-		it('leaves animations that already have waypoints as they are', () => {
-			const s = load([kf(0, 0), kf(5, 0.1, { waypoint: true }), kf(10, 1)]);
-			expect(times(s)).toEqual([0, 5, 10]);
-			expect(s.selfTimed.size).toBe(0);
-		});
-
-		it('keeps the times where they are when switched off, and frees the waypoint again', () => {
-			const s = load(route());
-			s.setKeyframeWaypoint(1, true);
-			const t = s.keyframes[1].t;
-			s.setKeyframeTime(1, 8);
-			expect(s.keyframes[1].t).toBe(t); // self-timed: not for dragging
-			s.setMoveEvenSpeed(0, false);
-			expect(s.keyframes[1].t).toBe(t);
-			s.setKeyframeTime(1, 8);
-			expect(s.keyframes[1].t).toBe(8);
-			s.setMoveEvenSpeed(0, true);
-			expect(s.keyframes[1].t).toBe(t);
-		});
-
-		it('re-times when the route or the ends of the move change', () => {
-			const s = load(route());
-			s.setKeyframeWaypoint(1, true);
-			const before = s.keyframes[1].t;
-			s.setKeyframeTime(2, 20);
-			expect(s.keyframes[1].t).toBeGreaterThan(before);
-			const stretched = s.keyframes[1].t;
-			s.setKeyframeHold(0, 2);
-			expect(s.keyframes[1].t).toBeCloseTo(stretched + 2, 1);
-			s.selectAt(1);
-			s.updateSelectedFromCamera({ lng: 0.9, lat: 0, zoom: 8, pitch: 0, bearing: 0, roll: 0 });
-			expect(s.keyframes[1].t).toBeGreaterThan(stretched + 2);
-		});
-
-		it('re-times when the projection changes, since the route does', () => {
-			const s = load([kf(0, -60, { lat: 50 }), kf(3, -40, { lat: 10 }), kf(10, 60, { lat: 70 })]);
-			s.setKeyframeWaypoint(1, true);
-			const mercator = s.keyframes[1].t;
-			s.projection = 'globe';
-			expect(s.keyframes[1].t).not.toBe(mercator);
-			s.projection = 'mercator';
-			expect(s.keyframes[1].t).toBe(mercator);
-		});
-
-		it('is handed on to the second half when a waypoint becomes a stop again', () => {
-			const s = load([kf(0, 0), kf(2, 0.1), kf(4, 1), kf(6, 1.2), kf(10, 2)]);
-			s.setKeyframeWaypoint(1, true);
-			s.setKeyframeWaypoint(2, true);
-			s.setKeyframeWaypoint(3, true);
-			expect([...s.selfTimed]).toEqual([1, 2, 3]);
-			s.setKeyframeWaypoint(2, false);
-			expect(s.keyframes[2].evenSpeed).toBe(true);
-			expect([...s.selfTimed]).toEqual([1, 3]);
-		});
-
-		it('survives a save and a reload with the same times', () => {
-			const s = load(route());
-			s.setKeyframeWaypoint(1, true);
-			const s2 = new AnimationStore();
-			s2.loadFromAnimation(s.toAnimation());
-			expect(times(s2)).toEqual(times(s));
-			expect(s2.keyframes[0].evenSpeed).toBe(true);
 		});
 	});
 

@@ -137,8 +137,6 @@ type WireAnimation = {
 	waypoints?: boolean[];
 	/** Hold of each keyframe in seconds, in order; 0 for none. */
 	holds?: number[];
-	/** One flag per keyframe, in order: does its move run at even speed? */
-	evenSpeed?: boolean[];
 };
 
 // ---------------------------------------------------------------------------
@@ -268,21 +266,10 @@ const OPTIONS: AnimOption[] = [
 		decode: (v, r) => {
 			v.holds = v.keyframes.map(() => (bool.decode(r) ? vuint.decode(r) / 1000 : 0));
 		}
-	},
-	{
-		// One bit per keyframe, like `waypoints`. The times of self-timed
-		// waypoints are stored like any other, so a build from before this
-		// still plays the link — with nearly, not exactly, even speed.
-		bit: 11,
-		label: 'evenSpeed',
-		shouldEmit: (v) => v.evenSpeed !== undefined && v.evenSpeed.some(Boolean),
-		encode: (v, w) => {
-			for (let i = 0; i < v.keyframes.length; i++) bool.encode(v.evenSpeed![i] === true, w);
-		},
-		decode: (v, r) => {
-			v.evenSpeed = v.keyframes.map(() => bool.decode(r));
-		}
 	}
+	// Bit 11 is taken: a short-lived "even speed" flag (one bit per keyframe)
+	// used it. Links from then still decode — the bits are simply not read —
+	// but a new option must not reuse the bit, or it would misread them.
 ];
 
 function holdMs(seconds: number | undefined): number {

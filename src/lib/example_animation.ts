@@ -5,8 +5,8 @@ import type { Animation } from './types';
  * highest range in the Mediterranean. The camera enters from the east just
  * north of the Asco valley, banks WSW to face the spine of the massif and
  * holds there for three seconds. The second half is one continuous move:
- * it tracks across the range through two waypoints at an even speed and
- * only comes to rest at the western coast. Used by the editor's
+ * it tracks across the range through three waypoints and only comes to
+ * rest at the western coast. Used by the editor's
  * "★ Load example" menu item — and so a tour of what a path is made of: a
  * plain move between two stops, a hold, and a move through waypoints.
  *
