@@ -15,7 +15,8 @@
 			"zoom": 1.73,
 			"pitch": 0,
 			"bearing": 0,
-			"roll": 0
+			"roll": 0,
+			"easeOut": 0.8
 		},
 		{
 			"t": 5.84,
