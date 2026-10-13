@@ -104,7 +104,7 @@
 </script>
 
 <header class="topbar">
-	<h1 title="Drop keyframes on a map, hit play.">Map Animation</h1>
+	<h1 title="Drop keyframes on a map, hit play.">Map Animator</h1>
 
 	<details bind:this={menuEl} class="dropdown file-menu">
 		<summary>File <span class="caret"><Icon name="caret" size={12} /></span></summary>
