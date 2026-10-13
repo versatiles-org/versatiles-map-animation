@@ -13,7 +13,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 ### Camera animation
 
 - Drop keyframes on a timeline that capture the current camera (lng, lat, zoom, pitch, bearing, roll).
-- Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
+- Play back with eased interpolation between keyframes; shortest-path bearing/roll wrap.
 - Every stop sets how gently the camera **eases in** (arrives) and **eases out** (leaves), each with its own slider when the stop is selected: 0 % is abrupt, at full speed; 100 % is very gradual. A quick take-off with a long, soft landing is two sliders away. A stronger easing makes the middle of the move faster — the speed curve on the timeline shows it. Click the percentage to go back to the default.
 - Keyframes are **stops** or **waypoints**. The camera comes to rest on a stop and flies through a waypoint, so the keyframes from one stop to the next form one move. A move through waypoints is one flowing curve that only eases in and out at its two stops — for following a river, orbiting a place or drifting without pause. The curve is built from what the viewer sees: where it zooms in on the way, the ground is covered while the camera is still high, so it arrives over its target before it gets close and never races across the map; zoom, tilt and bearing do not swing past their keyframes. A waypoint as first or last keyframe starts or ends the animation in motion.
 - A stop can **hold**: the camera rests there for a set time before moving on. Drag the right edge of the selected stop on the timeline or type the seconds; everything after it moves along.
