@@ -1,5 +1,6 @@
 import {
 	cameraOf,
+	departureOf,
 	MAX_CAMERA_LATITUDE,
 	type CameraState,
 	type Keyframe,
@@ -394,6 +395,7 @@ function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: numbe
  * Sample camera state at time t (seconds) from a keyframe array sorted by t.
  * Returns null if the array is empty. Holds the first/last keyframe outside
  * the defined range (US-defined "hold last frame" behavior).
+ * A stop with a `hold` keeps its view from `t` to `t + hold`.
  */
 export function sampleAt(
 	keyframes: Keyframe[],
@@ -404,16 +406,21 @@ export function sampleAt(
 	if (keyframes.length === 1 || t <= keyframes[0].t) return cameraOf(keyframes[0]);
 	const last = keyframes[keyframes.length - 1];
 	if (t >= last.t) return cameraOf(last);
+	// On a stop with a hold the move starts when the hold is over. For the
+	// maths that is simply a keyframe whose time is its departure.
+	const leaving = (kf: Keyframe): Keyframe => ({ ...kf, t: departureOf(kf) });
 	for (let i = 0; i < keyframes.length - 1; i++) {
 		const a = keyframes[i];
 		const b = keyframes[i + 1];
 		if (t >= a.t && t <= b.t) {
-			const span = b.t - a.t;
-			const alpha = span > 0 ? (t - a.t) / span : 0;
+			const from = departureOf(a);
+			if (t <= from) return cameraOf(a);
+			const span = b.t - from;
+			const alpha = span > 0 ? (t - from) / span : 0;
 			// The curve through a waypoint needs the keyframe beyond it.
-			const prev = a.waypoint && i > 0 ? keyframes[i - 1] : null;
+			const prev = a.waypoint && i > 0 ? leaving(keyframes[i - 1]) : null;
 			const next = b.waypoint && i + 2 < keyframes.length ? keyframes[i + 2] : null;
-			return interpolateKeyframes(a, b, alpha, projection, { prev, next });
+			return interpolateKeyframes(leaving(a), b, alpha, projection, { prev, next });
 		}
 	}
 	return cameraOf(last);

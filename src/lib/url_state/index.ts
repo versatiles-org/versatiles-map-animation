@@ -20,6 +20,7 @@ import type { InspectionNode } from '../codec';
 import {
 	ANIMATION_DEFAULTS,
 	DEFAULT_MAP_PROJECTION,
+	holdOf,
 	isDefaultScreenAnchor,
 	normalizeScreenAnchor,
 	normalizeSun,
@@ -65,7 +66,8 @@ function buildWire(anim: Animation): Wire {
 		sun: normalizeSun(anim.sun),
 		projection: anim.projection,
 		anchor: normalizeScreenAnchor(anim.anchor),
-		waypoints: anim.keyframes.map((kf) => kf.waypoint === true)
+		waypoints: anim.keyframes.map((kf) => kf.waypoint === true),
+		holds: anim.keyframes.map(holdOf)
 	};
 }
 
@@ -83,9 +85,11 @@ function fromWire(wire: Wire): Animation {
 			wire.projection !== DEFAULT_MAP_PROJECTION && { projection: wire.projection }),
 		terrain: wire.terrain,
 		sky: wire.sky,
-		keyframes: denormalizeKeyframes(wire.keyframes).map((kf, i) =>
-			wire.waypoints?.[i] ? { ...kf, waypoint: true } : kf
-		),
+		keyframes: denormalizeKeyframes(wire.keyframes).map((kf, i) => ({
+			...kf,
+			...(wire.waypoints?.[i] && { waypoint: true }),
+			...(!wire.waypoints?.[i] && (wire.holds?.[i] ?? 0) > 0 && { hold: wire.holds![i] })
+		})),
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
 		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,

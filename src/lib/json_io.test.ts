@@ -152,6 +152,30 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		expect(legacy.map((k) => k.path)).toEqual(['linear', 'linear', 'arc', 'linear', undefined]);
 	});
 
+	it('reads a hold on stops, and drops it where it means nothing', () => {
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		const read = (keyframes: object[]) =>
+			validateAnimation({ ...minimalAnim, keyframes }).keyframes;
+		const kfs = read([
+			kf(0, { hold: 2.5 }),
+			kf(5, { hold: 0 }),
+			kf(6, { hold: -1 }),
+			kf(7, { hold: 3, waypoint: true }),
+			kf(8)
+		]);
+		expect(kfs.map((k) => k.hold)).toEqual([2.5, undefined, undefined, undefined, undefined]);
+		expect(() => read([kf(0, { hold: 'long' })])).toThrow();
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

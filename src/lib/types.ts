@@ -513,6 +513,21 @@ export interface Keyframe {
 	 * first or last keyframe makes the animation start or end in motion.
 	 */
 	waypoint?: boolean;
+	/**
+	 * Seconds the camera rests on this stop: it arrives at `t` and leaves at
+	 * `t + hold`. Unset means it leaves at once. Waypoints have no hold.
+	 */
+	hold?: number;
+}
+
+/** How long the camera rests on a keyframe, in seconds — 0 for a waypoint. */
+export function holdOf(kf: Keyframe): number {
+	return kf.waypoint ? 0 : Math.max(0, kf.hold ?? 0);
+}
+
+/** When the camera leaves a keyframe: its time plus its hold. */
+export function departureOf(kf: Keyframe): number {
+	return kf.t + holdOf(kf);
 }
 
 export type CameraState = Omit<Keyframe, 't' | 'path'>;

@@ -135,6 +135,8 @@ type WireAnimation = {
 	anchor?: ScreenAnchor;
 	/** One flag per keyframe, in order: is it a waypoint? */
 	waypoints?: boolean[];
+	/** Hold of each keyframe in seconds, in order; 0 for none. */
+	holds?: number[];
 };
 
 // ---------------------------------------------------------------------------
@@ -247,8 +249,29 @@ const OPTIONS: AnimOption[] = [
 		decode: (v, r) => {
 			v.waypoints = v.keyframes.map(() => bool.decode(r));
 		}
+	},
+	{
+		// Per keyframe a flag, and for those that have one the hold in
+		// milliseconds — the unit keyframe times are stored in.
+		bit: 10,
+		label: 'holds',
+		shouldEmit: (v) => v.holds !== undefined && v.holds.some((h) => holdMs(h) > 0),
+		encode: (v, w) => {
+			for (let i = 0; i < v.keyframes.length; i++) {
+				const ms = holdMs(v.holds![i]);
+				bool.encode(ms > 0, w);
+				if (ms > 0) vuint.encode(ms, w);
+			}
+		},
+		decode: (v, r) => {
+			v.holds = v.keyframes.map(() => (bool.decode(r) ? vuint.decode(r) / 1000 : 0));
+		}
 	}
 ];
+
+function holdMs(seconds: number | undefined): number {
+	return Math.max(0, Math.round((seconds ?? 0) * 1000));
+}
 
 // ---------------------------------------------------------------------------
 // Codecs

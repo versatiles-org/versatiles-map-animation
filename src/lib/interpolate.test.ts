@@ -365,3 +365,51 @@ describe('waypoints', () => {
 		}
 	});
 });
+
+describe('hold', () => {
+	const kf = (t: number, lng: number, extra: Partial<Keyframe> = {}): Keyframe => ({
+		t,
+		lng,
+		lat: 0,
+		zoom: 5,
+		pitch: 0,
+		bearing: 0,
+		roll: 0,
+		path: 'linear',
+		...extra
+	});
+
+	it('keeps the view of the stop until the hold is over, then moves in the time left', () => {
+		const kfs = [kf(0, 0, { hold: 2 }), kf(4, 10)];
+		for (const t of [0, 1, 2]) expect(sampleAt(kfs, t)).toMatchObject({ lng: 0 });
+		// The move runs from 2 s to 4 s: halfway is at 3 s.
+		expect(sampleAt(kfs, 3)!.lng).toBeCloseTo(5, 9);
+		expect(sampleAt(kfs, 4)).toMatchObject({ lng: 10 });
+		// Same move without the hold, two seconds earlier.
+		const plain = [kf(0, 0), kf(2, 10)];
+		for (const dt of [0.3, 1, 1.7]) {
+			expect(sampleAt(kfs, 2 + dt)!.lng).toBeCloseTo(sampleAt(plain, dt)!.lng, 9);
+		}
+	});
+
+	it('holds in the middle and at the end of an animation', () => {
+		const kfs = [kf(0, 0), kf(2, 10, { hold: 3 }), kf(7, 20, { hold: 1 })];
+		for (const t of [2, 3.5, 5]) expect(sampleAt(kfs, t)).toMatchObject({ lng: 10 });
+		expect(sampleAt(kfs, 6)!.lng).toBeCloseTo(15, 9);
+		for (const t of [7, 7.5, 8, 9]) expect(sampleAt(kfs, t)).toMatchObject({ lng: 20 });
+	});
+
+	it('a move through waypoints leaves when the hold is over', () => {
+		const held = [kf(0, 0, { hold: 5 }), kf(6, 10, { waypoint: true }), kf(7, 20)];
+		const plain = [kf(0, 0), kf(1, 10, { waypoint: true }), kf(2, 20)];
+		for (const dt of [0.25, 0.5, 1, 1.5]) {
+			expect(sampleAt(held, 5 + dt)!.lng).toBeCloseTo(sampleAt(plain, dt)!.lng, 9);
+		}
+	});
+
+	it('ignores a hold on a waypoint', () => {
+		const flagged = [kf(0, 0), kf(1, 10, { waypoint: true, hold: 3 }), kf(2, 20)];
+		const plain = [kf(0, 0), kf(1, 10, { waypoint: true }), kf(2, 20)];
+		for (const t of [0.5, 1, 1.5]) expect(sampleAt(flagged, t)).toEqual(sampleAt(plain, t));
+	});
+});

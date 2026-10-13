@@ -673,6 +673,104 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s.selectedMove).toBeNull();
 	});
 
+	describe('hold', () => {
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t * 10,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		const load = (keyframes: object[], annotations: object[] = []) => {
+			const s = new AnimationStore();
+			s.loadFromAnimation({ ...s.toAnimation(), keyframes, annotations } as never);
+			return s;
+		};
+		const times = (s: AnimationStore) => s.keyframes.map((k) => k.t);
+
+		it('inserts the time at the stop: later keyframes move along', () => {
+			const s = load([kf(0), kf(2), kf(5)]);
+			s.setKeyframeHold(1, 3);
+			expect(s.keyframes[1].hold).toBe(3);
+			expect(times(s)).toEqual([0, 2, 8]);
+			expect(s.totalDuration).toBe(8);
+			s.setKeyframeHold(1, 1);
+			expect(times(s)).toEqual([0, 2, 6]);
+			s.setKeyframeHold(1, 0);
+			expect(s.keyframes[1]).not.toHaveProperty('hold');
+			expect(times(s)).toEqual([0, 2, 5]);
+		});
+
+		it('counts a hold on the last stop into the duration', () => {
+			const s = load([kf(0), kf(2)]);
+			s.setKeyframeHold(1, 1.5);
+			expect(s.totalDuration).toBe(3.5);
+			s.seekTo(3);
+			expect(s.sampledCamera).toMatchObject({ lng: 20 });
+		});
+
+		it('moves the annotations after the stop along, and leaves earlier ones alone', () => {
+			const s = load(
+				[kf(0), kf(2), kf(5)],
+				[
+					{ lng: 0, lat: 0, label: 'before', visibleFrom: 0.5, visibleUntil: 1.5 },
+					{ lng: 0, lat: 0, label: 'across', visibleFrom: 1, visibleUntil: 4 },
+					{ lng: 0, lat: 0, label: 'after', visibleFrom: 3, visibleUntil: 5 },
+					{ lng: 0, lat: 0, label: 'always' }
+				]
+			);
+			s.setKeyframeHold(1, 2);
+			expect(s.annotations.map((a) => [a.visibleFrom, a.visibleUntil])).toEqual([
+				[0.5, 1.5],
+				[1, 6],
+				[5, 7],
+				[undefined, undefined]
+			]);
+		});
+
+		it('snaps to the grid, never goes negative, and is not for waypoints', () => {
+			const s = load([kf(0), kf(2, { waypoint: true }), kf(5)]);
+			s.setKeyframeHold(0, 1.234);
+			expect(s.keyframes[0].hold).toBe(1.23);
+			s.setKeyframeHold(0, -4);
+			expect(s.keyframes[0]).not.toHaveProperty('hold');
+			expect(times(s)).toEqual([0, 2, 5]);
+			s.setKeyframeHold(1, 2);
+			expect(s.keyframes[1]).not.toHaveProperty('hold');
+		});
+
+		it('is dropped when the stop becomes a waypoint', () => {
+			const s = load([kf(0), kf(2, { hold: 2 }), kf(6)]);
+			s.setKeyframeWaypoint(1, true);
+			expect(s.keyframes[1]).not.toHaveProperty('hold');
+			expect(times(s)).toEqual([0, 2, 6]);
+		});
+
+		it('keeps keyframes out of each other when one is retimed', () => {
+			const s = load([kf(0), kf(2, { hold: 2 }), kf(6)]);
+			// Dropped into the hold of another stop: it lands right after it.
+			s.setKeyframeTime(2, 3);
+			expect(times(s)).toEqual([0, 2, 4.01]);
+			// Its own hold must not cover a later keyframe either.
+			s.setKeyframeTime(1, 3);
+			expect(s.keyframes.map((k) => [k.t, k.hold ?? 0])).toEqual([
+				[0, 0],
+				[4.01, 0],
+				[4.02, 2]
+			]);
+		});
+
+		it('does not add a keyframe inside a hold', () => {
+			const s = load([kf(0), kf(2, { hold: 2 })]);
+			s.seekTo(3);
+			s.addKeyframeFromCamera({ lng: 1, lat: 1, zoom: 1, pitch: 0, bearing: 0, roll: 0 });
+			expect(times(s)).toEqual([0, 2, 5]);
+		});
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

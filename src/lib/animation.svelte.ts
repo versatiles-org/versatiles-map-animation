@@ -7,6 +7,8 @@ import {
 	cameraOf,
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
+	departureOf,
+	holdOf,
 	DEFAULT_MAP_PROJECTION,
 	DEFAULT_SCREEN_ANCHOR,
 	isDefaultScreenAnchor,
@@ -55,6 +57,14 @@ function snapTime(t: number): number {
 }
 
 /** Return a new array with `arr[idx]` replaced by `value`. */
+/**
+ * Does the span `from..to` come closer than `MIN_TIME_GAP` to the time a
+ * keyframe occupies — its `t`, or its whole hold?
+ */
+function overlaps(kf: Keyframe, from: number, to: number): boolean {
+	return to > kf.t - MIN_TIME_GAP && from < departureOf(kf) + MIN_TIME_GAP;
+}
+
 function replaceAt<T>(arr: T[], idx: number, value: T): T[] {
 	return [...arr.slice(0, idx), value, ...arr.slice(idx + 1)];
 }
@@ -191,8 +201,9 @@ export class AnimationStore {
 	/** Live camera state from the map; not part of the saved animation. */
 	liveCamera = $state<CameraState>({ ...DEFAULT_INITIAL_VIEW });
 
+	/** When the animation ends: the last keyframe's time plus its hold. */
 	totalDuration = $derived(
-		this.keyframes.length > 0 ? this.keyframes[this.keyframes.length - 1].t : 0
+		this.keyframes.length > 0 ? departureOf(this.keyframes[this.keyframes.length - 1]) : 0
 	);
 	selectedKeyframe = $derived(
 		this.selectedIndex !== null ? (this.keyframes[this.selectedIndex] ?? null) : null
@@ -237,9 +248,10 @@ export class AnimationStore {
 		// If the playhead is parked on (or right next to) an existing keyframe,
 		// fall back to appending after the last one — otherwise consecutive
 		// clicks would all collide at the same time.
-		const collides = this.keyframes.some((kf) => Math.abs(kf.t - t) < MIN_TIME_GAP);
+		// The same goes for a playhead inside the hold of a stop.
+		const collides = this.keyframes.some((kf) => overlaps(kf, t, t));
 		if (collides) {
-			t = snapTime(this.keyframes[this.keyframes.length - 1].t + 1.0);
+			t = snapTime(departureOf(this.keyframes[this.keyframes.length - 1]) + 1.0);
 		}
 		const kf: Keyframe = { t, ...cam };
 		const after = this.keyframes.findIndex((k) => k.t > t);
@@ -280,9 +292,45 @@ export class AnimationStore {
 		const kf = this.keyframes[index];
 		if (!kf) return;
 		const updated: Keyframe = { ...kf };
-		if (waypoint) updated.waypoint = true;
-		else delete updated.waypoint;
+		if (waypoint) {
+			updated.waypoint = true;
+			// A waypoint is flown through; the time of its hold stays part of the move.
+			delete updated.hold;
+		} else delete updated.waypoint;
 		this.keyframes = replaceAt(this.keyframes, index, updated);
+	}
+
+	/**
+	 * Set how long the camera rests on a stop. The time is inserted (or taken
+	 * out) right there: every later keyframe moves by the difference, and so
+	 * do the visibility times of annotations that lie after the stop, so the
+	 * rest of the animation keeps its shape and stays in sync.
+	 */
+	setKeyframeHold(index: number, hold: number): void {
+		const kf = this.keyframes[index];
+		if (!kf || kf.waypoint) return;
+		const next = Math.max(0, snapTime(Number.isFinite(hold) ? hold : 0));
+		const delta = next - holdOf(kf);
+		if (delta === 0) return;
+		const pivot = departureOf(kf);
+		const updated: Keyframe = { ...kf };
+		if (next > 0) updated.hold = next;
+		else delete updated.hold;
+		this.keyframes = this.keyframes.map((k, i) =>
+			i === index ? updated : i > index ? { ...k, t: snapTime(k.t + delta) } : k
+		);
+		const shift = (t: number | undefined) =>
+			t !== undefined && t >= pivot ? Math.max(0, snapTime(t + delta)) : t;
+		this.annotations = this.annotations.map((a) => {
+			const visibleFrom = shift(a.visibleFrom);
+			const visibleUntil = shift(a.visibleUntil);
+			if (visibleFrom === a.visibleFrom && visibleUntil === a.visibleUntil) return a;
+			return {
+				...a,
+				...(visibleFrom !== undefined && { visibleFrom }),
+				...(visibleUntil !== undefined && { visibleUntil })
+			};
+		});
 	}
 
 	/**
@@ -305,8 +353,10 @@ export class AnimationStore {
 		const others = this.keyframes.filter((_, i) => i !== index);
 		// Nudge until no other keyframe is within MIN_TIME_GAP. MIN_TIME_GAP is
 		// itself one grid step, so nudged values stay on the grid.
-		while (others.some((o) => Math.abs(o.t - moved.t) < MIN_TIME_GAP)) {
-			moved.t = snapTime(moved.t + MIN_TIME_GAP);
+		// A hold makes a keyframe a span of time: neither may the moved one
+		// land inside another's hold, nor its own hold cover another keyframe.
+		for (let o; (o = others.find((o) => overlaps(o, moved.t, departureOf(moved))));) {
+			moved.t = snapTime(departureOf(o) + MIN_TIME_GAP);
 		}
 		const sorted = [...others, moved].sort((a, b) => a.t - b.t);
 		const newIndex = sorted.indexOf(moved);

@@ -743,6 +743,53 @@ describe('waypoints', () => {
 	});
 });
 
+describe('holds', () => {
+	const flight = (holds: number[], waypoints: number[] = []): Animation => ({
+		...example,
+		keyframes: holds.map((hold, i) => ({
+			t: i * 10,
+			lng: 10 + i,
+			lat: 50,
+			zoom: 8,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...(hold > 0 && { hold }),
+			...(waypoints.includes(i) && { waypoint: true })
+		}))
+	});
+
+	it('cost nothing when no stop holds', () => {
+		const plain = flight([0, 0, 0]);
+		const explicitZero = { ...plain, keyframes: plain.keyframes.map((k) => ({ ...k, hold: 0 })) };
+		expect(encodeAnimation(explicitZero)).toBe(encodeAnimation(plain));
+		expect(encodeAnimation(flight([0, 2, 0])).length).toBeGreaterThan(
+			encodeAnimation(plain).length
+		);
+		for (const kf of decodeAnimation(encodeAnimation(flight([0, 0, 0])))!.keyframes) {
+			expect(kf).not.toHaveProperty('hold');
+		}
+	});
+
+	it('round-trip to the millisecond, in any position', () => {
+		for (const holds of [
+			[2, 0, 0],
+			[0, 1.5, 0],
+			[0, 0, 3.25],
+			[0.01, 7.777, 120]
+		]) {
+			const decoded = decodeAnimation(encodeAnimation(flight(holds)));
+			expect(decoded?.keyframes.map((k) => k.hold ?? 0)).toEqual(holds);
+		}
+	});
+
+	it('round-trip next to waypoints, and never end up on one', () => {
+		const decoded = decodeAnimation(encodeAnimation(flight([2, 5, 0, 1], [1])));
+		expect(decoded?.keyframes.map((k) => k.hold ?? 0)).toEqual([2, 0, 0, 1]);
+		expect(decoded?.keyframes.map((k) => k.waypoint === true)).toEqual([false, true, false, false]);
+	});
+});
+
 describe('legacy spline path', () => {
 	// Links written while `spline` was a path style, four keyframes each.
 	const ALL_SPLINE = 'AhQkdTA4mHYp_W49h0-_RLrmZhcRVP4afjw8y1ENueLHIAfwvcPKErqKcancNU1YAAAA';

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 	import { MOVE_KIND_LABELS } from '../moves';
+	import { departureOf, holdOf } from '../types';
 	import PathIcon from './PathIcon.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -71,7 +72,7 @@
 
 	function startScrub(e: PointerEvent) {
 		const target = e.target as HTMLElement;
-		if (target.closest('.marker')) return;
+		if (target.closest('.marker, .hold, .hold-handle')) return;
 		// A press on a move's band selects that move; anywhere else on the
 		// track drops the selection. Either way it also scrubs.
 		const band = target.closest<HTMLElement>('.move');
@@ -207,6 +208,38 @@
 			},
 			onUp: () => {
 				store.isScrubbing = false;
+			}
+		});
+	}
+
+	/**
+	 * Drag the right edge of a stop: sets how long the camera rests there.
+	 * Later keyframes move along (see `setKeyframeHold`), which changes the
+	 * animation's length — so the view stops auto-fitting while dragging, or
+	 * the timeline would rescale under the pointer.
+	 */
+	function startDragHold(e: PointerEvent, index: number) {
+		e.stopPropagation();
+		e.preventDefault();
+		const kf = store.keyframes[index];
+		if (!kf) return;
+		store.selectAt(index);
+		store.pause();
+		const wasAutoFit = viewSpan === null;
+		viewSpan = span;
+		viewStart = start;
+		// Where on the handle it was grabbed, so it doesn't jump to the pointer.
+		const grab = tFromClientX(e.clientX) - departureOf(kf);
+		capturePointer(e.target as HTMLElement, e, {
+			onMove: (ev) => {
+				const current = store.keyframes[index];
+				if (!current) return;
+				store.setKeyframeHold(index, tFromClientX(ev.clientX) - grab - current.t);
+				store.currentTime = departureOf(store.keyframes[index]);
+			},
+			onUp: () => {
+				// Back to fitting the whole animation, now at its new length.
+				if (wasAutoFit) viewSpan = null;
 			}
 		});
 	}
@@ -351,7 +384,7 @@
 		{/each}
 
 		{#each store.moves as move (move.start)}
-			{@const from = store.keyframes[move.start].t}
+			{@const from = departureOf(store.keyframes[move.start])}
 			{@const to = store.keyframes[move.end].t}
 			<button
 				type="button"
@@ -367,6 +400,36 @@
 			>
 				<PathIcon icon={move.kind === 'curve' ? 'waypoint' : move.kind} size={14} />
 			</button>
+		{/each}
+
+		{#each store.keyframes as kf, i (i)}
+			{@const hold = holdOf(kf)}
+			{#if hold > 0}
+				<!-- The time the camera rests on a stop. Dragging it moves the
+				     keyframe, like dragging its marker. -->
+				<div
+					class="hold"
+					class:selected={store.selectedIndex === i}
+					style="left: {pct(kf.t)}%; width: {pct(kf.t + hold) - pct(kf.t)}%"
+					onpointerdown={(e) => startDragMarker(e, i)}
+					title="Stop {i + 1} rests for {fmt(hold)}s"
+					role="presentation"
+				></div>
+			{/if}
+			{#if !kf.waypoint && (hold > 0 || store.selectedIndex === i)}
+				<button
+					type="button"
+					class="hold-handle"
+					class:detached={hold === 0}
+					class:selected={store.selectedIndex === i}
+					style="left: {pct(kf.t + hold)}%"
+					onpointerdown={(e) => startDragHold(e, i)}
+					title={hold > 0
+						? `Rests for ${fmt(hold)}s — drag to change. Everything after moves along.`
+						: 'Drag right to let the camera rest here. Everything after moves along.'}
+					aria-label="Hold time of stop {i + 1}"
+				></button>
+			{/if}
 		{/each}
 
 		{#each store.keyframes as kf, i (i)}
@@ -610,6 +673,47 @@
 			:global(svg) {
 				display: none;
 			}
+		}
+	}
+	/* A stop that rests: a solid block from arrival to departure, in the
+	   colour of the keyframe markers, with a grip on its right edge. */
+	.hold {
+		position: absolute;
+		top: 50%;
+		height: 18px;
+		transform: translateY(-50%);
+		box-sizing: border-box;
+		background: #4a9eff;
+		border: 1px solid #fff;
+		border-radius: 3px;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+		cursor: ew-resize;
+
+		&.selected {
+			background: #ffd24a;
+		}
+	}
+	.hold-handle {
+		position: absolute;
+		top: 50%;
+		width: 9px;
+		height: 26px;
+		/* Sits on the block's right edge, mostly inside it. */
+		transform: translate(-7px, -50%);
+		padding: 0;
+		background: #fff;
+		border: 1px solid rgba(0, 0, 0, 0.6);
+		border-radius: 3px;
+		cursor: col-resize;
+
+		&.selected {
+			background: #ffd24a;
+		}
+		/* No hold yet: the grip stands right of the diamond, ready to be pulled out. */
+		&.detached {
+			transform: translate(11px, -50%);
+			height: 18px;
+			opacity: 0.85;
 		}
 	}
 	.marker {

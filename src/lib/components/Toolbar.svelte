@@ -3,7 +3,7 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { PATH_STYLE_LABELS, PATH_STYLES } from '../types';
+	import { holdOf, PATH_STYLE_LABELS, PATH_STYLES } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
 	import PathIcon from './PathIcon.svelte';
@@ -231,6 +231,27 @@
 					</button>
 				{/each}
 			</div>
+			<label
+				class="choice hold-input"
+				title={isWaypoint
+					? 'A waypoint is flown through and cannot hold'
+					: 'Seconds the camera rests on the selected stop before it moves on. Changing it moves everything after it along.'}
+			>
+				<span class="lbl">Hold</span>
+				<input
+					type="number"
+					min="0"
+					step="0.1"
+					value={store.selectedKeyframe ? holdOf(store.selectedKeyframe) : 0}
+					disabled={!hasSelection || isWaypoint}
+					onchange={(e) => {
+						if (store.selectedIndex !== null) {
+							store.setKeyframeHold(store.selectedIndex, Number(e.currentTarget.value));
+						}
+					}}
+				/>
+				<span>s</span>
+			</label>
 		{/if}
 	</div>
 
@@ -363,6 +384,26 @@
 			text-transform: uppercase;
 			letter-spacing: 0.06em;
 			color: #777;
+		}
+		input[type='number'] {
+			width: 3.6em;
+			padding: 0.35rem 0.3rem;
+			background: rgba(255, 255, 255, 0.06);
+			border: 1px solid #333;
+			border-radius: 4px;
+			color: #ddd;
+			font: inherit;
+			font-size: 13px;
+			font-variant-numeric: tabular-nums;
+
+			&:hover:not(:disabled),
+			&:focus {
+				border-color: #4a9eff;
+				outline: none;
+			}
+			&:disabled {
+				opacity: 0.4;
+			}
 		}
 		.note {
 			display: inline-flex;
