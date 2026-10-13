@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { chromiumArgs, isSoftwareRenderer, noGpuMessage } from './gpu.mjs';
+import {
+	chromiumArgs,
+	isSoftwareRenderer,
+	lacksGpuDrivers,
+	noGpuDriversMessage,
+	noGpuMessage
+} from './gpu.mjs';
 
 describe('chromiumArgs', () => {
 	it('draws in software by default, on any platform, exactly as before', () => {
@@ -65,6 +71,22 @@ describe('isSoftwareRenderer', () => {
 		]) {
 			expect(isSoftwareRenderer(name)).toBe(false);
 		}
+	});
+});
+
+describe('the image without GPU drivers', () => {
+	it('is recognised only where the image says so', () => {
+		expect(lacksGpuDrivers({ RENDERER_GPU_DRIVERS: 'false' })).toBe(true);
+		expect(lacksGpuDrivers({ RENDERER_GPU_DRIVERS: 'true' })).toBe(false);
+		// Outside the image (a native run, somebody's own container) nothing is assumed.
+		expect(lacksGpuDrivers({})).toBe(false);
+	});
+
+	it('names the image to use instead', () => {
+		const message = noGpuDriversMessage();
+		expect(message).toContain(':latest-gpu');
+		expect(message).toContain('--build-arg GPU=true');
+		expect(message).toContain('Leave out --gpu');
 	});
 });
 

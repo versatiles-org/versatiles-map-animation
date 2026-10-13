@@ -19,6 +19,7 @@
 		"check": "npm run format && npm run check:svelte && npm run lint && npm run test",
 		"dev": "vite dev",
 		"docker:build": "docker build -f render/Dockerfile -t versatiles-map-animation .",
+		"docker:build:gpu": "docker build -f render/Dockerfile --build-arg GPU=true -t versatiles-map-animation:gpu .",
 		"format:check": "prettier --log-level=warn --check .",
 		"format": "prettier --log-level=warn --write .",
 		"inspect": "tsx scripts/inspect-hash.ts",

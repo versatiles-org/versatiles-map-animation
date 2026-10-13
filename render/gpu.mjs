@@ -45,6 +45,27 @@ export function chromiumArgs({ gpu = false, platform = process.platform } = {}) 
 }
 
 /**
+ * Is this the variant of the Docker image that leaves out the GPU drivers?
+ * The image says which one it is in `RENDERER_GPU_DRIVERS` (see the
+ * Dockerfile); anywhere else the variable is unset and nothing is assumed.
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function lacksGpuDrivers(env = process.env) {
+	return env.RENDERER_GPU_DRIVERS === 'false';
+}
+
+/** What to tell someone who gave `--gpu` to the image without GPU drivers. */
+export function noGpuDriversMessage() {
+	return [
+		'--gpu was given, but this image has no GPU drivers.',
+		'Use the image whose tag ends in "-gpu", for example',
+		'  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu',
+		'or build it yourself with `--build-arg GPU=true`.',
+		'Leave out --gpu to render in software.'
+	].join('\n');
+}
+
+/**
  * Is this WebGL renderer (the `UNMASKED_RENDERER_WEBGL` string) one that
  * draws on the CPU? SwiftShader is Chromium's own; llvmpipe and lavapipe are
  * Mesa's, which a Linux system offers when it finds no GPU.

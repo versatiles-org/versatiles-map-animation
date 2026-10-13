@@ -21,8 +21,19 @@ concurrency:
 
 jobs:
   build:
-    name: Build and push
+    name: Build and push (${{ matrix.variant }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # `gpu` is the same image plus the GPU drivers that `--gpu` needs;
+        # its tags end in `-gpu` (see the GPU arg in render/Dockerfile).
+        include:
+          - variant: default
+            gpu: 'false'
+            suffix: ''
+          - variant: gpu
+            gpu: 'true'
+            suffix: '-gpu'
     steps:
       - uses: actions/checkout@v7
 
@@ -51,6 +62,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
+          flavor: |
+            suffix=${{ matrix.suffix }},onlatest=true
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -62,6 +75,8 @@ jobs:
         with:
           context: .
           file: render/Dockerfile
+          build-args: |
+            GPU=${{ matrix.gpu }}
           # Multi-arch so Apple-Silicon and arm64 Linux can pull directly.
           # arm64 builds run under QEMU on amd64 runners; that's slow but only
           # noticeable on the first push (gha cache covers subsequent runs).
@@ -69,5 +84,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # One cache per variant, or each build would evict the other's layers.
+          cache-from: type=gha,scope=${{ matrix.variant }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant }}

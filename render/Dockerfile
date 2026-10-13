@@ -26,16 +26,22 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # ("VersaTiles", bottom right) in. Debian's ffmpeg used to bring it along;
 # without it the attribution falls back to another typeface.
 #
-# libvulkan1 + mesa-vulkan-drivers are for `--gpu`: the Vulkan loader, and
-# Mesa's drivers for Intel and AMD GPUs (reached through `--device /dev/dri`).
-# NVIDIA's driver is not in the image; the NVIDIA Container Toolkit hands it
-# in at `docker run --gpus all`, and NVIDIA_DRIVER_CAPABILITIES tells it to
-# include the graphics part (Vulkan), not just CUDA. Without `--gpu` none of
-# this is used.
+# `--build-arg GPU=true` builds the variant for `--gpu`, published with a
+# `-gpu` suffix on its tags. It adds libvulkan1 + mesa-vulkan-drivers: the
+# Vulkan loader, and Mesa's drivers for Intel and AMD GPUs (reached through
+# `--device /dev/dri`) — some 260 MB that a render in software never touches,
+# which is why the default image goes without. NVIDIA's driver is in neither;
+# the NVIDIA Container Toolkit hands it in at `docker run --gpus all`, and
+# NVIDIA_DRIVER_CAPABILITIES tells it to include the graphics part (Vulkan),
+# not just CUDA. RENDERER_GPU_DRIVERS lets the renderer tell the two variants
+# apart, so `--gpu` in the default image can name the image to use instead.
+ARG GPU=false
+ENV RENDERER_GPU_DRIVERS=${GPU}
 ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ca-certificates fonts-dejavu-core libvulkan1 mesa-vulkan-drivers \
+	&& apt-get install -y --no-install-recommends ca-certificates fonts-dejavu-core \
+		$([ "$GPU" = true ] && echo libvulkan1 mesa-vulkan-drivers) \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 

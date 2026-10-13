@@ -4,7 +4,7 @@ Headless renderer that takes a sharing code (the `kf=...` URL hash payload) and
 produces a video of the animation — an MP4 by default, or one of the
 [formats](#formats) for editing and lossless output. Runs in a Docker container with software
 WebGL — no GPU required. On a Linux machine with a GPU, [`--gpu`](#gpu)
-makes it several times faster.
+and the `-gpu` variant of the image make it several times faster.
 
 ## Pull a prebuilt image
 
@@ -31,6 +31,9 @@ and `render/` in the build context) and leaves you with a local image named
 `ghcr.io/versatiles-org/versatiles-map-animation:latest` in the commands
 below, and drop `--pull always` if you copied a command from the editor:
 with it Docker looks for an image of that name online and fails.
+
+`npm run docker:build:gpu` builds the variant with the GPU drivers for
+[`--gpu`](#gpu), as `versatiles-map-animation:gpu`.
 
 ## Render an animation
 
@@ -118,30 +121,36 @@ same sRGB curve, so anything that does not move keeps its exact colour.
 
 By default the map is drawn in software, which works everywhere and is the
 slowest part of a render. With `--gpu` the browser draws on a GPU instead.
-The container has to be started with access to it:
+
+This needs the **`-gpu` variant of the image** — the same tags with `-gpu`
+at the end (`latest-gpu`, `v1.2.3-gpu`, …). It carries the GPU drivers,
+which the default image leaves out because they add about 260 MB that a
+render in software never uses. The container also has to be started with
+access to the GPU:
 
 ```sh
 # NVIDIA (needs the NVIDIA Container Toolkit on the host)
 docker run --rm -it --gpus all -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu \
   --hash 'AVYw...' --width 1920 --gpu --output animation.mp4
 
 # Intel or AMD
 docker run --rm -it --device /dev/dri -v "$PWD:/out" \
-  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  ghcr.io/versatiles-org/versatiles-map-animation:latest-gpu \
   --hash 'AVYw...' --width 1920 --gpu --output animation.mp4
 ```
 
 The renderer prints which GPU it draws on. If it asked for one and did not
-get one, it stops with an explanation instead of rendering slowly.
+get one, it stops with an explanation instead of rendering slowly — also
+when `--gpu` is given to the default image.
 
 - **Linux only, inside Docker.** Docker Desktop on macOS and Windows cannot
   pass a GPU into a container. On a Mac, run the renderer without Docker
   (`node render/render.mjs --gpu …` after `npm ci && npm run build`); there
   it uses Metal and drew the example about eight times faster.
 - **Not yet tried on a Linux GPU.** The browser flags follow Chrome's own
-  guidance for headless rendering on a GPU (ANGLE on Vulkan), and the image
-  carries the Vulkan loader and Mesa's drivers, but this path has only been
+  guidance for headless rendering on a GPU (ANGLE on Vulkan), and the `-gpu`
+  image carries the Vulkan loader and Mesa's drivers, but this path has only been
   exercised up to the point where no GPU is found. Please report how it goes.
 - **The picture is not bit-identical to software rendering.** GPUs and
   drivers round differently; the difference is not visible.

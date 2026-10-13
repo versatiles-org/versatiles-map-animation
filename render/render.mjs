@@ -34,7 +34,13 @@ import {
 	QUALITIES,
 	validateEncoding
 } from './formats.mjs';
-import { chromiumArgs, isSoftwareRenderer, noGpuMessage } from './gpu.mjs';
+import {
+	chromiumArgs,
+	isSoftwareRenderer,
+	lacksGpuDrivers,
+	noGpuDriversMessage,
+	noGpuMessage
+} from './gpu.mjs';
 
 const ALLOWED_WIDTHS = [640, 1280, 1920, 3840];
 const DEFAULT_OPTS = {
@@ -682,6 +688,7 @@ async function main() {
 		debug(`serving ${root} on ${server.url}`);
 	}
 
+	if (opts.gpu && lacksGpuDrivers()) throw new Error(noGpuDriversMessage());
 	const browser = await chromium.launch({ args: chromiumArgs({ gpu: opts.gpu }) });
 
 	try {
