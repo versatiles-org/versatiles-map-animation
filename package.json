@@ -1,6 +1,6 @@
 {
 	"name": "versatiles-map-animator",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Tool for composing map camera animations on a timeline (VersaTiles).",
 	"private": true,
 	"type": "module",
