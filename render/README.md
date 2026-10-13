@@ -1,7 +1,8 @@
 # Offline renderer
 
 Headless renderer that takes a sharing code (the `kf=...` URL hash payload) and
-produces an MP4 of the animation. Runs in a Docker container with software
+produces a video of the animation — an MP4 by default, or one of the
+[formats](#formats) for editing and lossless output. Runs in a Docker container with software
 WebGL — no GPU required.
 
 ## Pull a prebuilt image
@@ -58,14 +59,53 @@ docker run --rm -it -v "$PWD:/out" \
 | `--url <full-url>`     |                   | alternative to `--hash`; renderer extracts the hash   |
 | `--width <n>`          | `1280`            | one of `640`, `1280`, `1920`, `3840` (height = ×9/16) |
 | `--fps <n>`            | `30`              | frame rate                                            |
-| `--crf <n>`            | `18`              | x264 CRF — lower = higher quality, larger file        |
-| `--preset <name>`      | `slow`            | x264 preset (`ultrafast`…`veryslow`)                  |
+| `--format <name>`      | `mp4`             | `mp4`, `prores`, `ffv1` or `animation` — see below    |
+| `--quality <level>`    | `standard`        | for `mp4`: `high`, `standard` or `small`              |
+| `--crf <n>`            |                   | for `mp4`: exact x264 CRF instead of `--quality`      |
+| `--preset <name>`      | `slow`            | for `mp4`: x264 preset (`ultrafast`…`veryslow`)       |
 | `--frame-timeout <ms>` | `30000`           | per-frame settle deadline                             |
 | `--motion-blur <n>`    | `1` (off)         | sub-frames per output frame; 4–8 typical; N× slower   |
 | `--shutter-angle <d>`  | `180`             | shutter angle in degrees (only with motion blur)      |
 | `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
 | `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
-| `--output <path>`      | (required)        | output MP4 path (relative paths resolve under `/out`) |
+| `--output <path>`      | (required)        | output file; its ending has to match the format       |
+
+## Formats
+
+| `--format`  | file   | what it is                              | for                                                                  |
+| ----------- | ------ | --------------------------------------- | -------------------------------------------------------------------- |
+| `mp4`       | `.mp4` | H.264, 4:2:0, 8 bit                     | the web, social media, sending around. Small, plays everywhere.      |
+| `prores`    | `.mov` | ProRes 4444, 4:4:4, 10 bit              | editing in Premiere, Final Cut, DaVinci Resolve. Visually lossless.  |
+| `ffv1`      | `.mkv` | FFV1, RGB — **lossless**                | archiving and exact work. Compact; opens in Resolve, VLC, ffmpeg.    |
+| `animation` | `.mov` | QuickTime Animation, RGB — **lossless** | lossless for Adobe and Apple software. About twice the size of FFV1. |
+
+The two lossless formats store exactly the pixels the browser drew. As a
+guide, at 1920×1080 a frame takes about 0.1 MB as `mp4`, 1.5 MB as `prores`,
+1.5–2 MB as `ffv1` and 3–4 MB as `animation`.
+
+`mp4` has three quality levels:
+
+| `--quality` | x264 CRF | roughly, at 1920×1080 and 30 fps | for                                       |
+| ----------- | -------- | -------------------------------- | ----------------------------------------- |
+| `high`      | 15       | 27–40 Mbit/s                     | uploading to a platform that re-encodes   |
+| `standard`  | 18       | 18–28 Mbit/s                     | general use                               |
+| `small`     | 24       | 7–13 Mbit/s                      | embedding the file directly on a web page |
+
+`--crf` sets the value directly. `--quality`, `--crf` and `--preset` only
+apply to `mp4`.
+
+```sh
+docker run --rm -it -v "$PWD:/out" \
+  ghcr.io/versatiles-org/versatiles-map-animation:latest \
+  --hash 'AVYw...' --width 1920 --format ffv1 --output animation.mkv
+```
+
+**Colour.** The captured frames are sRGB. The lossless formats keep those
+RGB values untouched; `mp4` and `prores` are converted with the BT.709
+matrix to limited range, as every player expects of HD video. All files are
+tagged with BT.709 primaries and the sRGB transfer curve. With motion blur
+the frames are averaged in linear light at 16 bits and brought back to the
+same sRGB curve, so anything that does not move keeps its exact colour.
 
 ## Timing summary
 
@@ -105,7 +145,8 @@ so WebGL runs on the CPU, then drives the page frame-by-frame:
    MapLibre take many frames to settle (label fades, terrain textures
    renewed one tile per frame), so a frame is usually final after one or
    two redraws. The screenshot uses Chromium's speed-optimised PNG.
-4. Frames stream into ffmpeg over stdin → H.264 / yuv420p MP4 with `+faststart`.
+4. Frames stream into ffmpeg over stdin, which encodes them in the chosen
+   format (`formats.mjs` holds the ffmpeg settings of each).
 
 Per-frame render time scales with viewport size and animation complexity.
 As a guide, the example animation (satellite + terrain) takes about

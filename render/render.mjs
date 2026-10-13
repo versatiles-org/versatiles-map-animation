@@ -4,7 +4,8 @@
  *
  * Drives the static /view page frame-by-frame in headless Chromium with
  * software-WebGL (SwiftShader), captures each frame as PNG, and pipes the
- * stream into ffmpeg for H.264 encoding. A virtual clock (Playwright's
+ * stream into ffmpeg, which encodes it in the chosen format (see
+ * `formats.mjs`; H.264 in MP4 by default). A virtual clock (Playwright's
  * page.clock) keeps MapLibre's internal animations (label fades, transitions)
  * synchronised with the keyframe playhead so per-frame settle time is
  * decoupled from animation time.
@@ -12,7 +13,8 @@
  * Usage:
  *   node render.mjs --hash <code>           --output out.mp4
  *   node render.mjs --url 'https://…#kf=…'  --output out.mp4
- *   node render.mjs --hash AVYw… --width 1920 --fps 30 --crf 18 --output out.mp4
+ *   node render.mjs --hash AVYw… --width 1920 --fps 30 --quality high --output out.mp4
+ *   node render.mjs --hash AVYw… --format ffv1 --output out.mkv
  */
 
 import { spawn } from 'node:child_process';
@@ -23,6 +25,15 @@ import { dirname, extname, isAbsolute, join, normalize, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
+import {
+	DEFAULT_FORMAT,
+	DEFAULT_PRESET,
+	DEFAULT_QUALITY,
+	encodingArgs,
+	FORMATS,
+	QUALITIES,
+	validateEncoding
+} from './formats.mjs';
 
 const ALLOWED_WIDTHS = [640, 1280, 1920, 3840];
 const DEFAULT_OPTS = {
@@ -32,8 +43,12 @@ const DEFAULT_OPTS = {
 	// `--height` derived from the chosen composition aspect ratio.
 	height: null,
 	fps: 30,
-	crf: 18,
-	preset: 'slow',
+	// Output format and, for `mp4`, its quality — see `formats.mjs`. `crf`
+	// and `preset` are the expert overrides of `quality`; `null` = not given.
+	format: DEFAULT_FORMAT,
+	quality: undefined,
+	crf: null,
+	preset: null,
 	frameTimeoutMs: 30_000,
 	prewarm: true,
 	endTime: null,
@@ -141,6 +156,12 @@ function parseArgv(argv) {
 			case '--fps':
 				out.fps = parseInt(next(), 10);
 				break;
+			case '--format':
+				out.format = next();
+				break;
+			case '--quality':
+				out.quality = next();
+				break;
 			case '--crf':
 				out.crf = parseInt(next(), 10);
 				break;
@@ -195,8 +216,18 @@ function usage() {
 		'  --width <n>            video width — one of 640, 1280, 1920, 3840 (default 1280)',
 		'  --height <n>           video height (default: width * 9/16 — i.e. 16:9 aspect)',
 		'  --fps <n>              frame rate (default 30)',
-		'  --crf <n>              x264 CRF, lower = higher quality (default 18)',
-		'  --preset <name>        x264 preset (default "slow")',
+		'  --format <name>        output format (default "' + DEFAULT_FORMAT + '"):',
+		...Object.entries(FORMATS).map(
+			([name, f]) => `                           ${name.padEnd(10)} ${f.extension}  ${f.summary}`
+		),
+		'  --quality <level>      for --format mp4: ' +
+			Object.entries(QUALITIES)
+				.map(([name, crf]) => `${name} (CRF ${crf})`)
+				.join(', ') +
+			`; default ${DEFAULT_QUALITY}`,
+		'  --crf <n>              for --format mp4: exact x264 CRF instead of --quality,',
+		'                          0..51, lower = higher quality',
+		`  --preset <name>        for --format mp4: x264 preset (default "${DEFAULT_PRESET}")`,
 		'  --frame-timeout <ms>   per-frame settle timeout (default 30000)',
 		'  --motion-blur <n>      render N sub-frames per output frame and average them',
 		'                          for accumulation-buffer motion blur. 1 (default) = off,',
@@ -205,7 +236,7 @@ function usage() {
 		'                          180° spans half a frame duration; 360° spans the whole.',
 		'                          Only meaningful with --motion-blur > 1.',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
-		'  --output <path>        output MP4 (required)',
+		'  --output <path>        output file (required); its ending has to match the format',
 		'  -v, --verbose          show ffmpeg output and page console messages',
 		''
 	].join('\n');
@@ -305,36 +336,9 @@ function buildPageUrl(baseUrl, hash, render) {
 }
 
 function spawnFfmpeg(opts) {
-	// With motion blur, we stream N sub-frames per output frame at
-	// `fps × N`. ffmpeg's `tmix=frames=N` averages every N consecutive
-	// frames; then `select=not(mod(n+1,N))` keeps only the *last* frame of
-	// each complete N-window. Net: each output frame is the average of N
-	// sub-frames that span one output-frame's duration of animation time.
-	//
-	// Why not `fps=fps=…` to decimate? `tmix` is a sliding window — it
-	// emits one frame per input, each being the average of the previous N
-	// inputs. A timestamp-based decimator like `fps` picks the input frame
-	// nearest each output time slot, which lands at tmix indices kN — but
-	// `tmix[kN]` averages frames in [kN-N+1 .. kN], i.e. the END of output
-	// frame k-1's sub-frames + the START of output frame k's. The result
-	// is a visible "doubled" motion-blur trail per output frame. Keeping
-	// the indices kN-1 instead gives the clean per-group average we want.
-	//
-	// `tpad=stop=1:stop_mode=clone` adds one trailing dummy frame so the
-	// stream-end machinery flushes the last complete tmix window through
-	// `select` (without it, the final group's frame at index totalN-1 gets
-	// dropped at EOS).
-	//
-	// The two `zscale` calls do the averaging in **linear light**: PNGs
-	// from Chromium are sRGB-encoded (perceptually uniform), but mixing
-	// photons in the real world is linear. Averaging sRGB samples directly
-	// crushes shadows and mid-tones; converting to linear, averaging there,
-	// then re-encoding to BT.709 transfer keeps blur trails the brightness
-	// a real shutter would produce. Requires ffmpeg built with libzimg —
-	// Debian's `ffmpeg` package has it, and that's what the Docker image
-	// ships.
+	// With motion blur, we stream N sub-frames per output frame at `fps × N`
+	// and ffmpeg averages them — see `motionBlurFilters` in formats.mjs.
 	const samples = Math.max(1, opts.motionBlur);
-	const inputFps = opts.fps * samples;
 	const args = [
 		'-y',
 		'-loglevel',
@@ -342,52 +346,12 @@ function spawnFfmpeg(opts) {
 		'-f',
 		'image2pipe',
 		'-framerate',
-		String(inputFps),
+		String(opts.fps * samples),
 		'-i',
-		'pipe:0'
-	];
-	if (samples > 1) {
-		// Both endpoints of each zscale call are fully specified — zimg's
-		// `code 3074: no path between colorspaces` fires whenever any of
-		// `transfer / primaries / matrix / range` is left "unspecified" on
-		// either end, and PNG from image2pipe arrives with all four blank.
-		// (Setting them via `setparams` doesn't help; zscale only consumes
-		// its own filter options as fallbacks.) Chromium's canvas output is
-		// full-range sRGB-encoded with BT.709 primaries — same gamut as
-		// H.264 / BT.709 video — so the re-encoding step uses `t=bt709` to
-		// match what the player will assume.
-		const inRGB = 'tin=iec61966-2-1:pin=bt709:rin=full:min=bt709';
-		const outLinear = 't=linear:p=bt709:r=full:m=bt709';
-		const inLinear = 'tin=linear:pin=bt709:rin=full:min=bt709';
-		const outRGB = 't=bt709:p=bt709:r=full:m=bt709';
-		// `\,` escapes the comma inside the select expression so ffmpeg
-		// doesn't read it as a filter-chain separator.
-		const blurFilter = [
-			`zscale=${inRGB}:${outLinear}`,
-			`tpad=stop=1:stop_mode=clone`,
-			`tmix=frames=${samples}`,
-			`select=not(mod(n+1\\,${samples}))`,
-			`zscale=${inLinear}:${outRGB}`
-		].join(',');
-		// After select, the kept frames sit at PTS values offset by ~1/inputFps
-		// from a clean output-fps grid. `-r` on the output side re-times them
-		// to the requested output framerate so the encoded MP4 metadata is
-		// clean (otherwise it would be tagged at `inputFps`).
-		args.push('-vf', blurFilter, '-r', String(opts.fps));
-	}
-	args.push(
-		'-c:v',
-		'libx264',
-		'-preset',
-		opts.preset,
-		'-crf',
-		String(opts.crf),
-		'-pix_fmt',
-		'yuv420p',
-		'-movflags',
-		'+faststart',
+		'pipe:0',
+		...encodingArgs(opts),
 		opts.output
-	);
+	];
 	// Capture stderr so we can show it only on failure (when not verbose).
 	const proc = spawn('ffmpeg', args, {
 		stdio: ['pipe', 'inherit', VERBOSE ? 'inherit' : 'pipe']
@@ -416,21 +380,31 @@ async function waitForFrameReady(page, timeoutMs) {
 	// Resolve once MapLibre is idle (all tiles loaded, repaint done) for the
 	// current camera. We force a repaint to make the idle event reliable when
 	// the map happens to already be idle.
-	return await Promise.race([
-		page.evaluate(
-			() =>
-				new Promise((resolve) => {
-					const map = /** @type {any} */ (window).__map;
-					if (!map) return resolve(undefined);
-					const onIdle = () => resolve(undefined);
-					map.once('idle', onIdle);
-					map.triggerRepaint();
-				})
-		),
-		new Promise((_res, rej) =>
-			setTimeout(() => rej(new Error(`frame settle timeout after ${timeoutMs}ms`)), timeoutMs)
-		)
-	]);
+	let timer;
+	try {
+		return await Promise.race([
+			page.evaluate(
+				() =>
+					new Promise((resolve) => {
+						const map = /** @type {any} */ (window).__map;
+						if (!map) return resolve(undefined);
+						const onIdle = () => resolve(undefined);
+						map.once('idle', onIdle);
+						map.triggerRepaint();
+					})
+			),
+			new Promise((_res, rej) => {
+				timer = setTimeout(
+					() => rej(new Error(`frame settle timeout after ${timeoutMs}ms`)),
+					timeoutMs
+				);
+			})
+		]);
+	} finally {
+		// A timer left running keeps the process alive: without this the
+		// renderer sat idle for up to two minutes after "done".
+		clearTimeout(timer);
+	}
 }
 
 async function setupPage(browser, opts, hash) {
@@ -646,6 +620,7 @@ async function main() {
 		throw new Error(`--shutter-angle must be a number in (0, 360], got ${opts.shutterAngle}`);
 	}
 	if (!opts.output) throw new Error('--output is required');
+	validateEncoding(opts);
 	if (!opts.hash && !opts.url) throw new Error('--hash or --url is required');
 	const hash = extractHash(opts.url) ?? opts.hash;
 	if (!hash) throw new Error('could not extract hash from --url');

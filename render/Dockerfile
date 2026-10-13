@@ -26,7 +26,7 @@ RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
 	&& rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache /root/.npm
 
 COPY --from=app-builder /src/build /app/site
-COPY render/render.mjs ./
+COPY render/render.mjs render/formats.mjs ./
 
 # Final WORKDIR is the volume mount point so `--output` accepts plain
 # filenames (`--output animation.mp4`) — they resolve relative to the
