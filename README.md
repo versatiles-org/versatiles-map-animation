@@ -14,7 +14,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 
 - Drop keyframes on a timeline that capture the current camera (lng, lat, zoom, pitch, bearing, roll).
 - Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
-- Per-segment trajectory style: **arc** (default, smooth great-circle path) or **linear**.
+- Per-segment trajectory style: **arc** (default, smooth zoom-and-pan), **linear**, or **spline**. Arc and linear come to rest at every keyframe; consecutive spline segments form one flowing curve that passes through its keyframes without stopping and only eases in and out at its two ends.
 - Scrub anywhere on the timeline; click a keyframe to jump to its view; drag markers along the track to retime — and past their neighbours to **reorder** the sequence. Timestamps snap to 1/100 s.
 - Timeline zoom & pan: vertical scroll / Ctrl-wheel / pinch zooms; horizontal scroll pans; drag the pan-bar thumb to scroll, drag its edges to zoom; the playhead can be moved past the last keyframe to add a new one there.
 - Insert keyframes at the current playhead (compose a shot, then **+ Add** in the Keyframe group).
@@ -107,7 +107,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 			"pitch": 0, // 0..90
 			"bearing": 0, // -180..180
 			"roll": 0, // -180..180
-			"path": "arc" // optional: "arc" | "linear" — trajectory to this keyframe
+			"path": "arc" // optional: "arc" | "linear" | "spline" — trajectory from this keyframe to the next
 		}
 	],
 	"annotations": [

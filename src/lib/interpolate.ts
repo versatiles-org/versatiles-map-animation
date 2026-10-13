@@ -233,22 +233,132 @@ function globeLinearSample(
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Spline
+// ---------------------------------------------------------------------------
+//
+// `arc` and `linear` ease every segment on its own, so the camera comes to
+// rest at each keyframe. A `spline` segment is instead one piece of a curve
+// through time: a cubic Hermite segment whose end velocities come from the
+// neighbouring keyframes (Catmull-Rom), so position *and* speed are
+// continuous where two spline segments meet. Where a run of spline segments
+// starts or ends there is no spline neighbour; the velocity there is zero,
+// which is the ease-in / ease-out and also what the other path types expect
+// at their ends.
+
+/** Indices of the angles in a spline vector: they wrap, so they get unwrapped. */
+const SPLINE_ANGLES = [0, 4, 5];
+
+/** A keyframe as the vector the spline runs through: [lng, y, zoom, pitch, bearing, roll]. */
+function toSplineVector(kf: Keyframe, onGlobe: boolean): number[] {
+	return [
+		kf.lng,
+		// Same spaces as the other path types: Mercator plane, or lat and globe size.
+		onGlobe ? kf.lat : latToMercatorY(kf.lat),
+		onGlobe ? toGlobeZoom(kf.zoom, kf.lat) : kf.zoom,
+		kf.pitch,
+		kf.bearing,
+		kf.roll
+	];
+}
+
+/** Shift the angles of `v` by whole turns so each takes the short way from `from`. */
+function unwrapFrom(from: number[], v: number[]): number[] {
+	const out = [...v];
+	for (const i of SPLINE_ANGLES) out[i] = from[i] + shortestLngDelta(from[i], v[i]);
+	return out;
+}
+
+function normalizeAngle(deg: number): number {
+	return ((((deg + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Camera at `alpha` between `kfA` and `kfB`. `prev` / `next` are the
+ * keyframes beyond them if the curve continues there, otherwise `null`.
+ */
+function splineSample(
+	prev: Keyframe | null,
+	kfA: Keyframe,
+	kfB: Keyframe,
+	next: Keyframe | null,
+	alpha: number,
+	projection: MapProjection
+): CameraState {
+	if (alpha <= 0 || alpha >= 1) {
+		const kf = alpha <= 0 ? kfA : kfB;
+		return { ...cameraOf(kf), bearing: normalizeAngle(kf.bearing), roll: normalizeAngle(kf.roll) };
+	}
+	const onGlobe = projection === 'globe';
+	const a = toSplineVector(kfA, onGlobe);
+	const b = unwrapFrom(a, toSplineVector(kfB, onGlobe));
+	const p = prev && unwrapFrom(a, toSplineVector(prev, onGlobe));
+	const n = next && unwrapFrom(b, toSplineVector(next, onGlobe));
+
+	const h = kfB.t - kfA.t;
+	// Velocity at a keyframe: the slope between its two neighbours.
+	const slope = (from: number[] | null, to: number[], dt: number, i: number) =>
+		from && dt > 0 ? (to[i] - from[i]) / dt : 0;
+
+	const u = alpha;
+	const u2 = u * u;
+	const u3 = u2 * u;
+	const h00 = 2 * u3 - 3 * u2 + 1;
+	const h10 = u3 - 2 * u2 + u;
+	const h01 = -2 * u3 + 3 * u2;
+	const h11 = u3 - u2;
+
+	const v = a.map((_, i) => {
+		const va = slope(p, b, prev ? kfB.t - prev.t : 0, i);
+		const vb = n ? slope(a, n, next ? next.t - kfA.t : 0, i) : 0;
+		return h00 * a[i] + h10 * h * va + h01 * b[i] + h11 * h * vb;
+	});
+
+	const lat = onGlobe ? clampLat(v[1]) : mercatorYToLat(v[1]);
+	return {
+		lng: normalizeLng(v[0]),
+		lat,
+		zoom: onGlobe ? fromGlobeZoom(v[2], lat) : v[2],
+		// A curve can swing past its keyframes; the camera cannot tilt past these.
+		pitch: Math.max(0, Math.min(90, v[3])),
+		bearing: normalizeAngle(v[4]),
+		roll: normalizeAngle(v[5])
+	};
+}
+
 /**
  * `projection` picks the geometry the camera travels in — see the Globe
  * section above. The keyframes themselves mean the same in both.
+ *
+ * `neighbours` only matters for a `spline` segment: the keyframes before
+ * `kfA` and after `kfB` if the curve continues through them. Without them
+ * the segment eases in and out like the other path types.
  */
 export function interpolateKeyframes(
 	kfA: Keyframe,
 	kfB: Keyframe,
 	alpha: number,
-	projection: MapProjection = 'mercator'
+	projection: MapProjection = 'mercator',
+	neighbours: { prev?: Keyframe | null; next?: Keyframe | null } = {}
 ): CameraState {
+	const path = kfA.path ?? 'arc';
+	if (path === 'spline') {
+		const clamped = Math.max(0, Math.min(1, alpha));
+		return splineSample(
+			neighbours.prev ?? null,
+			kfA,
+			kfB,
+			neighbours.next ?? null,
+			clamped,
+			projection
+		);
+	}
 	const eased = easeInOut(alpha);
 	// `path` lives on the *origin* keyframe and describes the shape of the
 	// trajectory leaving it. `linear` is a direct lerp through
 	// (lng, lat, zoom) — the right choice for tiny moves where van Wijk's
 	// out-and-back arc feels theatrical.
-	const useArc = (kfA.path ?? 'arc') !== 'linear';
+	const useArc = path !== 'linear';
 	const onGlobe = projection === 'globe';
 	const sample = useArc
 		? onGlobe
@@ -299,7 +409,10 @@ export function sampleAt(
 		if (t >= a.t && t <= b.t) {
 			const span = b.t - a.t;
 			const alpha = span > 0 ? (t - a.t) / span : 0;
-			return interpolateKeyframes(a, b, alpha, projection);
+			// A spline segment continues into its neighbour if that is one too.
+			const prev = i > 0 && keyframes[i - 1].path === 'spline' ? keyframes[i - 1] : null;
+			const next = b.path === 'spline' && i + 2 < keyframes.length ? keyframes[i + 2] : null;
+			return interpolateKeyframes(a, b, alpha, projection, { prev, next });
 		}
 	}
 	return cameraOf(last);

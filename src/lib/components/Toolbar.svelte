@@ -3,6 +3,7 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
+	import type { PathStyle } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
 	import VideoDialog from './VideoDialog.svelte';
@@ -163,7 +164,7 @@
 		</button>
 		<label
 			class="control-label path-picker"
-			title="Trajectory shape from the selected keyframe to the next one"
+			title="Trajectory from the selected keyframe to the next one. Arc and Linear come to rest at each keyframe; consecutive Spline segments fly through their keyframes without stopping."
 		>
 			<span class="lbl">Path →</span>
 			<select
@@ -173,13 +174,14 @@
 					if (store.selectedIndex !== null) {
 						store.setKeyframePath(
 							store.selectedIndex,
-							(e.currentTarget as HTMLSelectElement).value as 'arc' | 'linear'
+							(e.currentTarget as HTMLSelectElement).value as PathStyle
 						);
 					}
 				}}
 			>
 				<option value="arc">⌒ Arc</option>
 				<option value="linear">— Linear</option>
+				<option value="spline">∿ Spline</option>
 			</select>
 		</label>
 	</div>

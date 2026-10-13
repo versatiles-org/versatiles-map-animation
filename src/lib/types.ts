@@ -44,7 +44,8 @@ export const ASPECT_RATIO_LABELS: Record<AspectRatio, string> = {
  */
 export const MAP_REFERENCE_WIDTH = 1280;
 
-export const PATH_STYLES = ['arc', 'linear'] as const;
+/** Pinned and append-only: the URL codec stores the index (2 bits, so one more fits). */
+export const PATH_STYLES = ['arc', 'linear', 'spline'] as const;
 export type PathStyle = (typeof PATH_STYLES)[number];
 export const DEFAULT_PATH: PathStyle = 'arc';
 
@@ -465,7 +466,10 @@ export interface Keyframe {
 	/**
 	 * Shape of the trajectory leaving this keyframe — i.e., the path used to
 	 * interpolate from this keyframe to the *next* one. `arc` (default) uses
-	 * van Wijk smooth zoom-and-pan; `linear` lerps each field directly.
+	 * van Wijk smooth zoom-and-pan; `linear` lerps each field directly. Both
+	 * come to rest at every keyframe. `spline` does not: consecutive spline
+	 * segments form one flowing curve through their keyframes, and the camera
+	 * only eases in and out where that run of segments starts and ends.
 	 * Ignored for the last keyframe.
 	 */
 	path?: PathStyle;

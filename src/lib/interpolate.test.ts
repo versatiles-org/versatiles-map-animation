@@ -232,3 +232,125 @@ describe('globe projection', () => {
 		expect(sampleAt(kfs, 2, 'globe')).not.toEqual(sampleAt(kfs, 2));
 	});
 });
+
+describe('spline path', () => {
+	const kf = (t: number, lng: number, lat = 0, extra: Partial<Keyframe> = {}): Keyframe => ({
+		t,
+		lng,
+		lat,
+		zoom: 5,
+		pitch: 0,
+		bearing: 0,
+		roll: 0,
+		path: 'spline',
+		...extra
+	});
+	/** Speed in degrees of longitude per second around time `t`. */
+	const speed = (kfs: Keyframe[], t: number, dt = 1e-4) =>
+		(sampleAt(kfs, t + dt)!.lng - sampleAt(kfs, t - dt)!.lng) / (2 * dt);
+
+	// Four keyframes in a row, one second and ten degrees apart.
+	const row = [kf(0, 0), kf(1, 10), kf(2, 20), kf(3, 30)];
+
+	it('passes through every keyframe', () => {
+		for (const k of row) expect(sampleAt(row, k.t)).toMatchObject({ lng: k.lng, lat: 0, zoom: 5 });
+	});
+
+	it('does not stop at the keyframes in between, unlike arc and linear', () => {
+		expect(speed(row, 1)).toBeCloseTo(10, 3);
+		expect(speed(row, 2)).toBeCloseTo(10, 3);
+		for (const path of ['arc', 'linear'] as const) {
+			const stopping = row.map((k) => ({ ...k, path }));
+			expect(Math.abs(speed(stopping, 1))).toBeLessThan(0.01);
+		}
+	});
+
+	it('moves at constant speed between evenly spaced keyframes', () => {
+		for (const t of [1.1, 1.5, 1.9]) expect(speed(row, t)).toBeCloseTo(10, 6);
+		expect(sampleAt(row, 1.5)!.lng).toBeCloseTo(15, 9);
+	});
+
+	it('eases in at the start of the run and out at its end', () => {
+		expect(Math.abs(speed(row, 0.001, 1e-4))).toBeLessThan(0.1);
+		expect(Math.abs(speed(row, 2.999, 1e-4))).toBeLessThan(0.1);
+		expect(speed(row, 0.5)).toBeGreaterThan(5);
+	});
+
+	it('comes to rest where it meets a segment of another type', () => {
+		// spline, spline, then arc: the run ends at the third keyframe.
+		const mixed = [kf(0, 0), kf(1, 10), kf(2, 20, 0, { path: 'arc' }), kf(3, 30)];
+		expect(speed(mixed, 1)).toBeGreaterThan(5);
+		expect(Math.abs(speed(mixed, 2))).toBeLessThan(0.01);
+		// arc, then spline: the run starts at the second keyframe.
+		const late = [kf(0, 0, 0, { path: 'arc' }), kf(1, 10), kf(2, 20), kf(3, 30)];
+		expect(Math.abs(speed(late, 1))).toBeLessThan(0.01);
+		expect(speed(late, 2)).toBeGreaterThan(5);
+	});
+
+	it('a single spline segment eases in and out like a smoothstep', () => {
+		const two = [kf(0, 0), kf(2, 10)];
+		expect(sampleAt(two, 1)!.lng).toBeCloseTo(5, 9);
+		expect(sampleAt(two, 0.5)!.lng).toBeCloseTo(10 * (3 * 0.25 ** 2 - 2 * 0.25 ** 3), 9);
+		expect(interpolateKeyframes(two[0], two[1], 0.25).lng).toBeCloseTo(sampleAt(two, 0.5)!.lng, 12);
+	});
+
+	it('respects uneven timing: speed is continuous across a keyframe', () => {
+		const uneven = [kf(0, 0), kf(1, 10), kf(4, 20), kf(5, 30)];
+		const before = (sampleAt(uneven, 1)!.lng - sampleAt(uneven, 1 - 1e-5)!.lng) / 1e-5;
+		const after = (sampleAt(uneven, 1 + 1e-5)!.lng - sampleAt(uneven, 1)!.lng) / 1e-5;
+		expect(before).toBeCloseTo(after, 2);
+		expect(before).toBeCloseTo(20 / 4, 2); // slope between the neighbours
+	});
+
+	it('takes the short way across the antimeridian and around the compass', () => {
+		const wrap = [
+			kf(0, 160, 0, { bearing: 160 }),
+			kf(1, 170, 0, { bearing: 170 }),
+			kf(2, -180, 0, { bearing: -180 }),
+			kf(3, -170, 0, { bearing: -170 })
+		];
+		const mid = sampleAt(wrap, 1.5)!;
+		expect(mid.lng).toBeCloseTo(175, 6);
+		expect(mid.bearing).toBeCloseTo(175, 6);
+		// The last segment eases out, so its midpoint is a little past halfway.
+		const across = sampleAt(wrap, 2.5)!;
+		expect(across.lng).toBeCloseTo(-173.75, 6);
+		expect(across.bearing).toBeCloseTo(-173.75, 6);
+	});
+
+	it('curves through a corner instead of turning on the spot', () => {
+		// East, then north: at the corner the camera is already heading north-east.
+		const corner = [kf(0, 0, 0), kf(1, 10, 0), kf(2, 10, 10), kf(3, 10, 20)];
+		const justBefore = sampleAt(corner, 0.99)!;
+		const justAfter = sampleAt(corner, 1.01)!;
+		expect(justAfter.lng - justBefore.lng).toBeGreaterThan(0);
+		expect(justAfter.lat - justBefore.lat).toBeGreaterThan(0);
+	});
+
+	it('keeps the pitch inside what the camera can do', () => {
+		const tilt = [
+			kf(0, 0, 0, { pitch: 0 }),
+			kf(1, 1, 0, { pitch: 85 }),
+			kf(2, 2, 0, { pitch: 88 }),
+			kf(3, 3, 0, { pitch: 0 })
+		];
+		for (let t = 0; t <= 3; t += 0.05) {
+			const { pitch } = sampleAt(tilt, t)!;
+			expect(pitch).toBeGreaterThanOrEqual(0);
+			expect(pitch).toBeLessThanOrEqual(90);
+		}
+	});
+
+	it('on the globe keeps the globe size between equally sized keyframes', () => {
+		const globe = [
+			kf(0, 0, 60, { zoom: 2 }),
+			kf(1, 20, 40, { zoom: fromGlobeZoom(3, 40) }),
+			kf(2, 40, 0, { zoom: 3 }),
+			kf(3, 60, -30, { zoom: fromGlobeZoom(3, -30) })
+		];
+		for (const t of [0.5, 1, 1.5, 2.5]) {
+			const cam = sampleAt(globe, t, 'globe')!;
+			expect(toGlobeZoom(cam.zoom, cam.lat)).toBeCloseTo(3, 9);
+		}
+	});
+});

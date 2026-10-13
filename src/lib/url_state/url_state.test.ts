@@ -6,6 +6,7 @@ import {
 	MAP_LAYER_GROUPS,
 	MAP_PROJECTIONS,
 	MAP_THEMES,
+	PATH_STYLES,
 	SCHEMA_VERSION,
 	type Animation
 } from '../types';
@@ -693,5 +694,33 @@ describe('anchor option', () => {
 		expect(decoded?.anchor).toEqual({ x: 0.25, y: 0.7 });
 		expect(decoded?.projection).toBe('globe');
 		expect(decoded?.aspectRatio).toBe('1:1');
+	});
+});
+
+describe('spline path', () => {
+	it('round-trips next to the other path types and costs no extra byte', () => {
+		const paths = ['spline', 'spline', 'linear', 'arc'] as const;
+		const withPaths = (list: readonly ('arc' | 'linear' | 'spline')[]): Animation => ({
+			...example,
+			keyframes: list.map((path, i) => ({
+				t: i,
+				lng: 10 + i,
+				lat: 50,
+				zoom: 8,
+				pitch: 0,
+				bearing: 0,
+				roll: 0,
+				...(path !== 'arc' && { path })
+			}))
+		});
+		const decoded = decodeAnimation(encodeAnimation(withPaths(paths)));
+		expect(decoded?.keyframes.map((k) => k.path ?? 'arc')).toEqual(paths);
+		expect(encodeAnimation(withPaths(paths)).length).toBe(
+			encodeAnimation(withPaths(['linear', 'linear', 'linear', 'arc'])).length
+		);
+	});
+
+	it('stores the index into PATH_STYLES, so the list is append-only', () => {
+		expect(PATH_STYLES).toEqual(['arc', 'linear', 'spline']);
 	});
 });
