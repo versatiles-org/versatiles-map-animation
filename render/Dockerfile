@@ -1,9 +1,12 @@
 # Multi-stage build:
 #   1. app-builder — builds the static SvelteKit site (just /index.html and /view.html).
 #   2. ffmpeg      — only the source of a statically linked ffmpeg binary.
-#   3. final       — node:24-slim with Chromium's headless shell + ffmpeg + the renderer
-#                    + the built site. The headless shell is smaller than the full
-#                    Chromium browser and works fine with --use-gl=swiftshader.
+#   3. renderer-deps — fetches what the renderer runs on: Playwright and
+#                    Chromium's headless shell. The headless shell is smaller than
+#                    the full Chromium browser and works fine with --use-gl=swiftshader.
+#   4. final       — plain Debian with the Node.js binary, ffmpeg, the headless
+#                    shell, the renderer and the built site. npm and yarn are
+#                    only needed to build, so they stay behind in the stages above.
 
 FROM node:24-bookworm-slim AS app-builder
 WORKDIR /src
@@ -19,7 +22,17 @@ RUN npm run build
 # Pinned by digest, so a moved tag cannot change what gets built.
 FROM mwader/static-ffmpeg:7.1.1@sha256:11a44711684c0b9f754c047dcd64235b8b52deab251bd0e0a86f22faa160749c AS ffmpeg
 
-FROM node:24-bookworm-slim
+FROM node:24-bookworm-slim AS renderer-deps
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+WORKDIR /app/render
+COPY render/package.json render/package-lock.json* ./
+# Playwright downloads an ffmpeg of its own next to the browser; it is for
+# recording videos of a page, which the renderer does not do.
+RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
+	&& npx playwright install chromium-headless-shell \
+	&& rm -r /ms-playwright/ffmpeg-*
+
+FROM debian:bookworm-slim
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # fonts-dejavu-core: the font Chromium ends up drawing the map's attribution
@@ -44,13 +57,17 @@ RUN apt-get update \
 		$([ "$GPU" = true ] && echo libvulkan1 mesa-vulkan-drivers) \
 	&& rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
+# The same Debian release as this image, so the binary finds its libraries.
+COPY --from=renderer-deps /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app/render
-COPY render/package.json render/package-lock.json* ./
-RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
-	&& npx playwright install --with-deps chromium-headless-shell \
-	&& npm cache clean --force \
-	&& rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache /root/.npm
+COPY --from=renderer-deps /app/render/node_modules ./node_modules
+# The system libraries and fonts Chromium needs. Playwright's command line
+# runs without npm.
+RUN node node_modules/playwright/cli.js install-deps chromium-headless-shell \
+	&& rm -rf /var/lib/apt/lists/*
+COPY --from=renderer-deps /ms-playwright /ms-playwright
+COPY render/package.json ./
 
 COPY --from=app-builder /src/build /app/site
 COPY render/render.mjs render/formats.mjs render/gpu.mjs ./
