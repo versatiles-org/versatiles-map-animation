@@ -495,6 +495,44 @@ async function prewarmPass(page, duration, opts) {
 	progress.finish();
 }
 
+/**
+ * Returns a function that captures the page as a PNG buffer.
+ *
+ * Playwright's `page.screenshot()` compresses the PNG as small as it can,
+ * which for a full-HD satellite frame costs more time than drawing it on a
+ * GPU. The PNGs here only live for the moment it takes to pipe them into
+ * ffmpeg, so their size does not matter: Chromium's `optimizeForSpeed`
+ * writes the same pixels with light compression in less than half the
+ * time. That switch is only reachable through the DevTools protocol; if a
+ * browser does not offer it, capturing falls back to `page.screenshot()`.
+ */
+async function createCapturer(page) {
+	const slow = () => page.screenshot({ type: 'png' });
+	let cdp;
+	try {
+		cdp = await page.context().newCDPSession(page);
+	} catch (err) {
+		debug(`fast capture unavailable (${err.message}), using page.screenshot`);
+		return slow;
+	}
+	let fast = true;
+	return async () => {
+		if (fast) {
+			try {
+				const { data } = await cdp.send('Page.captureScreenshot', {
+					format: 'png',
+					optimizeForSpeed: true
+				});
+				return Buffer.from(data, 'base64');
+			} catch (err) {
+				fast = false;
+				debug(`fast capture failed (${err.message}), using page.screenshot`);
+			}
+		}
+		return slow();
+	};
+}
+
 async function capturePass(page, duration, opts, ffmpegStdin) {
 	const total = Math.max(2, Math.round(duration * opts.fps));
 
@@ -528,6 +566,7 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	// drawing (seek + wait until the map has settled) and capturing (the
 	// screenshot: read-back, PNG encoding, transfer from the browser).
 	const timing = { drawMs: 0, captureMs: 0, captures: 0, pngBytes: 0 };
+	const capture = await createCapturer(page);
 	for (let i = 0; i < total; i++) {
 		// If ffmpeg has died, bail out instead of looping through all 700+
 		// remaining frames writing PNGs into a dead pipe. The exit promise
@@ -552,7 +591,7 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 				log(`! ${label} timeout (t=${t.toFixed(3)}): ${err.message}`);
 			}
 			const captureStart = performance.now();
-			const png = await page.screenshot({ type: 'png' });
+			const png = await capture();
 			timing.drawMs += captureStart - drawStart;
 			timing.captureMs += performance.now() - captureStart;
 			timing.captures++;
