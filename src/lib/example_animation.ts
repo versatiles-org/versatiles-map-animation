@@ -19,6 +19,7 @@ export const EXAMPLE_ANIMATION: Animation = {
 	version: 1,
 	style: 'satellite',
 	labels: true,
+	hiddenLayers: ['roads', 'transit', 'boundaries', 'pois', 'markings'],
 	terrain: true,
 	sky: true,
 	keyframes: [
