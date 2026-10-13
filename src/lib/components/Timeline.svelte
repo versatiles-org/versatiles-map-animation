@@ -431,7 +431,19 @@
 					move.kind
 				]}"
 			>
-				<PathIcon icon={move.kind === 'curve' ? 'waypoint' : move.kind} size={14} />
+				<!-- One icon per stretch between two keyframes: a move through
+				     waypoints shows its curve between each pair of them. -->
+				{#each { length: move.end - move.start }, s (s)}
+					{@const a = s === 0 ? from : store.keyframes[move.start + s].t}
+					{@const b = store.keyframes[move.start + s + 1].t}
+					<span
+						class="stretch"
+						style="left: {((a - from) / (to - from)) * 100}%; width: {((b - a) / (to - from)) *
+							100}%"
+					>
+						<PathIcon icon={move.kind} size={14} />
+					</span>
+				{/each}
 				{#if tint?.gradient}
 					<span class="speed" style="background: {tint.gradient}"></span>
 				{/if}
@@ -688,8 +700,6 @@
 		color: rgb(var(--move-color));
 		cursor: pointer;
 		overflow: hidden;
-		/* For hiding the icon when the band gets too narrow for it. */
-		container-type: inline-size;
 
 		&.linear {
 			--move-color: 63, 200, 170;
@@ -704,6 +714,17 @@
 			background: rgba(255, 210, 74, 0.3);
 			border-color: #ffd24a;
 			color: #ffd24a;
+		}
+		.stretch {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			pointer-events: none;
+			/* For hiding the icon when its stretch gets too narrow for it. */
+			container-type: inline-size;
 		}
 		@container (max-width: 40px) {
 			:global(svg) {

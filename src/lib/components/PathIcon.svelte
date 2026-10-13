@@ -3,10 +3,12 @@
 
 	/**
 	 * Pictograms of the camera-path vocabulary: the two travel styles of a
-	 * move, and the two kinds of keyframe. Drawn in `currentColor`, sized by
+	 * move, the curve of a move through waypoints, and the two kinds of
+	 * keyframe. Drawn in `currentColor`, sized by
 	 * the `size` prop.
 	 */
-	let { icon, size = 16 }: { icon: PathStyle | 'stop' | 'waypoint'; size?: number } = $props();
+	let { icon, size = 16 }: { icon: PathStyle | 'curve' | 'stop' | 'waypoint'; size?: number } =
+		$props();
 </script>
 
 <svg
@@ -30,6 +32,9 @@
 		<path d="M2.5 8 H13.5" />
 		<circle class="solid" cx="2.5" cy="8" r="1.6" />
 		<circle class="solid" cx="13.5" cy="8" r="1.6" />
+	{:else if icon === 'curve'}
+		<!-- A stretch of a move through waypoints: the curve from one keyframe to the next. -->
+		<path d="M2 11.5 C4 3 6.5 3 8 8 S12 13 14 4.5" />
 	{:else if icon === 'stop'}
 		<!-- The path arrives at the keyframe and leaves it again: a rest. -->
 		<path d="M1 8 H3.5 M12.5 8 H15" />
