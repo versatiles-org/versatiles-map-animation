@@ -19,7 +19,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Travel style of a move that goes straight from stop to stop: **Fly over** (default, rises and descends on long distances) or **Stay low** (straight, without rising; the ground passes at an even speed on screen even while the zoom changes).
 - The map shows the route in the editor: the camera's ground track as a line in the colours of the timeline, with a diamond for every stop and a dot for every waypoint. Click one to select its keyframe. It hides while the animation plays.
 - The timeline shows every move as a band between its stops, coloured by how the camera travels, with waypoints as dots on it. Click a keyframe to edit the keyframe, click a band to edit the move. A strip along a band turns orange, then red, where the picture moves too fast to follow (from 1.5 and 3 frame widths per second, counting everything that moves the picture: panning, zooming, turning and tilting, as seen through the camera's perspective).
-- Scrub anywhere on the timeline; click a keyframe to select it and jump to its view; drag the selected keyframe along the track to retime it — and past its neighbours to **reorder** the sequence. Only the selected keyframe can be dragged, so a click never moves one by accident. Timestamps snap to 1/100 s.
+- Scrub anywhere on the timeline; click a keyframe to select it and jump to its view; drag the selected keyframe along the track to retime it — and past its neighbours to **reorder** the sequence. Only the selected keyframe can be dragged, so a click never moves one by accident. The selected keyframe's time can also be typed into the **Time** field. Times lie on a grid of 1/100 s, the smallest step of an animation; anything finer in a loaded file or link is rounded to it.
 - Timeline zoom & pan: vertical scroll / Ctrl-wheel / pinch zooms; horizontal scroll pans; drag the pan-bar thumb to scroll, drag its edges to zoom; the playhead can be moved past the last keyframe to add a new one there.
 - Insert keyframes at the current playhead (compose a shot, then **+ Add** in the Keyframe group).
 
@@ -104,7 +104,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"anchor": { "x": 0.5, "y": 0.5 }, // optional: point of the frame the camera is built around, as fractions from the top-left corner
 	"keyframes": [
 		{
-			"t": 0.0, // seconds, snapped to 1/100 s in the editor
+			"t": 0.0, // seconds, on a grid of 1/100 s (finer values are rounded on load)
 			"lng": 13.405,
 			"lat": 52.52,
 			"zoom": 10,

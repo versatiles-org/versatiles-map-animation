@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeScreenAnchor, screenAnchorPadding } from './types';
+import {
+	normalizeScreenAnchor,
+	screenAnchorPadding,
+	snapKeyframeTimes,
+	snapTime,
+	TIME_RESOLUTION,
+	type Keyframe
+} from './types';
 
 describe('screenAnchorPadding', () => {
 	/** Middle of what the padding leaves free, as fractions of the frame. */
@@ -53,5 +60,66 @@ describe('normalizeScreenAnchor', () => {
 		for (const value of [undefined, null, 'centre', {}, { x: 0.5 }, { x: NaN, y: 0.5 }]) {
 			expect(normalizeScreenAnchor(value)).toBeUndefined();
 		}
+	});
+});
+
+describe('time resolution', () => {
+	const kf = (t: number, extra: Partial<Keyframe> = {}): Keyframe => ({
+		t,
+		lng: 0,
+		lat: 0,
+		zoom: 5,
+		pitch: 0,
+		bearing: 0,
+		roll: 0,
+		...extra
+	});
+
+	it('is a hundredth of a second', () => {
+		expect(TIME_RESOLUTION).toBe(0.01);
+	});
+
+	it('snapTime rounds to the grid and leaves clean decimals', () => {
+		expect(snapTime(3.274)).toBe(3.27);
+		expect(snapTime(3.275001)).toBe(3.28);
+		expect(snapTime(0.004)).toBe(0);
+		// No floating-point dust, for any step.
+		for (let i = 0; i <= 1000; i++)
+			expect(String(snapTime(i * 0.01)).length).toBeLessThanOrEqual(5);
+	});
+
+	it('snapKeyframeTimes puts times and holds on the grid, sorted', () => {
+		const out = snapKeyframeTimes([kf(4.004), kf(1.234, { hold: 0.777 }), kf(0)]);
+		expect(out.map((k) => k.t)).toEqual([0, 1.23, 4]);
+		expect(out.map((k) => k.hold)).toEqual([undefined, 0.78, undefined]);
+	});
+
+	it('keeps keyframes one step apart, and out of the hold before them', () => {
+		// Three keyframes within the same hundredth of a second.
+		expect(snapKeyframeTimes([kf(1.001), kf(1.002), kf(1.003)]).map((k) => k.t)).toEqual([
+			1, 1.01, 1.02
+		]);
+		// A keyframe that sits inside the hold before it moves behind it.
+		expect(snapKeyframeTimes([kf(1, { hold: 2 }), kf(2), kf(5)]).map((k) => k.t)).toEqual([
+			1, 3.01, 5
+		]);
+	});
+
+	it('drops what cannot be: negative times, empty holds, holds on waypoints', () => {
+		const out = snapKeyframeTimes([
+			kf(-1),
+			kf(1, { hold: 0.001 }),
+			kf(2, { hold: 3, waypoint: true }),
+			kf(3, { hold: -2 })
+		]);
+		expect(out.map((k) => k.t)).toEqual([0, 1, 2, 3]);
+		for (const k of out) expect(k).not.toHaveProperty('hold');
+	});
+
+	it('leaves keyframes that are already on the grid as they are, without touching the input', () => {
+		const input = [kf(0), kf(1.5, { hold: 0.5, path: 'linear' }), kf(4, { waypoint: true }), kf(6)];
+		const copy = structuredClone(input);
+		expect(snapKeyframeTimes(input)).toEqual(input);
+		expect(input).toEqual(copy);
 	});
 });

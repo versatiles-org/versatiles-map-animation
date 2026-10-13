@@ -3,7 +3,7 @@
 	import type { AnimationStore } from '../animation.svelte';
 	import { EXAMPLE_ANIMATION } from '../example_animation';
 	import { downloadAnimation, uploadAnimation } from '../json_io';
-	import { holdOf, PATH_STYLE_LABELS, PATH_STYLES } from '../types';
+	import { holdOf, PATH_STYLE_LABELS, PATH_STYLES, TIME_RESOLUTION } from '../types';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
 	import PathIcon from './PathIcon.svelte';
@@ -233,6 +233,33 @@
 			</div>
 			<label
 				class="choice hold-input"
+				title="When the camera arrives at the selected keyframe, in seconds from the start. Times are set in steps of {TIME_RESOLUTION} s."
+			>
+				<span class="lbl">Time</span>
+				<input
+					class="time"
+					type="number"
+					min="0"
+					step={TIME_RESOLUTION}
+					value={store.selectedKeyframe?.t ?? 0}
+					disabled={!hasSelection}
+					onchange={(e) => {
+						if (store.selectedIndex === null) return;
+						const value = Number(e.currentTarget.value);
+						if (Number.isFinite(value)) store.setKeyframeTime(store.selectedIndex, value);
+						// Like dragging the keyframe, the playhead follows it — and the
+						// field shows where it really landed (on the grid, clear of others).
+						const kf = store.selectedKeyframe;
+						if (kf) {
+							store.currentTime = kf.t;
+							e.currentTarget.value = String(kf.t);
+						}
+					}}
+				/>
+				<span>s</span>
+			</label>
+			<label
+				class="choice hold-input"
 				title={isWaypoint
 					? 'A waypoint is flown through and cannot hold'
 					: 'Seconds the camera rests on the selected stop before it moves on. Changing it moves everything after it along.'}
@@ -403,6 +430,10 @@
 			}
 			&:disabled {
 				opacity: 0.4;
+			}
+			/* Room for "123.45". */
+			&.time {
+				width: 4.8em;
 			}
 		}
 		.note {

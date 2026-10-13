@@ -2,7 +2,7 @@
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 	import { MOVE_KIND_LABELS, type Move } from '../moves';
 	import { SPEED_FAST, SPEED_VERY_FAST, speedProfile } from '../speed';
-	import { departureOf, holdOf } from '../types';
+	import { departureOf, holdOf, snapTime, TIME_RESOLUTION } from '../types';
 	import PathIcon from './PathIcon.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -100,8 +100,8 @@
 	// while leaving fade durations attached.
 	// ---------------------------------------------------------------------------
 
-	const ANN_MIN_GAP = 0.01; // seconds; keeps the inner handles distinguishable
-	const round2 = (v: number) => Math.round(v * 100) / 100;
+	const ANN_MIN_GAP = TIME_RESOLUTION; // keeps the inner handles distinguishable
+	const round2 = snapTime;
 
 	type FadeHandle = 'fadeIn' | 'visibleFrom' | 'visibleUntil' | 'fadeOut';
 

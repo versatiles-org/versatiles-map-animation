@@ -15,7 +15,10 @@ import {
 	normalizeLayerGroups,
 	normalizeScreenAnchor,
 	normalizeSun,
-	SCHEMA_VERSION
+	SCHEMA_VERSION,
+	snapKeyframeTimes,
+	snapTime,
+	TIME_RESOLUTION
 } from './types';
 import type {
 	Animation,
@@ -47,14 +50,8 @@ export type ResolvedAnnotation = Annotation & {
 	iconColor: string;
 };
 
-const MIN_TIME_GAP = 0.01;
-
-/** Snap a time value to the nearest centi-second (1/100 s). Keyframe `t`
- *  values are stored on this grid so the timeline reads as clean decimals
- *  ("3.27 s") rather than floating-point dust from drag math. */
-function snapTime(t: number): number {
-	return Math.round(t * 100) / 100;
-}
+/** Two keyframes are never closer than one step of the time grid. */
+const MIN_TIME_GAP = TIME_RESOLUTION;
 
 /** Return a new array with `arr[idx]` replaced by `value`. */
 /**
@@ -534,7 +531,7 @@ export class AnimationStore {
 	}
 
 	loadFromAnimation(anim: Animation): void {
-		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
+		this.keyframes = snapKeyframeTimes(anim.keyframes);
 		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
 		this.style = anim.style ?? ANIMATION_DEFAULTS.style;
 		this.theme = anim.theme;

@@ -520,6 +520,43 @@ export interface Keyframe {
 	hold?: number;
 }
 
+/**
+ * The smallest step of time in an animation, in seconds. Keyframe times and
+ * holds, and the show/hide times of markers, all lie on this grid, so the
+ * timeline reads as clean decimals ("3.27 s") and two keyframes are never
+ * closer than one step.
+ */
+export const TIME_RESOLUTION = 0.01;
+
+/** Round a time in seconds to the grid of `TIME_RESOLUTION`. */
+export function snapTime(t: number): number {
+	// Dividing by the number of steps per second gives clean decimals, where
+	// multiplying by the step leaves floating-point dust (57 × 0.01 ≠ 0.57).
+	const stepsPerSecond = Math.round(1 / TIME_RESOLUTION);
+	return Math.round(t * stepsPerSecond) / stepsPerSecond;
+}
+
+/**
+ * Keyframes as an animation holds them: sorted by time, every time and hold
+ * on the grid of `TIME_RESOLUTION`, and each keyframe at least one step
+ * after the one before it has left. Anything loaded from a file or a link
+ * goes through this, so times written by hand or by an older version end up
+ * on the grid too.
+ */
+export function snapKeyframeTimes(keyframes: readonly Keyframe[]): Keyframe[] {
+	let earliest = 0;
+	return [...keyframes]
+		.sort((a, b) => a.t - b.t)
+		.map((kf) => {
+			const out: Keyframe = { ...kf, t: Math.max(earliest, snapTime(Math.max(0, kf.t))) };
+			const hold = snapTime(holdOf(kf));
+			if (hold > 0) out.hold = hold;
+			else delete out.hold;
+			earliest = snapTime(out.t + hold + TIME_RESOLUTION);
+			return out;
+		});
+}
+
 /** How long the camera rests on a keyframe, in seconds — 0 for a waypoint. */
 export function holdOf(kf: Keyframe): number {
 	return kf.waypoint ? 0 : Math.max(0, kf.hold ?? 0);

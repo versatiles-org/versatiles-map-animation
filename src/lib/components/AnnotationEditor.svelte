@@ -16,7 +16,7 @@
 	import IconPicker from './IconPicker.svelte';
 	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
-	import { ANNOTATION_FIELD_DEFAULTS, type Annotation } from '../types';
+	import { ANNOTATION_FIELD_DEFAULTS, snapTime, TIME_RESOLUTION, type Annotation } from '../types';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -60,8 +60,8 @@
 	//   2. fadeIn / fadeOut ≥ 0 and stay ≤ their reference bound
 	// Plus we round to centi-second precision so dragged values don't stick
 	// floating-point dust into the input fields.
-	const ANN_MIN_GAP = 0.01;
-	const round2 = (v: number) => Math.round(v * 100) / 100;
+	const ANN_MIN_GAP = TIME_RESOLUTION;
+	const round2 = snapTime;
 
 	/**
 	 * Force the DOM input to mirror the clamped value. Svelte 5 short-circuits

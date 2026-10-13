@@ -771,6 +771,38 @@ describe('AnimationStore - load/serialise', () => {
 		});
 	});
 
+	it('puts loaded keyframes on the time grid, and typed times too', () => {
+		const s = new AnimationStore();
+		const kf = (t: number, extra: object = {}) => ({
+			t,
+			lng: t,
+			lat: 0,
+			zoom: 5,
+			pitch: 0,
+			bearing: 0,
+			roll: 0,
+			...extra
+		});
+		s.loadFromAnimation({
+			...s.toAnimation(),
+			keyframes: [kf(0.004), kf(1.2345, { hold: 0.999 }), kf(7.7777)]
+		});
+		expect(s.keyframes.map((k) => [k.t, k.hold ?? 0])).toEqual([
+			[0, 0],
+			[1.23, 1],
+			[7.78, 0]
+		]);
+		expect(s.totalDuration).toBe(7.78);
+		// What a number typed into the Time field does.
+		s.selectAt(2);
+		s.setKeyframeTime(2, 5.5049);
+		expect(s.keyframes[2].t).toBe(5.5);
+		// Typed onto another keyframe: it lands one step behind it.
+		s.setKeyframeTime(2, 0);
+		expect(s.keyframes.map((k) => k.t)).toEqual([0, 0.01, 1.23]);
+		expect(s.selectedIndex).toBe(1);
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());
