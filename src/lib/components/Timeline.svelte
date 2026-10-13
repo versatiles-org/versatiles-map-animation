@@ -185,17 +185,39 @@
 		});
 	}
 
+	/**
+	 * How far the pointer has to travel before a press on a keyframe becomes
+	 * a drag. A click is rarely perfectly still, and there is no undo.
+	 */
+	const DRAG_THRESHOLD_PX = 4;
+
+	/**
+	 * A press on a keyframe (or on the block of its hold). On an unselected
+	 * keyframe it only selects — retiming one takes a second, deliberate
+	 * gesture. On the selected keyframe it starts a drag once the pointer has
+	 * moved `DRAG_THRESHOLD_PX`.
+	 */
 	function startDragMarker(e: PointerEvent, index: number) {
 		e.stopPropagation();
 		e.preventDefault();
+		const wasSelected = store.selectedIndex === index;
 		store.selectAt(index);
 		store.pause();
-		// Dragging a keyframe re-seeks the playhead each frame, so it's a scrub
-		// in disguise — flag it so the editor's edit-mode chrome bows out and
-		// the user sees the real animation pose at the dragged time.
-		store.isScrubbing = true;
+		const kf = store.keyframes[index];
+		if (!wasSelected || !kf) return;
+		// Where on the keyframe it was grabbed, so it doesn't jump to the pointer.
+		const grab = tFromClientX(e.clientX) - kf.t;
+		let dragging = false;
 		capturePointer(e.target as HTMLElement, e, {
 			onMove: (ev) => {
+				if (!dragging) {
+					if (Math.abs(ev.clientX - e.clientX) < DRAG_THRESHOLD_PX) return;
+					dragging = true;
+					// Dragging a keyframe re-seeks the playhead each frame, so it's a
+					// scrub in disguise — flag it so the editor's edit-mode chrome bows
+					// out and the user sees the real animation pose at the dragged time.
+					store.isScrubbing = true;
+				}
 				// Track the moving keyframe via `selectedIndex` rather than the
 				// captured `index`: when the keyframe is dragged past a neighbor,
 				// `setKeyframeTime` re-sorts the array and updates the selection
@@ -203,9 +225,9 @@
 				// on the next frame.
 				const i = store.selectedIndex;
 				if (i === null) return;
-				store.setKeyframeTime(i, tFromClientX(ev.clientX));
-				const kf = store.keyframes[store.selectedIndex ?? i];
-				if (kf) store.currentTime = kf.t;
+				store.setKeyframeTime(i, tFromClientX(ev.clientX) - grab);
+				const moved = store.keyframes[store.selectedIndex ?? i];
+				if (moved) store.currentTime = moved.t;
 			},
 			onUp: () => {
 				store.isScrubbing = false;
@@ -217,22 +239,30 @@
 	 * Drag the right edge of a stop: sets how long the camera rests there.
 	 * Later keyframes move along (see `setKeyframeHold`), which changes the
 	 * animation's length — so the view stops auto-fitting while dragging, or
-	 * the timeline would rescale under the pointer.
+	 * the timeline would rescale under the pointer. Same rules as for the
+	 * keyframe itself: select first, then drag past the threshold.
 	 */
 	function startDragHold(e: PointerEvent, index: number) {
 		e.stopPropagation();
 		e.preventDefault();
 		const kf = store.keyframes[index];
 		if (!kf) return;
+		const wasSelected = store.selectedIndex === index;
 		store.selectAt(index);
 		store.pause();
+		if (!wasSelected) return;
 		const wasAutoFit = viewSpan === null;
-		viewSpan = span;
-		viewStart = start;
 		// Where on the handle it was grabbed, so it doesn't jump to the pointer.
 		const grab = tFromClientX(e.clientX) - departureOf(kf);
+		let dragging = false;
 		capturePointer(e.target as HTMLElement, e, {
 			onMove: (ev) => {
+				if (!dragging) {
+					if (Math.abs(ev.clientX - e.clientX) < DRAG_THRESHOLD_PX) return;
+					dragging = true;
+					viewSpan = span;
+					viewStart = start;
+				}
 				const current = store.keyframes[index];
 				if (!current) return;
 				store.setKeyframeHold(index, tFromClientX(ev.clientX) - grab - current.t);
@@ -240,7 +270,7 @@
 			},
 			onUp: () => {
 				// Back to fitting the whole animation, now at its new length.
-				if (wasAutoFit) viewSpan = null;
+				if (dragging && wasAutoFit) viewSpan = null;
 			}
 		});
 	}
@@ -460,7 +490,9 @@
 					class:selected={store.selectedIndex === i}
 					style="left: {pct(kf.t)}%; width: {pct(kf.t + hold) - pct(kf.t)}%"
 					onpointerdown={(e) => startDragMarker(e, i)}
-					title="Stop {i + 1} rests for {fmt(hold)}s"
+					title="Stop {i + 1} rests for {fmt(hold)}s — {store.selectedIndex === i
+						? 'drag to retime'
+						: 'click to select, then drag to retime'}"
 					role="presentation"
 				></div>
 			{/if}
@@ -472,9 +504,11 @@
 					class:selected={store.selectedIndex === i}
 					style="left: {pct(kf.t + hold)}%"
 					onpointerdown={(e) => startDragHold(e, i)}
-					title={hold > 0
-						? `Rests for ${fmt(hold)}s — drag to change. Everything after moves along.`
-						: 'Drag right to let the camera rest here. Everything after moves along.'}
+					title={store.selectedIndex !== i
+						? `Rests for ${fmt(hold)}s — click to select, then drag to change`
+						: hold > 0
+							? `Rests for ${fmt(hold)}s — drag to change. Everything after moves along.`
+							: 'Drag right to let the camera rest here. Everything after moves along.'}
 					aria-label="Hold time of stop {i + 1}"
 				></button>
 			{/if}
@@ -488,7 +522,11 @@
 				class:waypoint={kf.waypoint}
 				style="left: {pct(kf.t)}%"
 				onpointerdown={(e) => startDragMarker(e, i)}
-				title="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1} at {fmt(kf.t)}s"
+				title="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1} at {fmt(
+					kf.t
+				)}s — {store.selectedIndex === i
+					? 'drag to retime'
+					: 'click to select, then drag to retime'}"
 				aria-label="{kf.waypoint ? 'Waypoint' : 'Stop'} {i + 1}"
 			>
 				<span class="diamond"></span>
@@ -753,10 +791,12 @@
 		border: 1px solid #fff;
 		border-radius: 3px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-		cursor: ew-resize;
+		/* Only the selected keyframe can be dragged; the cursor says which. */
+		cursor: pointer;
 
 		&.selected {
 			background: #ffd24a;
+			cursor: ew-resize;
 		}
 	}
 	.hold-handle {
@@ -770,10 +810,11 @@
 		background: #fff;
 		border: 1px solid rgba(0, 0, 0, 0.6);
 		border-radius: 3px;
-		cursor: col-resize;
+		cursor: pointer;
 
 		&.selected {
 			background: #ffd24a;
+			cursor: col-resize;
 		}
 		/* No hold yet: the grip stands right of the diamond, ready to be pulled out. */
 		&.detached {
@@ -790,12 +831,15 @@
 		height: 20px;
 		background: transparent;
 		border: none;
-		cursor: ew-resize;
+		cursor: pointer;
 		padding: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 
+		&.selected {
+			cursor: ew-resize;
+		}
 		&.selected .diamond {
 			background: #ffd24a;
 		}
