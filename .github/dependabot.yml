@@ -19,6 +19,26 @@ updates:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
 
+  # The base images of the renderer image (render/Dockerfile).
+  - package-ecosystem: docker
+    directory: '/render'
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns:
+          - '*'
+      security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+    ignore:
+      # A new Node.js major is a decision, not a routine update — and the
+      # image tag also names the Debian release, which has to stay the one
+      # of the final stage.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: github-actions
     directory: '/'
     schedule:
