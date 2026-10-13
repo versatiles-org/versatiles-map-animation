@@ -243,12 +243,29 @@ function globeLinearSample(
 // A move from one stop straight to the next is eased on its own (`arc` or
 // `linear` above), so the camera rests at both ends. A waypoint is a
 // keyframe the camera flies through, so the segments on either side of it
-// are pieces of one curve through time: cubic Hermite segments whose
-// velocity at a waypoint is the slope between its two neighbours
-// (Catmull-Rom). Position *and* speed are then continuous there. At a stop
-// the velocity is zero, which is the ease-in / ease-out. A waypoint with no
-// neighbour beyond it — the first or last keyframe — keeps the velocity of
-// its one segment, so the animation starts or ends in motion.
+// are pieces of one curve through time: cubic Hermite segments that share
+// their velocity at the waypoint. Position *and* speed are then continuous
+// there. At a stop the velocity is zero, which is the ease-in / ease-out. A
+// waypoint with no neighbour beyond it — the first or last keyframe — keeps
+// the velocity of its one segment, so the animation starts or ends in motion.
+//
+// The velocity at a waypoint starts out as the slope between its two
+// neighbours (Catmull-Rom) and is then held back in two ways:
+//
+// - Zoom, tilt, bearing and roll do not swing past their keyframes: where a
+//   value turns around at a waypoint it rests there for that instant, and it
+//   never runs more than three times as fast as the slower of the two
+//   segments (the Fritsch–Carlson condition for a curve without overshoot).
+//
+// - The position is measured in what the viewer sees. A degree of ground is
+//   twice as many pixels one zoom level further in, so the curve is built
+//   from *on-screen* velocities — ground speed divided by the visible width
+//   — and the ground is covered in proportion to that width. A curve that
+//   comes down from the whole globe to a valley then crosses the continent
+//   while it is still high and is nearly on target when it gets close.
+//   Building it from ground speeds would carry the pace of the long haul
+//   into the zoomed-in end: the camera would dive first and then race
+//   across the map.
 
 /** Indices of the angles in a spline vector: they wrap, so they get unwrapped. */
 const SPLINE_ANGLES = [0, 4, 5];
@@ -277,54 +294,184 @@ function normalizeAngle(deg: number): number {
 	return ((((deg + 180) % 360) + 360) % 360) - 180;
 }
 
+/** Cubic Hermite basis at `u`: weights of start, start tangent, end, end tangent. */
+function hermite(u: number): [number, number, number, number] {
+	const u2 = u * u;
+	const u3 = u2 * u;
+	return [2 * u3 - 3 * u2 + 1, u3 - 2 * u2 + u, -2 * u3 + 3 * u2, u3 - u2];
+}
+
 /**
- * Camera at `alpha` between `kfA` and `kfB`. `prev` / `next` are the
- * keyframes beyond them if the curve continues there, otherwise `null`.
+ * The velocity at a waypoint, given the slopes of the segments into and out
+ * of it and the Catmull-Rom slope across both: no swinging past the
+ * keyframe, see the section comment.
+ */
+function limitedVelocity(slopeIn: number, slopeOut: number, across: number): number {
+	if (slopeIn * slopeOut <= 0) return 0;
+	const limit = 3 * Math.min(Math.abs(slopeIn), Math.abs(slopeOut));
+	return Math.sign(across) * Math.min(Math.abs(across), limit);
+}
+
+/** Intervals of the Simpson sums over a segment's visible width; even. */
+const WIDTH_STEPS = 32;
+
+/** Simpson's rule for `f` over 0…`to`. */
+function integrate(f: (u: number) => number, to: number): number {
+	const step = to / WIDTH_STEPS;
+	let sum = f(0) + f(to);
+	for (let i = 1; i < WIDTH_STEPS; i++) sum += f(i * step) * (i % 2 === 1 ? 4 : 2);
+	return (sum * step) / 3;
+}
+
+/** The keyframes a curve segment depends on, see `splineSample`. */
+export interface CurveNeighbours {
+	/** The keyframe before `kfA`, if `kfA` is a waypoint. */
+	prev?: Keyframe | null;
+	/** The keyframe before `prev`, if `prev` is a waypoint. */
+	prev2?: Keyframe | null;
+	/** The keyframe after `kfB`, if `kfB` is a waypoint. */
+	next?: Keyframe | null;
+	/** The keyframe after `next`, if `next` is a waypoint. */
+	next2?: Keyframe | null;
+}
+
+/**
+ * Camera at `alpha` between `kfA` and `kfB`. The neighbours are the
+ * keyframes beyond them as far as the curve continues there, otherwise
+ * `null`: the velocity at a waypoint depends on the segment on its other
+ * side, and how fast that one crosses the screen on the zoom it has there.
  */
 function splineSample(
-	prev: Keyframe | null,
 	kfA: Keyframe,
 	kfB: Keyframe,
-	next: Keyframe | null,
 	alpha: number,
-	projection: MapProjection
+	projection: MapProjection,
+	{ prev = null, prev2 = null, next = null, next2 = null }: CurveNeighbours
 ): CameraState {
 	if (alpha <= 0 || alpha >= 1) {
 		const kf = alpha <= 0 ? kfA : kfB;
 		return { ...cameraOf(kf), bearing: normalizeAngle(kf.bearing), roll: normalizeAngle(kf.roll) };
 	}
 	const onGlobe = projection === 'globe';
-	const a = toSplineVector(kfA, onGlobe);
-	const b = unwrapFrom(a, toSplineVector(kfB, onGlobe));
-	const p = prev && unwrapFrom(a, toSplineVector(prev, onGlobe));
-	const n = next && unwrapFrom(b, toSplineVector(next, onGlobe));
 
+	// The stretch of the curve that matters here, `kfA` at index 2 and `kfB`
+	// at 3, each as its spline vector with the angles unwrapped along the way.
+	const kfs = [prev && prev2, prev, kfA, kfB, next, next && next2];
+	const vectors: (number[] | null)[] = kfs.map(() => null);
+	vectors[2] = toSplineVector(kfA, onGlobe);
+	for (let j = 3; j < kfs.length; j++) {
+		const kf = kfs[j];
+		const from = vectors[j - 1];
+		vectors[j] = kf && from && unwrapFrom(from, toSplineVector(kf, onGlobe));
+	}
+	for (let j = 1; j >= 0; j--) {
+		const kf = kfs[j];
+		const from = vectors[j + 1];
+		vectors[j] = kf && from && unwrapFrom(from, toSplineVector(kf, onGlobe));
+	}
+
+	/** Mean velocity of component `i` from keyframe `from` to keyframe `to`, if both exist. */
+	const slope = (from: number, to: number, i: number): number | null => {
+		const a = vectors[from];
+		const b = vectors[to];
+		if (!a || !b) return null;
+		const dt = kfs[to]!.t - kfs[from]!.t;
+		return dt > 0 ? (b[i] - a[i]) / dt : 0;
+	};
+
+	/** Velocity of zoom, pitch, bearing or roll (component `i`) at keyframe `j`. */
+	const velocity = (j: number, i: number): number => {
+		if (!kfs[j]?.waypoint) return 0;
+		const into = slope(j - 1, j, i);
+		const out = slope(j, j + 1, i);
+		if (into === null || out === null) return into ?? out ?? 0;
+		return limitedVelocity(into, out, slope(j - 1, j + 1, i) ?? 0);
+	};
+
+	/** Zoom at `u` of the way from keyframe `j` to the one after it. */
+	const zoomOn = (j: number): ((u: number) => number) => {
+		const from = vectors[j]![2];
+		const to = vectors[j + 1]![2];
+		const h = kfs[j + 1]!.t - kfs[j]!.t;
+		const tangentFrom = h * velocity(j, 2);
+		const tangentTo = h * velocity(j + 1, 2);
+		return (u) => {
+			const [h00, h10, h01, h11] = hermite(u);
+			return h00 * from + h10 * tangentFrom + h01 * to + h11 * tangentTo;
+		};
+	};
+	/** Visible width, relative to zoom 0, averaged over the segment from keyframe `j`. */
+	const meanWidth = (j: number): number => {
+		const zoom = zoomOn(j);
+		return integrate((u) => Math.pow(2, -zoom(u)), 1);
+	};
+	/** How fast the segment from keyframe `j` crosses the screen on average: [lng, y] per second and width. */
+	const screenVelocity = (j: number): [number, number] | null => {
+		const a = vectors[j];
+		const b = vectors[j + 1];
+		if (!a || !b) return null;
+		const dt = kfs[j + 1]!.t - kfs[j]!.t;
+		if (!(dt > 0)) return [0, 0];
+		const scale = 1 / (dt * meanWidth(j));
+		return [(b[0] - a[0]) * scale, (b[1] - a[1]) * scale];
+	};
+	/** On-screen velocity of the position at keyframe `j`. */
+	const positionVelocity = (j: number): [number, number] => {
+		if (!kfs[j]?.waypoint) return [0, 0];
+		const into = screenVelocity(j - 1);
+		const out = screenVelocity(j);
+		if (!into || !out) return into ?? out ?? [0, 0];
+		// Catmull-Rom on screen: the two segments weighted by how long they last …
+		const dtIn = kfs[j]!.t - kfs[j - 1]!.t;
+		const dtOut = kfs[j + 1]!.t - kfs[j]!.t;
+		const total = dtIn + dtOut;
+		if (!(total > 0)) return [0, 0];
+		const across = [0, 1].map((i) => (into[i] * dtIn + out[i] * dtOut) / total);
+		// … and held back so the curve of the slower segment does not have to
+		// loop to fit the velocity in: up to three times its speed where the
+		// two segments run the same way (as for the other components), down
+		// to its own speed where the path turns a corner or doubles back.
+		const speed = Math.hypot(across[0], across[1]);
+		const speedIn = Math.hypot(into[0], into[1]);
+		const speedOut = Math.hypot(out[0], out[1]);
+		const aligned =
+			speedIn > 0 && speedOut > 0
+				? Math.max(0, (into[0] * out[0] + into[1] * out[1]) / (speedIn * speedOut))
+				: 0;
+		const limit = Math.min(speedIn, speedOut) * (1 + 2 * aligned);
+		const factor = speed > limit ? limit / speed : 1;
+		return [across[0] * factor, across[1] * factor];
+	};
+
+	const a = vectors[2]!;
+	const b = vectors[3]!;
 	const h = kfB.t - kfA.t;
-	const slope = (from: number, to: number, dt: number) => (dt > 0 ? (to - from) / dt : 0);
-	// Velocity of component `i` at each end — see the section comment.
-	const velocityA = (i: number) =>
-		!kfA.waypoint ? 0 : p && prev ? slope(p[i], b[i], kfB.t - prev.t) : slope(a[i], b[i], h);
-	const velocityB = (i: number) =>
-		!kfB.waypoint ? 0 : n && next ? slope(a[i], n[i], next.t - kfA.t) : slope(a[i], b[i], h);
-
-	const u = alpha;
-	const u2 = u * u;
-	const u3 = u2 * u;
-	const h00 = 2 * u3 - 3 * u2 + 1;
-	const h10 = u3 - 2 * u2 + u;
-	const h01 = -2 * u3 + 3 * u2;
-	const h11 = u3 - u2;
-
+	const [h00, h10, h01, h11] = hermite(alpha);
 	const v = a.map(
-		(_, i) => h00 * a[i] + h10 * h * velocityA(i) + h01 * b[i] + h11 * h * velocityB(i)
+		(_, i) => h00 * a[i] + h10 * h * velocity(2, i) + h01 * b[i] + h11 * h * velocity(3, i)
 	);
+
+	// The position runs along its own Hermite curve, not by time but by the
+	// share of the segment's ground covered so far — the visible width summed
+	// up to here, over the sum for the whole segment.
+	const zoom = zoomOn(2);
+	const width = (u: number) => Math.pow(2, -zoom(u));
+	const widthSum = integrate(width, 1);
+	const covered = integrate(width, alpha) / widthSum;
+	const [g00, g10, g01, g11] = hermite(covered);
+	const from = positionVelocity(2);
+	const to = positionVelocity(3);
+	for (const i of [0, 1]) {
+		// On-screen velocity → tangent in terms of the ground covered.
+		v[i] = g00 * a[i] + g10 * h * widthSum * from[i] + g01 * b[i] + g11 * h * widthSum * to[i];
+	}
 
 	const lat = onGlobe ? clampLat(v[1]) : mercatorYToLat(v[1]);
 	return {
 		lng: normalizeLng(v[0]),
 		lat,
 		zoom: onGlobe ? fromGlobeZoom(v[2], lat) : v[2],
-		// A curve can swing past its keyframes; the camera cannot tilt past these.
+		// Out of caution: the limited velocities keep the tilt between its keyframes.
 		pitch: Math.max(0, Math.min(90, v[3])),
 		bearing: normalizeAngle(v[4]),
 		roll: normalizeAngle(v[5])
@@ -335,26 +482,18 @@ function splineSample(
  * `projection` picks the geometry the camera travels in — see the Globe
  * section above. The keyframes themselves mean the same in both.
  *
- * `neighbours` only matter next to a waypoint: the keyframe before `kfA`
- * if `kfA` is one, the keyframe after `kfB` if `kfB` is one.
+ * `neighbours` only matter next to a waypoint — see `CurveNeighbours`.
  */
 export function interpolateKeyframes(
 	kfA: Keyframe,
 	kfB: Keyframe,
 	alpha: number,
 	projection: MapProjection = 'mercator',
-	neighbours: { prev?: Keyframe | null; next?: Keyframe | null } = {}
+	neighbours: CurveNeighbours = {}
 ): CameraState {
 	if (kfA.waypoint || kfB.waypoint) {
 		const clamped = Math.max(0, Math.min(1, alpha));
-		return splineSample(
-			neighbours.prev ?? null,
-			kfA,
-			kfB,
-			neighbours.next ?? null,
-			clamped,
-			projection
-		);
+		return splineSample(kfA, kfB, clamped, projection, neighbours);
 	}
 	const path = kfA.path ?? 'arc';
 	const eased = easeInOut(alpha);
@@ -438,10 +577,18 @@ export function sampleAt(
 			if (t <= from) return cameraOf(a);
 			const span = b.t - from;
 			const alpha = span > 0 ? (t - from) / span : 0;
-			// The curve through a waypoint needs the keyframe beyond it.
+			// The curve through a waypoint needs the keyframes beyond it, as far
+			// as the curve goes on: up to the next stop, two keyframes at most.
 			const prev = a.waypoint && i > 0 ? leaving(keyframes[i - 1]) : null;
+			const prev2 = prev?.waypoint && i > 1 ? leaving(keyframes[i - 2]) : null;
 			const next = b.waypoint && i + 2 < keyframes.length ? keyframes[i + 2] : null;
-			return interpolateKeyframes(leaving(a), b, alpha, projection, { prev, next });
+			const next2 = next?.waypoint && i + 3 < keyframes.length ? keyframes[i + 3] : null;
+			return interpolateKeyframes(leaving(a), b, alpha, projection, {
+				prev,
+				prev2,
+				next,
+				next2
+			});
 		}
 	}
 	return cameraOf(last);

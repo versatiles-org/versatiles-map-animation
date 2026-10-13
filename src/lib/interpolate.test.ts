@@ -9,6 +9,7 @@ import {
 	sampleAt,
 	toGlobeZoom
 } from './interpolate';
+import { screenSpeed, SPEED_FAST } from './screen_speed';
 import type { Keyframe } from './types';
 
 describe('easeInOut', () => {
@@ -351,6 +352,74 @@ describe('waypoints', () => {
 			expect(pitch).toBeGreaterThanOrEqual(0);
 			expect(pitch).toBeLessThanOrEqual(90);
 		}
+	});
+
+	describe('through very different zooms', () => {
+		// Reported: from the whole globe down to a valley in the Alps through a
+		// waypoint, then tilting. The curve used to carry the ground speed of
+		// the long haul into the zoomed-in end: the camera dived over Italy and
+		// then raced to the Alps at twenty frame widths a second.
+		const dive: Keyframe[] = [
+			stop(0, 16.36, 35.29, { zoom: 1.73 }),
+			via(5, 7.08, 46.11, { zoom: 13.24 }),
+			stop(10, 7.49, 46.29, { zoom: 12.27, pitch: 67, bearing: 50 })
+		];
+		const projections = ['mercator', 'globe'] as const;
+
+		it('never crosses the screen fast', () => {
+			for (const projection of projections) {
+				for (let t = 0; t < 10; t += 0.01) {
+					const from = sampleAt(dive, t, projection)!;
+					const to = sampleAt(dive, t + 0.005, projection)!;
+					expect(screenSpeed(from, to, 0.005)).toBeLessThan(SPEED_FAST);
+				}
+			}
+		});
+
+		it('is over its target before it is close to the ground', () => {
+			for (const projection of projections) {
+				for (let t = 0; t <= 5; t += 0.05) {
+					const cam = sampleAt(dive, t, projection)!;
+					const visible = 360 / Math.pow(2, cam.zoom);
+					const away = Math.hypot(cam.lng - dive[1].lng, cam.lat - dive[1].lat);
+					// From zoom 6 on, the waypoint is within the frame.
+					if (cam.zoom > 6) expect(away / visible).toBeLessThan(0.5);
+				}
+			}
+		});
+
+		it('does not swing past its keyframes', () => {
+			for (const projection of projections) {
+				for (let t = 0; t <= 10; t += 0.05) {
+					const cam = sampleAt(dive, t, projection)!;
+					// The zoom turns around at the waypoint, the rest only starts there.
+					expect(cam.zoom).toBeLessThanOrEqual(13.24 + 1e-6);
+					expect(cam.zoom).toBeGreaterThanOrEqual(1.73 - 1e-6);
+					expect(cam.bearing).toBeGreaterThanOrEqual(-1e-6);
+					expect(cam.bearing).toBeLessThanOrEqual(50 + 1e-6);
+					expect(cam.pitch).toBeLessThanOrEqual(67 + 1e-6);
+				}
+			}
+		});
+
+		it('still passes the waypoint without a jump in speed', () => {
+			const climb = [
+				stop(0, 0, 0, { zoom: 4 }),
+				via(2, 10, 0, { zoom: 6 }),
+				via(4, 13, 0, { zoom: 8 }),
+				stop(6, 14, 0, { zoom: 9 })
+			];
+			for (const t of [2, 4]) {
+				const before = (sampleAt(climb, t)!.lng - sampleAt(climb, t - 1e-4)!.lng) / 1e-4;
+				const after = (sampleAt(climb, t + 1e-4)!.lng - sampleAt(climb, t)!.lng) / 1e-4;
+				expect(before).toBeGreaterThan(0);
+				expect(after / before).toBeCloseTo(1, 2);
+			}
+			// And it only ever moves forward.
+			for (let t = 0; t < 6; t += 0.05) {
+				expect(sampleAt(climb, t + 0.05)!.lng).toBeGreaterThanOrEqual(sampleAt(climb, t)!.lng);
+			}
+		});
 	});
 
 	it('on the globe keeps the globe size between equally sized keyframes', () => {
