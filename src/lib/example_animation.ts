@@ -7,7 +7,7 @@ import type { Animation } from './types';
  * holds there for three seconds. The second half is one continuous move:
  * it tracks across the range through three waypoints and only comes to
  * rest at the western coast. Used by the editor's
- * "★ Load example" menu item — and so a tour of what a path is made of: a
+ * "Load example" menu item — and so a tour of what a path is made of: a
  * plain move between two stops, a hold, and a move through waypoints.
  *
  * Annotations mark the two summits in view during the hold: they fade in

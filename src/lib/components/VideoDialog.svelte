@@ -21,6 +21,7 @@
 	} from '../render_command';
 	import { aspectRatioValue } from '../types';
 	import { encodeAnimation } from '../url_state';
+	import Icon from './Icon.svelte';
 
 	const VIDEO_WIDTHS = [640, 1280, 1920, 3840] as const;
 	type VideoWidth = (typeof VIDEO_WIDTHS)[number];
@@ -206,9 +207,12 @@
 			onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
 		/>
 		<button type="button" onclick={copy} class:copied title="Copy command">
-			{copied ? '✓ Copied' : '⧉ Copy'}
+			<Icon name={copied ? 'check' : 'copy'} />
+			{copied ? 'Copied' : 'Copy'}
 		</button>
-		<button type="button" onclick={onClose} aria-label="Close" title="Close">✕</button>
+		<button type="button" onclick={onClose} aria-label="Close" title="Close"
+			><Icon name="close" /></button
+		>
 	</div>
 </div>
 

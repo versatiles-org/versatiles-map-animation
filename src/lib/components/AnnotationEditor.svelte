@@ -13,6 +13,7 @@
 	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
+	import Icon from './Icon.svelte';
 	import IconPicker from './IconPicker.svelte';
 	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
@@ -168,7 +169,7 @@
 			aria-label="Deselect annotation"
 			title="Deselect"
 		>
-			✕
+			<Icon name="close" />
 		</button>
 	</div>
 
@@ -184,7 +185,7 @@
 			onclick={() => resetAnnFields('icon')}
 			disabled={!isAnnSet('icon')}
 			title="Reset shape to the current default"
-			aria-label="Reset shape">⟲</button
+			aria-label="Reset shape"><Icon name="reset" size={12} /></button
 		>
 	</div>
 
@@ -270,7 +271,7 @@
 			onclick={() => resetAnnFields('labelFont')}
 			disabled={!isAnnSet('labelFont')}
 			title="Reset font to the current default"
-			aria-label="Reset font">⟲</button
+			aria-label="Reset font"><Icon name="reset" size={12} /></button
 		>
 	</label>
 
@@ -361,7 +362,7 @@
 				disabled={ann.visibleFrom === undefined}
 				title="Show from the start of the animation"
 			>
-				⟲
+				<Icon name="reset" size={12} />
 			</button>
 			<span class="sublbl">until</span>
 			<input
@@ -379,7 +380,7 @@
 				disabled={ann.visibleUntil === undefined}
 				title="Show until the end of the animation"
 			>
-				⟲
+				<Icon name="reset" size={12} />
 			</button>
 		</div>
 	</div>
@@ -432,7 +433,7 @@
 			onclick={onMoveHere}
 			title="Move this annotation to the current map center"
 		>
-			⤴ Move here
+			<Icon name="pin" /> Move here
 		</button>
 	</div>
 
@@ -443,9 +444,9 @@
 			onclick={onDuplicate}
 			title="Clone this annotation slightly offset from the original"
 		>
-			⧉ Duplicate
+			<Icon name="copy" /> Duplicate
 		</button>
-		<button type="button" class="danger" onclick={onDelete}>✕ Delete</button>
+		<button type="button" class="danger" onclick={onDelete}><Icon name="trash" /> Delete</button>
 	</footer>
 {/if}
 

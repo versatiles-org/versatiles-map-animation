@@ -11,6 +11,7 @@
 	import { downloadAnimation, uploadAnimation } from '../json_io';
 	import { encodeAnimation } from '../url_state';
 	import EmbedDialog from './EmbedDialog.svelte';
+	import Icon from './Icon.svelte';
 	import VideoDialog from './VideoDialog.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -22,7 +23,7 @@
 	let panel = $state<'embed' | 'video' | null>(null);
 
 	// Status flash for the share-link copy result. The two dialogs each have
-	// their own internal "✓ Copied" badge state.
+	// their own internal "Copied" badge state.
 	let status = $state<{ tone: 'ok' | 'err'; text: string } | null>(null);
 	let statusTimer: ReturnType<typeof setTimeout> | undefined;
 	function flash(tone: 'ok' | 'err', text: string) {
@@ -73,9 +74,9 @@
 		const url = `${window.location.origin}${resolve('/')}#kf=${encodeAnimation(store.toAnimation())}`;
 		try {
 			await navigator.clipboard.writeText(url);
-			flash('ok', '✓ Share link copied');
+			flash('ok', 'Share link copied');
 		} catch {
-			flash('err', '✕ Could not copy link');
+			flash('err', 'Could not copy link');
 		}
 	}
 	function togglePanel(which: 'embed' | 'video') {
@@ -101,17 +102,21 @@
 	<h1 title="Drop keyframes on a map, hit play.">Map Animation</h1>
 
 	<details bind:this={menuEl} class="file-menu">
-		<summary>File <span class="caret" aria-hidden="true">▾</span></summary>
+		<summary>File <span class="caret"><Icon name="caret" size={12} /></span></summary>
 		<div class="menu" role="menu">
-			<button type="button" role="menuitem" onclick={onLoadExample}>★ Load example</button>
+			<button type="button" role="menuitem" onclick={onLoadExample}
+				><Icon name="star" /> Load example</button
+			>
 			<hr />
-			<button type="button" role="menuitem" onclick={onImportClick}>↑ Import JSON</button>
+			<button type="button" role="menuitem" onclick={onImportClick}
+				><Icon name="import" /> Import JSON</button
+			>
 			<button type="button" role="menuitem" onclick={onExport} disabled={!hasKeyframes}>
-				↓ Export JSON
+				<Icon name="export" /> Export JSON
 			</button>
 			<hr />
 			<button type="button" role="menuitem" onclick={onClear} disabled={!hasKeyframes}>
-				⌫ Clear
+				<Icon name="trash" /> Clear
 			</button>
 		</div>
 	</details>
@@ -120,6 +125,7 @@
 
 	{#if status}
 		<span class="status" class:ok={status.tone === 'ok'} class:err={status.tone === 'err'}>
+			<Icon name={status.tone === 'ok' ? 'check' : 'close'} size={12} />
 			{status.text}
 		</span>
 	{/if}
@@ -131,7 +137,7 @@
 			disabled={!hasKeyframes}
 			title="Copy a link that opens this animation in the editor"
 		>
-			🔗 Share link
+			<Icon name="link" /> Share link
 		</button>
 		<button
 			type="button"
@@ -141,7 +147,7 @@
 			disabled={!hasKeyframes}
 			title="Get an iframe snippet for your own page"
 		>
-			🖼 Embed…
+			<Icon name="embed" /> Embed…
 		</button>
 		<button
 			type="button"
@@ -151,7 +157,7 @@
 			disabled={!hasKeyframes}
 			title="Get the command that renders this animation to a video file"
 		>
-			🎬 Export video…
+			<Icon name="video" /> Export video…
 		</button>
 	</div>
 
@@ -167,7 +173,9 @@
 {#if importError}
 	<div class="import-error" role="alert">
 		<span>Import failed: {importError}</span>
-		<button type="button" onclick={() => (importError = null)} aria-label="Dismiss">✕</button>
+		<button type="button" onclick={() => (importError = null)} aria-label="Dismiss"
+			><Icon name="close" /></button
+		>
 	</div>
 {/if}
 

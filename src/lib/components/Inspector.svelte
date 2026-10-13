@@ -10,6 +10,7 @@
 
 	import type { AnimationStore } from '../animation.svelte';
 	import { holdOf, PATH_STYLE_LABELS, PATH_STYLES, TIME_RESOLUTION } from '../types';
+	import Icon from './Icon.svelte';
 	import PathIcon from './PathIcon.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
@@ -125,10 +126,10 @@
 				onclick={() => store.updateSelectedFromCamera(store.liveCamera)}
 				title="Replace this keyframe's view with what the map shows now"
 			>
-				↻ Set to current view
+				<Icon name="view" /> Set to current view
 			</button>
 			<button type="button" onclick={() => store.deleteAt(index)} title="Delete this keyframe">
-				✕ Delete
+				<Icon name="trash" /> Delete
 			</button>
 		</div>
 	{:else}

@@ -10,6 +10,7 @@
 	import { resolve } from '$app/paths';
 	import type { AnimationStore } from '../animation.svelte';
 	import { encodeAnimation } from '../url_state';
+	import Icon from './Icon.svelte';
 
 	let {
 		store,
@@ -69,9 +70,12 @@
 			onfocus={(e) => (e.currentTarget as HTMLInputElement).select()}
 		/>
 		<button type="button" onclick={copy} class:copied title="Copy snippet">
-			{copied ? '✓ Copied' : '⧉ Copy'}
+			<Icon name={copied ? 'check' : 'copy'} />
+			{copied ? 'Copied' : 'Copy'}
 		</button>
-		<button type="button" onclick={onClose} aria-label="Close" title="Close">✕</button>
+		<button type="button" onclick={onClose} aria-label="Close" title="Close"
+			><Icon name="close" /></button
+		>
 	</div>
 	<p class="hint">The iframe scales to its container at the chosen composition aspect ratio.</p>
 </div>

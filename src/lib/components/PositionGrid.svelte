@@ -9,6 +9,7 @@
 
 	import { POSITION_GRID } from '../annotation_panel_helpers';
 	import type { LabelPosition } from '../types';
+	import Icon from './Icon.svelte';
 
 	let {
 		label = 'Side',
@@ -53,7 +54,7 @@
 		onclick={onReset}
 		disabled={!canReset}
 		title={resetTitle}
-		aria-label={resetAriaLabel}>⟲</button
+		aria-label={resetAriaLabel}><Icon name="reset" size={12} /></button
 	>
 </div>
 

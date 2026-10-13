@@ -13,6 +13,7 @@
 	import ColorRow from './ColorRow.svelte';
 	import FontSelect from './FontSelect.svelte';
 	import HaloRow from './HaloRow.svelte';
+	import Icon from './Icon.svelte';
 	import IconPicker from './IconPicker.svelte';
 	import PositionGrid from './PositionGrid.svelte';
 	import SliderRow from './SliderRow.svelte';
@@ -63,7 +64,7 @@
 </div>
 <p class="hint">
 	The style of every marker, new or existing, wherever it has not been given its own. The
-	<strong>⟲</strong> next to each row clears just that field.
+	<Icon name="reset" size={12} /> next to each row clears just that field.
 </p>
 
 <!-- Icon -->
@@ -80,7 +81,7 @@
 		onclick={() => unsetDefaults('icon')}
 		disabled={!isDefaultSet('icon')}
 		title="Reset shape to the hardcoded default"
-		aria-label="Reset default shape">⟲</button
+		aria-label="Reset default shape"><Icon name="reset" size={12} /></button
 	>
 </div>
 
@@ -137,7 +138,7 @@
 		onclick={() => unsetDefaults('labelFont')}
 		disabled={!isDefaultSet('labelFont')}
 		title="Reset font to the hardcoded default"
-		aria-label="Reset default font">⟲</button
+		aria-label="Reset default font"><Icon name="reset" size={12} /></button
 	>
 </label>
 

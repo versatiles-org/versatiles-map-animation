@@ -7,6 +7,7 @@
 	 */
 
 	import { normalizeHex } from '../annotation_panel_helpers';
+	import Icon from './Icon.svelte';
 
 	let {
 		color,
@@ -64,7 +65,7 @@
 		onclick={onReset}
 		disabled={!canReset}
 		title={resetTitle}
-		aria-label={resetAriaLabel}>⟲</button
+		aria-label={resetAriaLabel}><Icon name="reset" size={12} /></button
 	>
 </div>
 

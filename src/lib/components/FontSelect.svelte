@@ -9,6 +9,7 @@
 
 	import { familyLabel, FONT_GROUPS, fontVariantLabel } from '../annotation_panel_helpers';
 	import type { AnnotationLabelFont } from '../types';
+	import Icon from './Icon.svelte';
 
 	let {
 		value,
@@ -93,7 +94,7 @@
 	>
 		<span class="family">{familyLabel(currentFamily)}</span>
 		<span class="variant">{fontVariantLabel(value)}</span>
-		<span class="caret" aria-hidden="true">▾</span>
+		<span class="caret"><Icon name="caret" size={12} /></span>
 	</button>
 	{#if menuOpen}
 		<div class="menu" role="listbox">

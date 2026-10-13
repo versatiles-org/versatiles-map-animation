@@ -156,10 +156,14 @@
 		display: none;
 	}
 	.sub-panel > summary::before {
-		content: '▸';
+		content: '';
 		display: inline-block;
-		width: 0.8em;
-		color: #666;
+		width: 10px;
+		height: 10px;
+		background: #666;
+		/* A chevron pointing right, drawn like the icons of Icon.svelte. */
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4.5 9.5 8 6 11.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+			center / contain no-repeat;
 		transition: transform 120ms ease;
 	}
 	.sub-panel[open] > summary::before {
@@ -192,7 +196,7 @@
 		color: #666;
 	}
 	.sub-panel.is-disabled > summary::before {
-		color: #444;
+		background: #444;
 	}
 
 	/* A foldable part inside a panel. */

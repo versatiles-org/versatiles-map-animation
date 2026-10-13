@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '#lib/components/Icon.svelte';
 	import { AnimationStore } from '#lib/animation.svelte.ts';
 	import { aspectRatioValue } from '#lib/types.ts';
 	import {
@@ -74,7 +75,9 @@
 	{#if urlError}
 		<div class="banner" role="alert">
 			<span>Couldn’t load shared link: {urlError}</span>
-			<button type="button" onclick={() => (urlError = null)} aria-label="Dismiss">✕</button>
+			<button type="button" onclick={() => (urlError = null)} aria-label="Dismiss"
+				><Icon name="close" /></button
+			>
 		</div>
 	{/if}
 

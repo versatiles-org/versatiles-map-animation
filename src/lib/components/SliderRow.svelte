@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from './Icon.svelte';
 	/**
 	 * Generic numeric-slider row: label + `<input type="range">` + a small
 	 * numeric readout (formatted via the `formatValue` prop) + reset button.
@@ -57,7 +58,7 @@
 		onclick={onReset}
 		disabled={!canReset}
 		title={resetTitle}
-		aria-label={resetAriaLabel}>⟲</button
+		aria-label={resetAriaLabel}><Icon name="reset" size={12} /></button
 	>
 </label>
 

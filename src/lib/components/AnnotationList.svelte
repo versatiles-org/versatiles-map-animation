@@ -10,6 +10,7 @@
 	import { resolveAnnotation, type AnimationStore } from '../animation.svelte';
 	import { spritePreviewStyle } from '../sprite_meta';
 	import { DEFAULT_ANNOTATION_LABEL_COLOR } from '../types';
+	import Icon from './Icon.svelte';
 
 	let { store }: { store: AnimationStore } = $props();
 
@@ -80,7 +81,7 @@
 					onclick={() => store.selectAnnotation(i)}
 					title="Click to edit, drag to reorder"
 				>
-					<span class="grip" aria-hidden="true">⋮⋮</span>
+					<span class="grip"><Icon name="grip" size={12} /></span>
 					<span class="icon-prev" style={spritePreviewStyle(r.icon, 18)}></span>
 					<span
 						class="annotation-label"

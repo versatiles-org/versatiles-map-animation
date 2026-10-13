@@ -10,6 +10,7 @@
 	import { shortName } from '../annotation_panel_helpers';
 	import { spritePreviewStyle } from '../sprite_meta';
 	import { ANNOTATION_ICONS, type AnnotationIcon } from '../types';
+	import Icon from './Icon.svelte';
 
 	let {
 		value,
@@ -49,7 +50,7 @@
 	>
 		<span class="icon-prev" style={spritePreviewStyle(value, 22)}></span>
 		<span class="icon-name">{shortName(value)}</span>
-		<span class="caret" aria-hidden="true">▾</span>
+		<span class="caret"><Icon name="caret" size={12} /></span>
 	</button>
 	{#if menuOpen}
 		<ul class="icon-menu" role="listbox" aria-label={ariaLabel}>

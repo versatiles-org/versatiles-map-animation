@@ -5,6 +5,7 @@
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
+	import Icon from './Icon.svelte';
 
 	let {
 		store,
@@ -55,7 +56,7 @@
 			aria-label="Restart"
 			title="Back to the start"
 		>
-			⏮
+			<Icon name="restart" />
 		</button>
 		<button
 			type="button"
@@ -64,7 +65,8 @@
 			disabled={!canPlay}
 			title="Spacebar"
 		>
-			{store.isPlaying ? '⏸ Pause' : '▶ Play'}
+			<Icon name={store.isPlaying ? 'pause' : 'play'} />
+			{store.isPlaying ? 'Pause' : 'Play'}
 		</button>
 	</div>
 
@@ -80,10 +82,10 @@
 			onclick={onAddKeyframe}
 			title="Add a keyframe with the current view at the playhead"
 		>
-			+ Keyframe
+			<Icon name="plus" /> Keyframe
 		</button>
 		<button type="button" onclick={onAddMarker} title="Pin a marker at the current map center">
-			+ Marker
+			<Icon name="plus" /> Marker
 		</button>
 	</div>
 
