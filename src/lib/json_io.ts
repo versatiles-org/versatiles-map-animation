@@ -5,12 +5,14 @@ import {
 	ANNOTATION_STYLE_KEYS,
 	isAnnotationIcon,
 	isAspectRatio,
+	isDefaultScreenAnchor,
 	isLabelPosition,
 	isMapProjection,
 	isMapStyleId,
 	isMapTheme,
 	isPathStyle,
 	normalizeLayerGroups,
+	normalizeScreenAnchor,
 	normalizeSun,
 	SCHEMA_VERSION,
 	type Animation,
@@ -119,6 +121,7 @@ export function validateAnimation(input: unknown): Animation {
 			? validatePartialAnnotation(obj.defaultAnnotation as Record<string, unknown>)
 			: {};
 	const sun = normalizeSun(obj.sun);
+	const anchor = normalizeScreenAnchor(obj.anchor);
 	return {
 		version: SCHEMA_VERSION,
 		style,
@@ -135,6 +138,7 @@ export function validateAnimation(input: unknown): Animation {
 		annotations,
 		annotationScale,
 		aspectRatio,
+		...(anchor && !isDefaultScreenAnchor(anchor) && { anchor }),
 		defaultAnnotation
 	};
 }

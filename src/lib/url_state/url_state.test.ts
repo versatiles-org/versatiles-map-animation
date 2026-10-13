@@ -657,3 +657,41 @@ describe('projection option', () => {
 		expect(MAP_PROJECTIONS).toEqual(['mercator', 'globe']);
 	});
 });
+
+describe('anchor option', () => {
+	it('costs nothing in the middle of the frame and two bytes elsewhere', () => {
+		const plain = encodeAnimation(example);
+		expect(encodeAnimation({ ...example, anchor: { x: 0.5, y: 0.5 } })).toBe(plain);
+		expect(decodeAnimation(plain)).not.toHaveProperty('anchor');
+		const moved = encodeAnimation({ ...example, anchor: { x: 0.25, y: 0.7 } });
+		expect(base64UrlToBytes(moved).length).toBe(base64UrlToBytes(plain).length + 2);
+	});
+
+	it('round-trips the whole frame in whole percent', () => {
+		for (const anchor of [
+			{ x: 0, y: 0 },
+			{ x: 1, y: 1 },
+			{ x: 0.25, y: 0.7 },
+			{ x: 0.5, y: 0.07 }
+		]) {
+			expect(decodeAnimation(encodeAnimation({ ...example, anchor }))?.anchor).toEqual(anchor);
+		}
+		expect(
+			decodeAnimation(encodeAnimation({ ...example, anchor: { x: 0.333, y: 1.4 } }))?.anchor
+		).toEqual({ x: 0.33, y: 1 });
+	});
+
+	it('round-trips next to other options', () => {
+		const decoded = decodeAnimation(
+			encodeAnimation({
+				...example,
+				anchor: { x: 0.25, y: 0.7 },
+				projection: 'globe',
+				aspectRatio: '1:1'
+			})
+		);
+		expect(decoded?.anchor).toEqual({ x: 0.25, y: 0.7 });
+		expect(decoded?.projection).toBe('globe');
+		expect(decoded?.aspectRatio).toBe('1:1');
+	});
+});

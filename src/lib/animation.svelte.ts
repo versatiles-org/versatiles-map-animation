@@ -7,7 +7,10 @@ import {
 	createEmptyAnimation,
 	DEFAULT_INITIAL_VIEW,
 	DEFAULT_MAP_PROJECTION,
+	DEFAULT_SCREEN_ANCHOR,
+	isDefaultScreenAnchor,
 	normalizeLayerGroups,
+	normalizeScreenAnchor,
 	normalizeSun,
 	SCHEMA_VERSION
 } from './types';
@@ -24,6 +27,7 @@ import type {
 	MapStyleId,
 	MapTheme,
 	PathStyle,
+	ScreenAnchor,
 	Sun
 } from './types';
 
@@ -170,6 +174,8 @@ export class AnimationStore {
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
 	aspectRatio = $state<AspectRatio>(ANIMATION_DEFAULTS.aspectRatio);
+	/** Point of the frame the camera is built around; see `ScreenAnchor`. */
+	anchor = $state<ScreenAnchor>({ ...DEFAULT_SCREEN_ANCHOR });
 	/**
 	 * Per-animation marker style defaults. New markers start from these; the
 	 * URL/JSON codec uses them as the carry-forward baseline so annotations
@@ -451,6 +457,7 @@ export class AnimationStore {
 		this.sky = anim.sky ?? ANIMATION_DEFAULTS.sky;
 		this.annotationScale = anim.annotationScale ?? ANIMATION_DEFAULTS.annotationScale;
 		this.aspectRatio = anim.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio;
+		this.anchor = normalizeScreenAnchor(anim.anchor) ?? { ...DEFAULT_SCREEN_ANCHOR };
 		this.defaultAnnotation = { ...(anim.defaultAnnotation ?? {}) };
 		this.selectedIndex = null;
 		this.selectedAnnotationIndex = null;
@@ -475,6 +482,7 @@ export class AnimationStore {
 			annotations: this.annotations.map((a) => ({ ...a })),
 			annotationScale: this.annotationScale,
 			aspectRatio: this.aspectRatio,
+			...(!isDefaultScreenAnchor(this.anchor) && { anchor: { ...this.anchor } }),
 			defaultAnnotation: { ...this.defaultAnnotation }
 		};
 	}

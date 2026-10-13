@@ -362,6 +362,56 @@ export function isMapProjection(value: unknown): value is MapProjection {
  */
 export const MAX_CAMERA_LATITUDE = 85.051129;
 
+/**
+ * The point of the frame the camera is built around, as fractions of its
+ * width and height from the top-left corner. A keyframe's position sits
+ * there, and zoom, rotation and tilt pivot around it. The default is the
+ * middle of the frame.
+ */
+export interface ScreenAnchor {
+	x: number;
+	y: number;
+}
+
+export const DEFAULT_SCREEN_ANCHOR: ScreenAnchor = { x: 0.5, y: 0.5 };
+
+export function isDefaultScreenAnchor(anchor: ScreenAnchor): boolean {
+	return anchor.x === DEFAULT_SCREEN_ANCHOR.x && anchor.y === DEFAULT_SCREEN_ANCHOR.y;
+}
+
+/**
+ * Whole percent inside the frame — the resolution the URL codec stores.
+ * `undefined` for anything that is not a pair of finite numbers.
+ */
+export function normalizeScreenAnchor(value: unknown): ScreenAnchor | undefined {
+	if (!value || typeof value !== 'object') return undefined;
+	const { x, y } = value as Record<string, unknown>;
+	if (typeof x !== 'number' || !Number.isFinite(x)) return undefined;
+	if (typeof y !== 'number' || !Number.isFinite(y)) return undefined;
+	const percent = (v: number) => Math.min(100, Math.max(0, Math.round(v * 100))) / 100;
+	return { x: percent(x), y: percent(y) };
+}
+
+/**
+ * The anchor as MapLibre padding for a map of the given size: padding moves
+ * the map's centre point to the middle of what it leaves free, so pad one
+ * side per axis until that middle is the anchor.
+ */
+export function screenAnchorPadding(
+	anchor: ScreenAnchor,
+	width: number,
+	height: number
+): { top: number; right: number; bottom: number; left: number } {
+	const dx = (2 * anchor.x - 1) * width;
+	const dy = (2 * anchor.y - 1) * height;
+	return {
+		left: Math.max(0, dx),
+		right: Math.max(0, -dx),
+		top: Math.max(0, dy),
+		bottom: Math.max(0, -dy)
+	};
+}
+
 export const MAP_STYLE_LABELS: Record<MapStyleId, string> = {
 	colorful: 'OSM',
 	satellite: 'Satellite'
@@ -885,6 +935,8 @@ export interface Animation {
 	annotationScale: number;
 	/** Composition aspect ratio. Defaults to 16:9. */
 	aspectRatio: AspectRatio;
+	/** Unset means the middle of the frame — see `ScreenAnchor`. */
+	anchor?: ScreenAnchor;
 	/**
 	 * Per-animation marker style defaults — fields set here become the
 	 * baseline for new markers (Pin button) AND the codec's carry-forward

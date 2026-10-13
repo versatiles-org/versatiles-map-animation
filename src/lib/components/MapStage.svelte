@@ -28,6 +28,8 @@
 		DEFAULT_MAP_THEMES,
 		MAP_REFERENCE_WIDTH,
 		MAX_CAMERA_LATITUDE,
+		isDefaultScreenAnchor,
+		screenAnchorPadding,
 		type Annotation,
 		type CameraState,
 		type LabelPosition
@@ -139,6 +141,14 @@
 		const w = map.getContainer().clientWidth;
 		if (w <= 0) return 0;
 		return Math.log2(w / MAP_REFERENCE_WIDTH);
+	}
+	/**
+	 * The screen anchor as padding for the map's current size. Padding is in
+	 * pixels, so it has to be worked out again whenever the map is resized.
+	 */
+	function anchorPadding(): maplibregl.PaddingOptions {
+		const c = map?.getContainer();
+		return screenAnchorPadding(store.anchor, c?.clientWidth ?? 0, c?.clientHeight ?? 0);
 	}
 	const BASE_TEXT_PX = 13;
 
@@ -322,6 +332,7 @@
 			pitch: cam.pitch,
 			bearing: cam.bearing,
 			roll: cam.roll,
+			padding: anchorPadding(),
 			duration: 0,
 			animate: false,
 			freezeElevation: true
@@ -388,8 +399,10 @@
 			// the new offset; otherwise a window resize would shift the framing.
 			const cam = store.sampledCamera;
 			if (cam) applyCamera(cam);
+			else map?.setPadding(anchorPadding());
 		});
 		updateContainerScale();
+		map.setPadding(anchorPadding());
 		// Click on an annotation marker → select it. Click on empty map → clear
 		// any annotation selection. The marker click handler stops propagation,
 		// so the empty-map fallback only fires when no marker was hit.
@@ -469,6 +482,16 @@
 			if (rafId) cancelAnimationFrame(rafId);
 			rafId = 0;
 		};
+	});
+
+	// effect: move the screen anchor. Without keyframes there is no sampled
+	// camera to re-apply, so the padding is set on its own: the place in the
+	// middle of the view moves to the new anchor.
+	$effect(() => {
+		const anchor = store.anchor;
+		if (!map || !initialStyleApplied) return;
+		const c = map.getContainer();
+		map.setPadding(screenAnchorPadding(anchor, c.clientWidth, c.clientHeight));
 	});
 
 	// effect: apply the sampled camera to the map.
@@ -640,6 +663,13 @@
 >
 	<div class="map-stage" data-testid="map-stage">
 		<div bind:this={container} class="map-canvas"></div>
+		{#if editMode && !renderMode && !isDefaultScreenAnchor(store.anchor)}
+			<div
+				class="anchor-mark"
+				style="left: {store.anchor.x * 100}%; top: {store.anchor.y * 100}%;"
+				aria-hidden="true"
+			></div>
+		{/if}
 		<a
 			class="watermark"
 			class:on-dark-map={onDarkMap}
@@ -688,6 +718,35 @@
 	.map-canvas {
 		width: 100%;
 		height: 100%;
+	}
+	/* Crosshair at the screen anchor, editor only. Two bars drawn by the
+	   pseudo-elements, white with a dark outline so it reads on any map. */
+	.anchor-mark {
+		position: absolute;
+		z-index: 1;
+		width: 0;
+		height: 0;
+		pointer-events: none;
+
+		&::before,
+		&::after {
+			content: '';
+			position: absolute;
+			background: #fff;
+			outline: 1px solid rgba(0, 0, 0, 0.7);
+		}
+		&::before {
+			left: -12px;
+			top: -1px;
+			width: 24px;
+			height: 2px;
+		}
+		&::after {
+			left: -1px;
+			top: -12px;
+			width: 2px;
+			height: 24px;
+		}
 	}
 	.watermark {
 		position: absolute;

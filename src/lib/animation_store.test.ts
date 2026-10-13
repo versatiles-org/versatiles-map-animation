@@ -594,6 +594,19 @@ describe('AnimationStore - load/serialise', () => {
 		expect(s2.projection).toBe('mercator');
 	});
 
+	it('serialises the anchor only when it is off centre', () => {
+		const s = new AnimationStore();
+		expect(s.anchor).toEqual({ x: 0.5, y: 0.5 });
+		expect(s.toAnimation()).not.toHaveProperty('anchor');
+		s.anchor = { x: 0.25, y: 0.7 };
+		expect(s.toAnimation().anchor).toEqual({ x: 0.25, y: 0.7 });
+		const s2 = new AnimationStore();
+		s2.loadFromAnimation(s.toAnimation());
+		expect(s2.anchor).toEqual({ x: 0.25, y: 0.7 });
+		s2.reset();
+		expect(s2.anchor).toEqual({ x: 0.5, y: 0.5 });
+	});
+
 	it('reset returns the store to an empty state', () => {
 		const s = new AnimationStore();
 		s.addKeyframeFromCamera(cam());

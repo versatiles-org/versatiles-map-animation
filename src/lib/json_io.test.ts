@@ -110,6 +110,20 @@ describe('validateAnimation - missing/optional top-level fields', () => {
 		}
 	});
 
+	it('reads an anchor in whole percent and leaves out the middle and anything malformed', () => {
+		expect(validateAnimation({ ...minimalAnim, anchor: { x: 0.25, y: 0.7 } }).anchor).toEqual({
+			x: 0.25,
+			y: 0.7
+		});
+		expect(validateAnimation({ ...minimalAnim, anchor: { x: -1, y: 0.333 } }).anchor).toEqual({
+			x: 0,
+			y: 0.33
+		});
+		for (const anchor of [{ x: 0.5, y: 0.5 }, { x: 0.2 }, { x: '0.2', y: 0.2 }, 'left', null]) {
+			expect(validateAnimation({ ...minimalAnim, anchor })).not.toHaveProperty('anchor');
+		}
+	});
+
 	it('reads buildings3d only when it is exactly true', () => {
 		expect(validateAnimation({ ...minimalAnim, buildings3d: true }).buildings3d).toBe(true);
 		expect(validateAnimation({ ...minimalAnim, buildings3d: false })).not.toHaveProperty(

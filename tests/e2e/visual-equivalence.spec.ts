@@ -178,6 +178,34 @@ test.describe('globe projection', () => {
 	});
 });
 
+/**
+ * Berlin, zoom 5 flat → zoom 12 pitched and turned, with the screen anchor
+ * at 25 % from the left and 70 % from the top.
+ */
+const ANCHOR_HASH = 'AhQQdT4YmDKfsP4afDZJC-WqQAACAGYw';
+
+test.describe('screen anchor', () => {
+	test('the keyframe position stays on the anchor at any time and size', async ({ page }) => {
+		for (const [width, height] of [
+			[1280, 720],
+			[640, 360]
+		]) {
+			for (const t of [0, 2, 4]) {
+				await openViewer(page, width, height, ANCHOR_HASH, t);
+				const [fx, fy] = await page.evaluate(() => {
+					const m = window.__viewer_map!;
+					const c = m.getContainer();
+					const p = m.project([13.3777, 52.5163]);
+					return [p.x / c.clientWidth, p.y / c.clientHeight];
+				});
+				// 3 decimals: the URL stores the position on a grid that is coarse at zoom 5.
+				expect(fx).toBeCloseTo(0.25, 3);
+				expect(fy).toBeCloseTo(0.7, 3);
+			}
+		}
+	});
+});
+
 test.describe('annotation layer setup', () => {
 	test('loading the annotated demo does not raise a maplibre style error', async ({ page }) => {
 		const errors: string[] = [];

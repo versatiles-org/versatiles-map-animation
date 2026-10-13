@@ -30,6 +30,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Optional 3D terrain (with hillshade).
 - Optional sun position (compass direction and height above the horizon) that lights the 3D buildings and the terrain's hillshade.
 - Optional atmospheric sky (visible when the camera is pitched).
+- Screen anchor: the point of the frame the camera is built around, anywhere from edge to edge instead of the middle. Keyframe positions sit there and zooms, rotations and tilts pivot around it — e.g. off to one side to leave room for a title.
 - Composition aspect ratio: `16:9` (default), `21:9`, `4:3`, `3:2`, `1:1`, `4:5`, `9:16`. Editor preview, embed iframe, and MP4 render all letterbox to the chosen aspect, so the composition stays WYSIWYG across surfaces.
 
 ### Annotations
@@ -96,6 +97,7 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 	"sky": false,
 	"annotationScale": 1, // global multiplier on per-annotation iconSize/labelSize
 	"aspectRatio": "16:9", // "16:9" | "21:9" | "4:3" | "3:2" | "1:1" | "4:5" | "9:16"
+	"anchor": { "x": 0.5, "y": 0.5 }, // optional: point of the frame the camera is built around, as fractions from the top-left corner
 	"keyframes": [
 		{
 			"t": 0.0, // seconds, snapped to 1/100 s in the editor

@@ -3,6 +3,8 @@
 	import {
 		ASPECT_RATIOS,
 		DEFAULT_MAP_THEMES,
+		DEFAULT_SCREEN_ANCHOR,
+		isDefaultScreenAnchor,
 		DEFAULT_SUN,
 		LABEL_SWITCH_LAYER_GROUPS,
 		MAP_LAYER_GROUP_LABELS,
@@ -17,6 +19,7 @@
 		SATELLITE_OVERLAY_LAYER_GROUPS,
 		type MapLayerGroup,
 		type MapTheme,
+		type ScreenAnchor,
 		type Sun
 	} from '../types';
 
@@ -71,6 +74,10 @@
 				? 'Switch on 3D buildings or Terrain to see the sun'
 				: null
 	);
+	function setAnchor(axis: keyof ScreenAnchor, e: Event): void {
+		const percent = Number((e.currentTarget as HTMLInputElement).value);
+		store.anchor = { ...store.anchor, [axis]: percent / 100 };
+	}
 	function setSun(part: keyof Sun, e: Event): void {
 		if (!store.sun) return;
 		const value = Number((e.currentTarget as HTMLInputElement).value);
@@ -87,6 +94,34 @@
 			{/each}
 		</select>
 	</label>
+	<div
+		class="sliders"
+		title="Where in the frame a keyframe's position sits. Zoom, rotation and tilt pivot around this point; a crosshair marks it on the map."
+	>
+		<div class="row head">
+			<span class="lbl">Anchor</span>
+			{#if !isDefaultScreenAnchor(store.anchor)}
+				<button type="button" onclick={() => (store.anchor = { ...DEFAULT_SCREEN_ANCHOR })}>
+					Centre
+				</button>
+			{/if}
+		</div>
+		{#each [['x', 'from left'], ['y', 'from top']] as const as [axis, from] (axis)}
+			<label class="row">
+				<span class="lbl">{axis.toUpperCase()}</span>
+				<input
+					type="range"
+					min="0"
+					max="100"
+					step="1"
+					aria-label="Anchor {axis}, percent {from}"
+					value={Math.round(store.anchor[axis] * 100)}
+					oninput={(e) => setAnchor(axis, e)}
+				/>
+				<span class="val">{Math.round(store.anchor[axis] * 100)}%</span>
+			</label>
+		{/each}
+	</div>
 	<label class="row" title="Base map style">
 		<span class="lbl">Map</span>
 		<select bind:value={store.style}>
@@ -197,7 +232,7 @@
 		<span>Sun</span>
 	</label>
 	{#if store.sun}
-		<div class="sun" class:blocked={sunBlocked !== null}>
+		<div class="sliders" class:blocked={sunBlocked !== null}>
 			<label
 				class="row"
 				title="Compass direction the light comes from: 0° north, 90° east, 180° south, 270° west"
@@ -284,7 +319,7 @@
 		margin-top: 0.4rem;
 		padding-left: 0.2rem;
 	}
-	.sun {
+	.sliders {
 		display: flex;
 		flex-direction: column;
 		gap: 0.3rem;
@@ -293,6 +328,24 @@
 		.row {
 			display: grid;
 			grid-template-columns: 3.6rem 1fr 2.2rem;
+		}
+		.row.head {
+			display: flex;
+			justify-content: space-between;
+			cursor: default;
+		}
+		button {
+			padding: 0 0.4rem;
+			background: transparent;
+			border: 1px solid #333;
+			border-radius: 4px;
+			color: #ddd;
+			font: inherit;
+			cursor: pointer;
+
+			&:hover {
+				border-color: #4a9eff;
+			}
 		}
 		input {
 			min-width: 0;

@@ -17,7 +17,14 @@
 
 import { base64UrlToBytes, BitReader, BitWriter, bytesToBase64Url, inspect } from '../codec';
 import type { InspectionNode } from '../codec';
-import { ANIMATION_DEFAULTS, DEFAULT_MAP_PROJECTION, normalizeSun, SCHEMA_VERSION } from '../types';
+import {
+	ANIMATION_DEFAULTS,
+	DEFAULT_MAP_PROJECTION,
+	isDefaultScreenAnchor,
+	normalizeScreenAnchor,
+	normalizeSun,
+	SCHEMA_VERSION
+} from '../types';
 import type { Animation } from '../types';
 import {
 	AnimationCodec,
@@ -56,7 +63,8 @@ function buildWire(anim: Animation): Wire {
 		buildings3d: anim.buildings3d,
 		// The wire holds whole degrees in fixed ranges.
 		sun: normalizeSun(anim.sun),
-		projection: anim.projection
+		projection: anim.projection,
+		anchor: normalizeScreenAnchor(anim.anchor)
 	};
 }
 
@@ -78,6 +86,7 @@ function fromWire(wire: Wire): Animation {
 		annotations: wire.annotations.map(denormalizeAnnotation),
 		annotationScale: wire.annotationScale ?? ANIMATION_DEFAULTS.annotationScale,
 		aspectRatio: wire.aspectRatio ?? ANIMATION_DEFAULTS.aspectRatio,
+		...(wire.anchor && !isDefaultScreenAnchor(wire.anchor) && { anchor: wire.anchor }),
 		// Now preserved on the wire (options-mask bit 2). Animations
 		// encoded before this feature shipped just lack the bit and come
 		// back with empty defaults — backwards-compatible by construction.

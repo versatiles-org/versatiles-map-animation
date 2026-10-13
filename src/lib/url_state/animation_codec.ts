@@ -33,6 +33,7 @@ import {
 	ASPECT_RATIOS,
 	DEFAULT_ASPECT_RATIO,
 	DEFAULT_MAP_PROJECTION,
+	isDefaultScreenAnchor,
 	MAP_LAYER_GROUPS,
 	MAP_PROJECTIONS,
 	MAP_STYLE_IDS,
@@ -45,6 +46,7 @@ import type {
 	MapProjection,
 	MapStyleId,
 	MapTheme,
+	ScreenAnchor,
 	Sun
 } from '../types';
 import { annotationsCodec, defaultAnnotationCodec } from './annotation_codec';
@@ -87,6 +89,18 @@ const sunCodec: Codec<Sun> = {
 	decode: (r) => ({ direction: r.readBits(9) % 360, altitude: Math.min(90, r.readBits(7)) })
 };
 
+/** Screen anchor in whole percent: 7 bits each for x and y (0–100). */
+const anchorCodec: Codec<ScreenAnchor> = {
+	encode: (anchor, w) => {
+		w.writeBits(Math.round(anchor.x * 100), 7);
+		w.writeBits(Math.round(anchor.y * 100), 7);
+	},
+	decode: (r) => ({
+		x: Math.min(100, r.readBits(7)) / 100,
+		y: Math.min(100, r.readBits(7)) / 100
+	})
+};
+
 /** Animation-level scale: vuint of round(scale*100). Default 1.0 → 100. */
 const annotationScaleCodec: Codec<number> = {
 	encode: (v, w) => vuint.encode(Math.max(1, Math.round(v * 100)), w),
@@ -118,6 +132,7 @@ type WireAnimation = {
 	buildings3d?: boolean;
 	sun?: Sun;
 	projection?: MapProjection;
+	anchor?: ScreenAnchor;
 };
 
 // ---------------------------------------------------------------------------
@@ -205,6 +220,15 @@ const OPTIONS: AnimOption[] = [
 		encode: (v, w) => projectionCodec.encode(v.projection!, w),
 		decode: (v, r) => {
 			v.projection = projectionCodec.decode(r);
+		}
+	},
+	{
+		bit: 8,
+		label: 'anchor',
+		shouldEmit: (v) => v.anchor !== undefined && !isDefaultScreenAnchor(v.anchor),
+		encode: (v, w) => anchorCodec.encode(v.anchor!, w),
+		decode: (v, r) => {
+			v.anchor = anchorCodec.decode(r);
 		}
 	}
 ];
