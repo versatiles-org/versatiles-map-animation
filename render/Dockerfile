@@ -25,10 +25,14 @@ FROM mwader/static-ffmpeg:7.1.1@sha256:11a44711684c0b9f754c047dcd64235b8b52deab2
 FROM node:24-bookworm-slim AS renderer-deps
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app/render
-COPY render/package.json render/package-lock.json* ./
+COPY render/package.json render/package-lock.json ./
+# `npm ci` installs exactly the Playwright version of the lock file, and
+# with it one exact Chromium: a new browser can draw the map differently, so
+# it should only change when the lock file does.
+#
 # Playwright downloads an ffmpeg of its own next to the browser; it is for
 # recording videos of a page, which the renderer does not do.
-RUN npm install --omit=dev --no-package-lock --no-audit --no-fund \
+RUN npm ci --omit=dev --no-audit --no-fund \
 	&& npx playwright install chromium-headless-shell \
 	&& rm -r /ms-playwright/ffmpeg-*
 
