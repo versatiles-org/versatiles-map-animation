@@ -15,6 +15,7 @@ Prototype tool for composing camera animations on a VersaTiles map and previewin
 - Drop keyframes on a timeline that capture the current camera (lng, lat, zoom, pitch, bearing, roll).
 - Play back with ease-in-out interpolation between keyframes; shortest-path bearing/roll wrap.
 - Keyframes are **stops** or **waypoints**. The camera comes to rest on a stop and flies through a waypoint, so the keyframes from one stop to the next form one move. A move through waypoints is one flowing curve that only eases in and out at its two stops — for following a river, orbiting a place or drifting without pause. A waypoint as first or last keyframe starts or ends the animation in motion.
+- A move through waypoints runs at an **even speed** on screen: the waypoints time themselves, so a long stretch is never rushed and a short one never crawls. Switch it off on the move to set waypoint times by hand.
 - A stop can **hold**: the camera rests there for a set time before moving on. Drag the right edge of the stop on the timeline or type the seconds; everything after it moves along.
 - Travel style of a move that goes straight from stop to stop: **Fly over** (default, rises and descends on long distances) or **Stay low** (straight, without rising; the ground passes at an even speed on screen even while the zoom changes).
 - The map shows the route in the editor: the camera's ground track as a line in the colours of the timeline, with a diamond for every stop and a dot for every waypoint. Click one to select its keyframe. It hides while the animation plays.
@@ -113,7 +114,8 @@ The same shape ships in the downloadable JSON and (in a more compact bit-packed 
 			"roll": 0, // -180..180
 			"path": "arc", // optional: travel style of the move starting here — "arc" (Fly over) | "linear" (Stay low)
 			"waypoint": false, // optional: true = the camera flies through instead of stopping
-			"hold": 0 // optional: seconds the camera rests on this stop; it arrives at `t` and leaves at `t + hold`
+			"hold": 0, // optional: seconds the camera rests on this stop; it arrives at `t` and leaves at `t + hold`
+			"evenSpeed": false // optional, on the keyframe a move through waypoints starts from: travel it at even speed; the `t` of its waypoints is then worked out on load
 		}
 	],
 	"annotations": [

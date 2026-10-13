@@ -518,6 +518,14 @@ export interface Keyframe {
 	 * `t + hold`. Unset means it leaves at once. Waypoints have no hold.
 	 */
 	hold?: number;
+	/**
+	 * On the keyframe a move through waypoints starts from: the move runs at
+	 * an even speed on screen, easing only at its stops. Its waypoints then
+	 * time themselves — their `t` is worked out from the route and kept up to
+	 * date, so it is still the moment the camera passes them. Ignored on a
+	 * move without waypoints.
+	 */
+	evenSpeed?: boolean;
 }
 
 /** How long the camera rests on a keyframe, in seconds — 0 for a waypoint. */

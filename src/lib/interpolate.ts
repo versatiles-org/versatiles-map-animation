@@ -1,3 +1,5 @@
+import { movesOf, type Move } from './moves';
+import { screenSpeed } from './screen_speed';
 import {
 	cameraOf,
 	departureOf,
@@ -412,6 +414,198 @@ function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: numbe
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Even speed
+// ---------------------------------------------------------------------------
+//
+// The times of waypoints decide how fast the camera is between them, and
+// getting them right by hand is fiddly: too little time for a long stretch
+// and the picture races. A move with `evenSpeed` takes that job over. Only
+// the times of its two ends count. In between:
+//
+//  1. The route is the same kind of curve through the waypoints, but laid
+//     out by distance instead of by time (each keyframe sits at the summed
+//     on-screen distance from the start), so its shape does not depend on
+//     any timing.
+//  2. The length of that route on screen is measured — panning, zooming and
+//     turning, see `screenSpeed`.
+//  3. The camera travels it at a constant speed, ramping up after a stop
+//     and down before one.
+//
+// The moment it passes each waypoint falls out of that, which is what
+// `withEvenSpeedTimes` writes back into the keyframes.
+
+/** Seconds the camera takes to reach or leave its even speed at a stop. */
+const EVEN_SPEED_RAMP = 1;
+/** Samples of the route measured per stretch between two keyframes. */
+const EVEN_SPEED_SAMPLES = 48;
+
+interface EvenRoute {
+	/** The move's keyframes with `t` replaced by distance along the route. */
+	layout: Keyframe[];
+	/** Position along `layout` (its `t`) of each sample… */
+	at: number[];
+	/** …and the on-screen length of the route up to there. */
+	length: number[];
+}
+
+/** On-screen distance between two keyframes, going straight from one to the other. */
+function chordLength(a: Keyframe, b: Keyframe): number {
+	const steps = 8;
+	const at = (f: number): CameraState => ({
+		lng: a.lng + shortestLngDelta(a.lng, b.lng) * f,
+		lat: lerp(a.lat, b.lat, f),
+		zoom: lerp(a.zoom, b.zoom, f),
+		pitch: lerp(a.pitch, b.pitch, f),
+		bearing: a.bearing + shortestLngDelta(a.bearing, b.bearing) * f,
+		roll: a.roll + shortestLngDelta(a.roll, b.roll) * f
+	});
+	let sum = 0;
+	for (let i = 0; i < steps; i++) sum += screenSpeed(at(i / steps), at((i + 1) / steps), 1);
+	return sum;
+}
+
+function buildEvenRoute(keyframes: Keyframe[], move: Move, projection: MapProjection): EvenRoute {
+	const layout: Keyframe[] = [];
+	let distance = 0;
+	for (let i = move.start; i <= move.end; i++) {
+		// Two keyframes on the same view still need to be apart on the layout.
+		if (i > move.start) distance += Math.max(1e-6, chordLength(keyframes[i - 1], keyframes[i]));
+		const { hold: _hold, evenSpeed: _evenSpeed, ...kf } = keyframes[i];
+		layout.push({ ...kf, t: distance });
+	}
+	const at = [0];
+	const length = [0];
+	let prev = sampleSegments(layout, 0, projection)!;
+	for (let i = 0; i < layout.length - 1; i++) {
+		for (let s = 1; s <= EVEN_SPEED_SAMPLES; s++) {
+			const d = lerp(layout[i].t, layout[i + 1].t, s / EVEN_SPEED_SAMPLES);
+			const cam = sampleSegments(layout, d, projection)!;
+			at.push(d);
+			length.push(length[length.length - 1] + screenSpeed(prev, cam, 1));
+			prev = cam;
+		}
+	}
+	return { layout, at, length };
+}
+
+// Measuring a route takes a few hundred camera samples, and playback asks
+// for the same move every frame. Keyed by the keyframe array itself: the
+// store replaces it on every edit, which is exactly when a route is stale.
+const evenRouteCache = new WeakMap<Keyframe[], Map<string, EvenRoute>>();
+
+function evenRoute(keyframes: Keyframe[], move: Move, projection: MapProjection): EvenRoute {
+	let perArray = evenRouteCache.get(keyframes);
+	if (!perArray) evenRouteCache.set(keyframes, (perArray = new Map()));
+	const key = `${move.start}:${projection}`;
+	let route = perArray.get(key);
+	if (!route) perArray.set(key, (route = buildEvenRoute(keyframes, move, projection)));
+	return route;
+}
+
+/**
+ * Share of the route covered after `time` seconds of a move that takes
+ * `duration`: speed ramps up over `rampIn`, stays constant, ramps down over
+ * `rampOut`. With no ramps this is just `time / duration`.
+ */
+function evenProgress(time: number, duration: number, rampIn: number, rampOut: number): number {
+	if (time <= 0) return 0;
+	if (time >= duration) return 1;
+	// Constant speed such that the area under the speed curve is 1.
+	const speed = 1 / (duration - rampIn / 2 - rampOut / 2);
+	if (time < rampIn) return (speed * time * time) / (2 * rampIn);
+	if (time > duration - rampOut) {
+		const left = duration - time;
+		return 1 - (speed * left * left) / (2 * rampOut);
+	}
+	return speed * (time - rampIn / 2);
+}
+
+/** The ramps of an even-speed move: one at each end that is a stop. */
+function evenRamps(keyframes: Keyframe[], move: Move, duration: number): [number, number] {
+	const ramp = Math.min(EVEN_SPEED_RAMP, duration / 3);
+	return [keyframes[move.start].waypoint ? 0 : ramp, keyframes[move.end].waypoint ? 0 : ramp];
+}
+
+function sampleEvenMove(
+	keyframes: Keyframe[],
+	move: Move,
+	t: number,
+	projection: MapProjection
+): CameraState {
+	const from = departureOf(keyframes[move.start]);
+	const duration = keyframes[move.end].t - from;
+	const { layout, at, length } = evenRoute(keyframes, move, projection);
+	const total = length[length.length - 1];
+	const target = total * evenProgress(t - from, duration, ...evenRamps(keyframes, move, duration));
+	// Find the two samples the target length lies between.
+	let lo = 0;
+	let hi = length.length - 1;
+	while (hi - lo > 1) {
+		const mid = (lo + hi) >> 1;
+		if (length[mid] <= target) lo = mid;
+		else hi = mid;
+	}
+	const span = length[hi] - length[lo];
+	const f = span > 0 ? (target - length[lo]) / span : 0;
+	return sampleSegments(layout, lerp(at[lo], at[hi], f), projection)!;
+}
+
+/** Does this move run at even speed? Only a move through waypoints can. */
+function isEvenSpeedMove(keyframes: Keyframe[], move: Move): boolean {
+	return move.kind === 'curve' && keyframes[move.start].evenSpeed === true;
+}
+
+/**
+ * The indices of the waypoints that time themselves: those inside a move
+ * with `evenSpeed`.
+ */
+export function selfTimedWaypoints(keyframes: Keyframe[]): Set<number> {
+	const out = new Set<number>();
+	for (const move of movesOf(keyframes)) {
+		if (!isEvenSpeedMove(keyframes, move)) continue;
+		for (let i = move.start + 1; i < move.end; i++) out.add(i);
+	}
+	return out;
+}
+
+/**
+ * The keyframes with every self-timed waypoint moved to the moment the
+ * camera passes it, to the millisecond. Returns the same array when nothing
+ * had to change.
+ */
+export function withEvenSpeedTimes(keyframes: Keyframe[], projection: MapProjection): Keyframe[] {
+	let out = keyframes;
+	for (const move of movesOf(keyframes)) {
+		if (!isEvenSpeedMove(keyframes, move)) continue;
+		const from = departureOf(keyframes[move.start]);
+		const duration = keyframes[move.end].t - from;
+		if (!(duration > 0)) continue;
+		const { length } = buildEvenRoute(keyframes, move, projection);
+		const total = length[length.length - 1];
+		const ramps = evenRamps(keyframes, move, duration);
+		for (let i = move.start + 1; i < move.end; i++) {
+			// Length of the route up to this waypoint: it sits on a sample.
+			const k = i - move.start;
+			const share =
+				total > 0 ? length[k * EVEN_SPEED_SAMPLES] / total : k / (move.end - move.start);
+			// When is that share covered? `evenProgress` only ever rises.
+			let lo = 0;
+			let hi = duration;
+			for (let n = 0; n < 40; n++) {
+				const mid = (lo + hi) / 2;
+				if (evenProgress(mid, duration, ...ramps) < share) lo = mid;
+				else hi = mid;
+			}
+			const t = Math.round((from + (lo + hi) / 2) * 1000) / 1000;
+			if (t === keyframes[i].t) continue;
+			if (out === keyframes) out = [...keyframes];
+			out[i] = { ...keyframes[i], t };
+		}
+	}
+	return out;
+}
+
 /**
  * Sample camera state at time t (seconds) from a keyframe array sorted by t.
  * Returns null if the array is empty. Holds the first/last keyframe outside
@@ -419,6 +613,24 @@ function linearLngLatZoom(kfA: ZoomedPosition, kfB: ZoomedPosition, alpha: numbe
  * A stop with a `hold` keeps its view from `t` to `t + hold`.
  */
 export function sampleAt(
+	keyframes: Keyframe[],
+	t: number,
+	projection: MapProjection = 'mercator'
+): CameraState | null {
+	if (keyframes.length > 1 && t > keyframes[0].t && t < keyframes[keyframes.length - 1].t) {
+		for (const move of movesOf(keyframes)) {
+			if (!isEvenSpeedMove(keyframes, move)) continue;
+			// Only the times of the two ends count — see the section above.
+			if (t > departureOf(keyframes[move.start]) && t < keyframes[move.end].t) {
+				return sampleEvenMove(keyframes, move, t, projection);
+			}
+		}
+	}
+	return sampleSegments(keyframes, t, projection);
+}
+
+/** `sampleAt` for keyframes that are each passed at their own time `t`. */
+function sampleSegments(
 	keyframes: Keyframe[],
 	t: number,
 	projection: MapProjection = 'mercator'

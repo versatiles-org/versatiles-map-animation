@@ -1,4 +1,4 @@
-import { sampleAt } from './interpolate';
+import { sampleAt, selfTimedWaypoints, withEvenSpeedTimes } from './interpolate';
 import type { MapStyleOptions } from './map_style';
 import { movesOf, type Move } from './moves';
 import {
@@ -185,7 +185,15 @@ export class AnimationStore {
 	buildings3d = $state(false);
 	/** Position of the sun; unset = the map's standard lighting. */
 	sun = $state<Sun | undefined>(undefined);
-	projection = $state<MapProjection>(DEFAULT_MAP_PROJECTION);
+	#projection = $state<MapProjection>(DEFAULT_MAP_PROJECTION);
+	get projection(): MapProjection {
+		return this.#projection;
+	}
+	/** The route between keyframes depends on the projection, and with it the times of self-timed waypoints. */
+	set projection(value: MapProjection) {
+		this.#projection = value;
+		this.keyframes = this.retimed(this.keyframes);
+	}
 	terrain = $state(ANIMATION_DEFAULTS.terrain);
 	sky = $state(ANIMATION_DEFAULTS.sky);
 	annotationScale = $state<number>(ANIMATION_DEFAULTS.annotationScale);
@@ -213,6 +221,8 @@ export class AnimationStore {
 			? (this.annotations[this.selectedAnnotationIndex] ?? null)
 			: null
 	);
+	/** Waypoints whose time is set by their move running at even speed. */
+	selfTimed = $derived(selfTimedWaypoints(this.keyframes));
 	/** The moves between the stops — see `Move`. */
 	moves = $derived(movesOf(this.keyframes));
 	selectedMove = $derived<Move | null>(
@@ -256,7 +266,11 @@ export class AnimationStore {
 		const kf: Keyframe = { t, ...cam };
 		const after = this.keyframes.findIndex((k) => k.t > t);
 		const idx = after === -1 ? this.keyframes.length : after;
-		this.keyframes = [...this.keyframes.slice(0, idx), kf, ...this.keyframes.slice(idx)];
+		this.keyframes = this.retimed([
+			...this.keyframes.slice(0, idx),
+			kf,
+			...this.keyframes.slice(idx)
+		]);
 		this.selectedIndex = idx;
 		this.selectedMoveStart = null;
 		this.currentTime = t;
@@ -266,12 +280,12 @@ export class AnimationStore {
 		if (this.selectedIndex === null) return;
 		const kf = this.keyframes[this.selectedIndex];
 		if (!kf) return;
-		this.keyframes = replaceAt(this.keyframes, this.selectedIndex, { ...kf, ...cam });
+		this.keyframes = this.retimed(replaceAt(this.keyframes, this.selectedIndex, { ...kf, ...cam }));
 	}
 
 	deleteAt(index: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
-		this.keyframes = this.keyframes.filter((_, i) => i !== index);
+		this.keyframes = this.retimed(this.keyframes.filter((_, i) => i !== index));
 		this.selectedIndex = adjustIndexAfterDelete(this.selectedIndex, index);
 		this.selectedMoveStart = null;
 	}
@@ -287,17 +301,54 @@ export class AnimationStore {
 		this.keyframes = replaceAt(this.keyframes, index, updated);
 	}
 
-	/** Make a keyframe a waypoint (the camera flies through) or a stop (it rests). */
+	/**
+	 * Make a keyframe a waypoint (the camera flies through) or a stop (it
+	 * rests). The first waypoint put into a move switches the move to even
+	 * speed, so it flows without anyone having to tune times; a stop put into
+	 * such a move passes that on to the move it now starts.
+	 */
 	setKeyframeWaypoint(index: number, waypoint: boolean): void {
 		const kf = this.keyframes[index];
-		if (!kf) return;
+		if (!kf || (kf.waypoint === true) === waypoint) return;
+		const next = [...this.keyframes];
 		const updated: Keyframe = { ...kf };
 		if (waypoint) {
 			updated.waypoint = true;
 			// A waypoint is flown through; the time of its hold stays part of the move.
 			delete updated.hold;
-		} else delete updated.waypoint;
-		this.keyframes = replaceAt(this.keyframes, index, updated);
+			// The move this keyframe is in from now on: the one that ended here,
+			// joined with the one that started here. It starts where the former
+			// started — or here, for the first keyframe.
+			const arriving = this.moves.find((m) => m.end === index);
+			const leaving = this.moves.find((m) => m.start === index);
+			const hadWaypoints = [arriving, leaving].some((m) => m && m.kind === 'curve');
+			if (arriving) {
+				delete updated.evenSpeed;
+				if (!hadWaypoints) next[arriving.start] = { ...next[arriving.start], evenSpeed: true };
+			} else if (!hadWaypoints) updated.evenSpeed = true;
+		} else {
+			delete updated.waypoint;
+			// It now starts the second half of the move it was in.
+			const containing = this.moves.find((m) => m.start < index && index < m.end);
+			if (containing && this.keyframes[containing.start].evenSpeed) updated.evenSpeed = true;
+		}
+		next[index] = updated;
+		this.keyframes = this.retimed(next);
+	}
+
+	/** Switch even speed on or off for the move that starts at keyframe `start`. */
+	setMoveEvenSpeed(start: number, evenSpeed: boolean): void {
+		const kf = this.keyframes[start];
+		if (!kf) return;
+		const updated: Keyframe = { ...kf };
+		if (evenSpeed) updated.evenSpeed = true;
+		else delete updated.evenSpeed;
+		this.keyframes = this.retimed(replaceAt(this.keyframes, start, updated));
+	}
+
+	/** Keyframes with their self-timed waypoints at the right times — see `withEvenSpeedTimes`. */
+	private retimed(keyframes: Keyframe[]): Keyframe[] {
+		return withEvenSpeedTimes(keyframes, this.#projection);
 	}
 
 	/**
@@ -316,8 +367,10 @@ export class AnimationStore {
 		const updated: Keyframe = { ...kf };
 		if (next > 0) updated.hold = next;
 		else delete updated.hold;
-		this.keyframes = this.keyframes.map((k, i) =>
-			i === index ? updated : i > index ? { ...k, t: snapTime(k.t + delta) } : k
+		this.keyframes = this.retimed(
+			this.keyframes.map((k, i) =>
+				i === index ? updated : i > index ? { ...k, t: snapTime(k.t + delta) } : k
+			)
 		);
 		const shift = (t: number | undefined) =>
 			t !== undefined && t >= pivot ? Math.max(0, snapTime(t + delta)) : t;
@@ -347,6 +400,8 @@ export class AnimationStore {
 	 */
 	setKeyframeTime(index: number, t: number): void {
 		if (index < 0 || index >= this.keyframes.length) return;
+		// A self-timed waypoint gets its time from its move.
+		if (this.selfTimed.has(index)) return;
 		// Snap to the 1/100s grid so dragged values land on clean centi-second
 		// stops, then clamp to t ≥ 0.
 		const moved: Keyframe = { ...this.keyframes[index], t: Math.max(0, snapTime(t)) };
@@ -370,7 +425,7 @@ export class AnimationStore {
 			if (index < sel && newIndex >= sel) this.selectedIndex = sel - 1;
 			else if (index > sel && newIndex <= sel) this.selectedIndex = sel + 1;
 		}
-		this.keyframes = sorted;
+		this.keyframes = this.retimed(sorted);
 		// Indices may have shifted, and with them what a move's start means.
 		this.selectedMoveStart = null;
 	}
@@ -534,7 +589,7 @@ export class AnimationStore {
 	}
 
 	loadFromAnimation(anim: Animation): void {
-		this.keyframes = [...anim.keyframes].sort((a, b) => a.t - b.t);
+		this.keyframes = this.retimed([...anim.keyframes].sort((a, b) => a.t - b.t));
 		this.annotations = (anim.annotations ?? []).map((a) => ({ ...a }));
 		this.style = anim.style ?? ANIMATION_DEFAULTS.style;
 		this.theme = anim.theme;
