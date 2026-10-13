@@ -146,7 +146,7 @@
 </script>
 
 <svelte:head>
-	<title>Map Animator Prototype – VersaTiles</title>
+	<title>Map Animator – VersaTiles</title>
 	<meta
 		name="description"
 		content="Compose camera animations on a VersaTiles map using keyframes."

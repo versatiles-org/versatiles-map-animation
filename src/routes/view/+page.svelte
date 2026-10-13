@@ -56,7 +56,7 @@
 </script>
 
 <svelte:head>
-	<title>Map Animator — VersaTiles</title>
+	<title>Map Animator – VersaTiles</title>
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
