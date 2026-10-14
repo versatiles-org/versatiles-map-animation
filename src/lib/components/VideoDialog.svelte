@@ -6,6 +6,9 @@
 	 * is derived from the animation's aspect ratio. The encoded animation is
 	 * passed on the URL fragment, so it ships with the command line. The
 	 * command itself is put together in `render_command.ts`.
+	 *
+	 * Where the editor is served by the render server (`server/`) and the
+	 * user is logged in there, the dialog can also hand the render to it.
 	 */
 
 	import type { AnimationStore } from '../animation.svelte';
@@ -100,6 +103,52 @@
 		copied = true;
 		if (copyTimer) clearTimeout(copyTimer);
 		copyTimer = setTimeout(() => (copied = false), 1800);
+	}
+
+	// The render server, if this editor is served by one: who is logged in.
+	// Anywhere else (GitHub Pages, `npm run dev`) the request fails or finds
+	// no such route, and the dialog offers the command only.
+	let serverUser = $state<string | null>(null);
+	let title = $state('');
+	let sending = $state(false);
+	let sent = $state<{ ok: boolean; text: string } | null>(null);
+	$effect(() => {
+		fetch('/api/me', { credentials: 'same-origin' })
+			.then((res) => (res.ok ? res.json() : null))
+			.then((me) => (serverUser = typeof me?.user === 'string' ? me.user : null))
+			.catch(() => {});
+	});
+
+	async function sendToServer() {
+		sending = true;
+		sent = null;
+		try {
+			const res = await fetch('/api/jobs', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					hash: encodeAnimation(store.toAnimation()),
+					title,
+					settings: {
+						width: videoWidth,
+						fps: videoFps,
+						format: videoFormat,
+						quality: videoQuality,
+						motionBlur,
+						shutterAngle
+					}
+				})
+			});
+			const body = await res.json().catch(() => ({}));
+			sent = res.ok
+				? { ok: true, text: 'Added to the queue.' }
+				: { ok: false, text: body.error ?? `The server answered ${res.status}.` };
+		} catch {
+			sent = { ok: false, text: 'The server could not be reached.' };
+		} finally {
+			sending = false;
+		}
 	}
 
 	$effect(() => {
@@ -197,6 +246,33 @@
 			{/if}
 		</span>
 	</div>
+	{#if serverUser}
+		<div class="embed-row server-row">
+			<input
+				class="title"
+				type="text"
+				maxlength="120"
+				placeholder="Title (optional)"
+				aria-label="Title of the render"
+				bind:value={title}
+			/>
+			<button type="button" class="primary" onclick={sendToServer} disabled={sending}>
+				<Icon name="video" />
+				{sending ? 'Sending…' : 'Render on this server'}
+			</button>
+			{#if sent}
+				<span class="sent" class:error={!sent.ok} role="status">
+					{sent.text}
+					{#if sent.ok}
+						<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- a page of the render server, not of this app -->
+						<a href="/renders/" target="_blank" rel="noopener">See your renders</a>
+					{/if}
+				</span>
+			{:else}
+				<span class="sent">Logged in as {serverUser} — or run the command below yourself.</span>
+			{/if}
+		</div>
+	{/if}
 	<div class="embed-row">
 		<input
 			id="video-input"
@@ -322,6 +398,40 @@
 				background: rgba(80, 200, 120, 0.18);
 				border-color: #4ac888;
 				color: #b6f0c9;
+			}
+			&.primary {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				background: #4a9eff;
+				border-color: #4a9eff;
+				color: #fff;
+				font-weight: 600;
+				white-space: nowrap;
+			}
+			&:disabled {
+				opacity: 0.6;
+				cursor: default;
+			}
+		}
+	}
+	.server-row {
+		align-items: center;
+
+		input.title {
+			flex: 0 1 16rem;
+			font-family: inherit;
+		}
+		.sent {
+			font-size: 12px;
+			color: #aaa;
+
+			&.error {
+				color: #ff8080;
+			}
+			a {
+				margin-left: 0.3rem;
+				color: #7cb8ff;
 			}
 		}
 	}
