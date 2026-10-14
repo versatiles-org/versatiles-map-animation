@@ -20,6 +20,7 @@
 		"dev": "vite dev",
 		"docker:build": "docker build -f render/Dockerfile -t versatiles-map-animator .",
 		"docker:build:gpu": "docker build -f render/Dockerfile --build-arg GPU=true -t versatiles-map-animator:gpu .",
+		"docker:build:server": "docker build -f render/Dockerfile --target server -t versatiles-map-animator:server .",
 		"format:check": "prettier --log-level=warn --check .",
 		"format": "prettier --log-level=warn --write .",
 		"inspect": "tsx scripts/inspect-hash.ts",

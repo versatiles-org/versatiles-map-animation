@@ -31,9 +31,16 @@ jobs:
           - variant: default
             gpu: 'false'
             suffix: ''
+            target: renderer
           - variant: gpu
             gpu: 'true'
             suffix: '-gpu'
+            target: renderer
+          # The render server (server/), built on the default image.
+          - variant: server
+            gpu: 'false'
+            suffix: '-server'
+            target: server
     steps:
       - uses: actions/checkout@v7
 
@@ -75,6 +82,7 @@ jobs:
         with:
           context: .
           file: render/Dockerfile
+          target: ${{ matrix.target }}
           build-args: |
             GPU=${{ matrix.gpu }}
           # Multi-arch so Apple-Silicon and arm64 Linux can pull directly.

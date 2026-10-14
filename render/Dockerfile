@@ -4,9 +4,14 @@
 #   3. renderer-deps — fetches what the renderer runs on: Playwright and
 #                    Chromium's headless shell. The headless shell is smaller than
 #                    the full Chromium browser and works fine with --use-gl=swiftshader.
-#   4. final       — plain Debian with the Node.js binary, ffmpeg, the headless
+#   4. renderer    — plain Debian with the Node.js binary, ffmpeg, the headless
 #                    shell, the renderer and the built site. npm and yarn are
 #                    only needed to build, so they stay behind in the stages above.
+#   5. server      — the renderer plus the render server (`server/`), which runs
+#                    it for the jobs users add in a browser. Built with
+#                    `--target server`; see server/README.md.
+#   6. (last)      — the renderer again, so a build without `--target` stays
+#                    the renderer image it always was.
 
 FROM node:24-bookworm-slim AS app-builder
 WORKDIR /src
@@ -36,7 +41,7 @@ RUN npm ci --omit=dev --no-audit --no-fund \
 	&& npx playwright install chromium-headless-shell \
 	&& rm -r /ms-playwright/ffmpeg-*
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim AS renderer
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # The system libraries Chromium's headless shell links against (`ldd` on its
@@ -95,3 +100,18 @@ WORKDIR /out
 VOLUME ["/out"]
 ENTRYPOINT ["node", "/app/render/render.mjs"]
 CMD ["--help"]
+
+# The render server: the same image, with the server and a place for its
+# data (users file, jobs, videos). Its jobs run `render.mjs` from above.
+FROM renderer AS server
+WORKDIR /app/server
+COPY server/package.json server/*.mjs ./
+COPY server/page ./page
+ENV DATA_DIR=/data PORT=8080
+WORKDIR /data
+VOLUME ["/data"]
+EXPOSE 8080
+ENTRYPOINT ["node", "/app/server/server.mjs"]
+CMD []
+
+FROM renderer
