@@ -64,6 +64,8 @@ Hosted but not publicly linked. The JSON schema is the durable contract; the edi
     --hash '<URL-hash payload>' --width 1920 --fps 30 --output animation.mp4
   ```
 
+- **Render server** for a team: the editor, a queue of renders with progress, previews and downloads, behind a login — one Docker container, see [`server/README.md`](server/README.md). Logged in, **Export video…** offers **Render on this server**.
+
 ## Run locally
 
 ```sh

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Log in – Map Animator</title>
+		<link rel="stylesheet" href="/renders/assets/style.css" />
+	</head>
+	<body class="login">
+		<form method="post" action="/renders/login">
+			<h1>Map Animator</h1>
+			<p class="message" id="message" role="alert" hidden></p>
+			<label>
+				<span>User</span>
+				<input name="user" autocomplete="username" required autofocus />
+			</label>
+			<label>
+				<span>Password</span>
+				<input name="password" type="password" autocomplete="current-password" required />
+			</label>
+			<input type="hidden" name="next" id="next" />
+			<button type="submit" class="primary">Log in</button>
+		</form>
+		<script>
+			const params = new URLSearchParams(location.search);
+			document.getElementById('next').value = params.get('next') ?? '/renders/';
+			const message = params.has('wait')
+				? 'Too many failed logins. Try again in a quarter of an hour.'
+				: params.has('failed')
+					? 'Wrong user or password.'
+					: null;
+			if (message) {
+				const el = document.getElementById('message');
+				el.textContent = message;
+				el.hidden = false;
+			}
+		</script>
+	</body>
+</html>

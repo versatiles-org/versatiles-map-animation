@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Renders – Map Animator</title>
+		<link rel="stylesheet" href="/renders/assets/style.css" />
+		<script type="module" src="/renders/assets/renders.js"></script>
+	</head>
+	<body>
+		<header class="topbar">
+			<h1>Renders</h1>
+			<a class="button" href="/">Editor</a>
+			<span class="spacer"></span>
+			<span class="user" id="user"></span>
+			<form method="post" action="/renders/logout">
+				<button type="submit">Log out</button>
+			</form>
+		</header>
+
+		<main>
+			<form class="new" id="new">
+				<h2>New render</h2>
+				<label class="wide">
+					<span>Share link</span>
+					<input
+						name="link"
+						required
+						placeholder="Paste a link from the editor’s “Share link” button"
+						autocomplete="off"
+					/>
+				</label>
+				<label class="wide">
+					<span>Title</span>
+					<input name="title" maxlength="120" placeholder="Optional — also names the download" />
+				</label>
+				<label>
+					<span>Width</span>
+					<select name="width">
+						<option value="640">640 px wide</option>
+						<option value="1280" selected>1280 px wide (HD)</option>
+						<option value="1920">1920 px wide (Full HD)</option>
+						<option value="3840">3840 px wide (4K)</option>
+					</select>
+				</label>
+				<label>
+					<span>Frame rate</span>
+					<select name="fps">
+						<option>24</option>
+						<option>25</option>
+						<option selected>30</option>
+						<option>50</option>
+						<option>60</option>
+					</select>
+				</label>
+				<label>
+					<span>Format</span>
+					<select name="format">
+						<option value="mp4" selected>MP4 (H.264)</option>
+						<option value="prores">ProRes 4444 (MOV)</option>
+						<option value="ffv1">FFV1, lossless (MKV)</option>
+						<option value="animation">QuickTime Animation, lossless (MOV)</option>
+					</select>
+				</label>
+				<label>
+					<span>Quality</span>
+					<select name="quality">
+						<option value="high">High</option>
+						<option value="standard" selected>Standard</option>
+						<option value="small">Small</option>
+					</select>
+				</label>
+				<label>
+					<span>Motion blur</span>
+					<select name="motionBlur">
+						<option value="1" selected>Off</option>
+						<option value="2">2× (2× slower)</option>
+						<option value="4">4× (4× slower)</option>
+						<option value="8">8× (8× slower)</option>
+					</select>
+				</label>
+				<div class="actions">
+					<button type="submit" class="primary">Add to queue</button>
+					<span class="message" id="formMessage" role="status"></span>
+				</div>
+			</form>
+
+			<ol class="jobs" id="jobs" aria-live="polite"></ol>
+			<p class="empty" id="empty" hidden>
+				No renders yet. Add one above, or use “Export video…” in the editor.
+			</p>
+		</main>
+	</body>
+</html>

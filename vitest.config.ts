@@ -15,7 +15,7 @@ export default mergeConfig(
 				include: ['src/**/*.{ts,js}'],
 				exclude: ['src/**/*.d.ts']
 			},
-			include: ['src/**/*.{test,spec}.{js,ts}', 'render/**/*.test.mjs']
+			include: ['src/**/*.{test,spec}.{js,ts}', 'render/**/*.test.mjs', 'server/**/*.test.mjs']
 		}
 	})
 );

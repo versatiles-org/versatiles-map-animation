@@ -1,0 +1,15 @@
+{
+	"name": "map-animator-server",
+	"version": "0.2.0",
+	"private": true,
+	"type": "module",
+	"description": "Render server for versatiles-map-animator: the editor, a queue of render jobs and the finished videos, behind a login.",
+	"main": "server.mjs",
+	"scripts": {
+		"start": "node server.mjs",
+		"passwd": "node passwd.mjs"
+	},
+	"engines": {
+		"node": ">=24"
+	}
+}

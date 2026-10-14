@@ -2,6 +2,7 @@ node_modules/
 .svelte-kit/
 build/
 coverage/
+server/data/
 *.mp4
 
 # Playwright
