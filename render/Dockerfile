@@ -45,8 +45,8 @@ FROM debian:bookworm-slim AS renderer
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # The system libraries Chromium's headless shell links against (`ldd` on its
-# binaries), named one by one. Playwright's own `install-deps` would also
-# bring xvfb, and with it Mesa's OpenGL drivers and LLVM, plus fonts for
+# binaries, on amd64 and arm64 — they differ), named one by one. Playwright's
+# own `install-deps` would also bring xvfb, and with it Mesa's OpenGL drivers and LLVM, plus fonts for
 # every script — some 250 MB that drawing a map in software never uses.
 # When a new Playwright brings a browser that needs another library, the
 # renderer fails at start with the name of the missing file.
@@ -74,7 +74,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates \
 		fonts-dejavu-core libfontconfig1 \
-		libasound2 libatk1.0-0 libatspi2.0-0 libdbus-1-3 libdrm2 libexpat1 libgbm1 \
+		libasound2 libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 libdbus-1-3 libdrm2 libexpat1 libgbm1 \
 		libglib2.0-0 libnspr4 libnss3 libx11-6 libxcb1 libxcomposite1 libxdamage1 \
 		libxext6 libxfixes3 libxi6 libxkbcommon0 libxrandr2 libxrender1 \
 		$([ "$GPU" = true ] && echo libvulkan1 mesa-vulkan-drivers) \
