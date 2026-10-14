@@ -61,6 +61,23 @@ Let's Encrypt's staging server has looser rate limits, and browsers do not
 trust its certificates. Delete `/srv/map-animator/tls/` before switching to
 the real one.
 
+### Update
+
+A new image is published whenever `main` changes (`latest-server`) and for
+every release (`v0.2.0-server` and so on). To update, pull it and replace the
+container — a running container keeps the image it was started from:
+
+```sh
+docker pull ghcr.io/versatiles-org/versatiles-map-animator:latest-server
+docker rm -f map-animator
+docker run -d --name map-animator ...   # the same command as the first time
+docker image prune -f                   # optional: remove the old image
+```
+
+Users, renders and the certificate are in the data folder, so they stay.
+A render that was running is rendered again from the start. `docker logs
+map-animator` shows whether the server started.
+
 ## Users
 
 `users.txt` in the data folder holds one user per line, `name:scrypt:<salt>:<hash>`.
