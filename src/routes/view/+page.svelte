@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { AnimationStore } from '#lib/animation.svelte.ts';
+	import { aspectRatioValue } from '#lib/types.ts';
 	import { readAnimationFromUrl } from '#lib/url_state/index.ts';
 	import MapStage from '#lib/components/MapStage.svelte';
 
@@ -46,6 +47,10 @@
 				},
 				get duration() {
 					return store.totalDuration;
+				},
+				/** Width over height of the animation's frame, e.g. 16 / 9. */
+				get aspectRatio() {
+					return aspectRatioValue(store.aspectRatio);
 				}
 			};
 		}

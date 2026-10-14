@@ -62,23 +62,25 @@ docker run --rm -it -v "$PWD:/out" \
 
 ## Options
 
-| flag                   | default           | notes                                                 |
-| ---------------------- | ----------------- | ----------------------------------------------------- |
-| `--hash <code>`        | (required)        | URL-hash payload from the editor's Share button       |
-| `--url <full-url>`     |                   | alternative to `--hash`; renderer extracts the hash   |
-| `--width <n>`          | `1280`            | one of `640`, `1280`, `1920`, `3840` (height = ×9/16) |
-| `--fps <n>`            | `30`              | frame rate                                            |
-| `--format <name>`      | `mp4`             | `mp4`, `prores`, `ffv1` or `animation` — see below    |
-| `--quality <level>`    | `standard`        | for `mp4`: `high`, `standard` or `small`              |
-| `--crf <n>`            |                   | for `mp4`: exact x264 CRF instead of `--quality`      |
-| `--preset <name>`      | `slow`            | for `mp4`: x264 preset (`ultrafast`…`veryslow`)       |
-| `--frame-timeout <ms>` | `30000`           | per-frame settle deadline                             |
-| `--motion-blur <n>`    | `1` (off)         | sub-frames per output frame; 4–8 typical; N× slower   |
-| `--shutter-angle <d>`  | `180`             | shutter angle in degrees (only with motion blur)      |
-| `--gpu`                | (off)             | draw on a GPU instead of in software — see below      |
-| `--no-prewarm`         | (prewarm enabled) | skip the initial pass that fills the tile cache       |
-| `--end-time <s>`       | full duration     | cap render duration (useful for previews)             |
-| `--output <path>`      | (required)        | output file; its ending has to match the format       |
+| flag                   | default            | notes                                                 |
+| ---------------------- | ------------------ | ----------------------------------------------------- |
+| `--hash <code>`        | (required)         | URL-hash payload from the editor's Share button       |
+| `--url <full-url>`     |                    | alternative to `--hash`; renderer extracts the hash   |
+| `--width <n>`          | `1280`             | one of `640`, `1280`, `1920`, `3840`                  |
+| `--height <n>`         | from the animation | video height; by default the animation's aspect ratio |
+| `--fps <n>`            | `30`               | frame rate                                            |
+| `--format <name>`      | `mp4`              | `mp4`, `prores`, `ffv1` or `animation` — see below    |
+| `--quality <level>`    | `standard`         | for `mp4`: `high`, `standard` or `small`              |
+| `--crf <n>`            |                    | for `mp4`: exact x264 CRF instead of `--quality`      |
+| `--preset <name>`      | `slow`             | for `mp4`: x264 preset (`ultrafast`…`veryslow`)       |
+| `--frame-timeout <ms>` | `30000`            | per-frame settle deadline                             |
+| `--motion-blur <n>`    | `1` (off)          | sub-frames per output frame; 4–8 typical; N× slower   |
+| `--shutter-angle <d>`  | `180`              | shutter angle in degrees (only with motion blur)      |
+| `--gpu`                | (off)              | draw on a GPU instead of in software — see below      |
+| `--no-prewarm`         | (prewarm enabled)  | skip the initial pass that fills the tile cache       |
+| `--end-time <s>`       | full duration      | cap render duration (useful for previews)             |
+| `--progress-json`      | (off)              | progress as JSON lines on stdout, for programs        |
+| `--output <path>`      | (required)         | output file; its ending has to match the format       |
 
 ## Formats
 

@@ -45,9 +45,9 @@ import {
 const ALLOWED_WIDTHS = [640, 1280, 1920, 3840];
 const DEFAULT_OPTS = {
 	width: 1280,
-	// Optional explicit pixel height. When omitted, defaults to width * 9/16
-	// (legacy 16:9 behaviour). The editor always passes both `--width` and
-	// `--height` derived from the chosen composition aspect ratio.
+	// Optional explicit pixel height. When omitted, it follows from the
+	// animation's own aspect ratio. The editor passes both `--width` and
+	// `--height`, derived from the same.
 	height: null,
 	fps: 30,
 	// Output format and, for `mp4`, its quality — see `formats.mjs`. `crf`
@@ -79,6 +79,18 @@ const DEFAULT_OPTS = {
 // ---------------------------------------------------------------------------
 
 let VERBOSE = false;
+/** With `--progress-json`: progress as JSON lines on stdout, for a program that runs the renderer. */
+let PROGRESS_JSON = false;
+
+/**
+ * One line of machine-readable progress on stdout, with `--progress-json`:
+ * `{"phase":"rendering","done":12,"total":300,"eta":41.5}`. Phases come in
+ * the order `preparing`, `warming`, `rendering`, `encoding`; `eta` is in
+ * seconds and only given while a phase is under way.
+ */
+function report(progress) {
+	if (PROGRESS_JSON) process.stdout.write(JSON.stringify(progress) + '\n');
+}
 
 function log(msg) {
 	process.stderr.write(msg + '\n');
@@ -102,9 +114,11 @@ function fmtBytes(n) {
 }
 
 class Progress {
-	constructor(total, label) {
+	/** `phase` names it in the output of `--progress-json`, see `report`. */
+	constructor(total, label, phase) {
 		this.total = total;
 		this.label = label;
+		this.phase = phase;
 		this.start = Date.now();
 		this.tty = !!process.stderr.isTTY;
 		this.lastPaint = 0;
@@ -122,6 +136,12 @@ class Progress {
 		const remaining = n < this.total ? (this.total - n) / Math.max(rate, 0.001) : 0;
 		const pct = Math.round((n / this.total) * 100);
 		const eta = n < this.total ? `ETA ${fmtDuration(remaining)}` : `${fmtDuration(elapsed)}`;
+		report({
+			phase: this.phase,
+			done: n,
+			total: this.total,
+			...(n < this.total && isFinite(remaining) && { eta: Math.round(remaining * 10) / 10 })
+		});
 		const line = `  ${this.label}  ${String(n).padStart(String(this.total).length)}/${this.total}  ${String(pct).padStart(3)}%  ${eta}`;
 		if (this.tty) {
 			process.stderr.write('\r\x1b[2K' + line);
@@ -177,6 +197,9 @@ function parseArgv(argv) {
 			case '--preset':
 				out.preset = next();
 				break;
+			case '--progress-json':
+				out.progressJson = true;
+				break;
 			case '--output':
 			case '-o':
 				out.output = next();
@@ -226,7 +249,7 @@ function usage() {
 		'  --site-root <dir>      static-files root to serve (default: /app/site or ./build)',
 		'  --site-url <url>       skip the built-in static server and use this base URL instead',
 		'  --width <n>            video width — one of 640, 1280, 1920, 3840 (default 1280)',
-		'  --height <n>           video height (default: width * 9/16 — i.e. 16:9 aspect)',
+		"  --height <n>           video height (default: from the animation's aspect ratio)",
 		'  --fps <n>              frame rate (default 30)',
 		'  --format <name>        output format (default "' + DEFAULT_FORMAT + '"):',
 		...Object.entries(FORMATS).map(
@@ -252,6 +275,8 @@ function usage() {
 		'                          `--gpus all` (NVIDIA) or `--device /dev/dri` (Intel, AMD).',
 		'  --no-prewarm           skip the initial trajectory walk that pre-fills tile cache',
 		'  --output <path>        output file (required); its ending has to match the format',
+		'  --progress-json        progress as one JSON line per update on stdout, for programs',
+		'                          that run the renderer (the readable progress stays on stderr)',
 		'  -v, --verbose          show ffmpeg output and page console messages',
 		''
 	].join('\n');
@@ -495,6 +520,16 @@ async function setupPage(browser, opts, hash) {
 		);
 	}
 	await waitForFrameReady(page, setupTimeout);
+	if (opts.height == null) {
+		// No height given: the one of the animation's own frame. The page was
+		// opened at 16:9 to find out; it follows a new size of the window.
+		const aspect = await page.evaluate(() => /** @type {any} */ (window).__renderer.aspectRatio);
+		opts.height = aspect > 0 ? Math.round(opts.width / aspect) : height;
+		if (opts.height !== height) {
+			await page.setViewportSize({ width: opts.width, height: opts.height });
+			await waitForFrameReady(page, setupTimeout);
+		}
+	}
 	const duration = await page.evaluate(() => /** @type {any} */ (window).__renderer.duration);
 	return { ctx, page, duration };
 }
@@ -506,7 +541,7 @@ async function prewarmPass(page, duration, opts) {
 	// (or the next prewarm step) requires them.
 	const fps = 2;
 	const total = Math.max(2, Math.ceil(duration * fps) + 1);
-	const progress = new Progress(total, 'warming tile cache');
+	const progress = new Progress(total, 'warming tile cache', 'warming');
 	for (let i = 0; i < total; i++) {
 		const t = Math.min(duration, i / fps);
 		await page.evaluate((t) => /** @type {any} */ (window).__renderer.seekTo(t), t);
@@ -586,7 +621,7 @@ async function capturePass(page, duration, opts, ffmpegStdin) {
 	// distributed across [t_i, t_i + shutterRatio/fps).
 	const samples = Math.max(1, opts.motionBlur);
 	const shutterRatio = opts.shutterAngle / 360;
-	const progress = new Progress(total, 'rendering frames');
+	const progress = new Progress(total, 'rendering frames', 'rendering');
 	// Where the time of this pass goes, for the summary printed at the end:
 	// drawing (seek + wait until the map has settled) and capturing (the
 	// screenshot: read-back, PNG encoding, transfer from the browser).
@@ -661,6 +696,7 @@ async function main() {
 		return;
 	}
 	VERBOSE = !!opts.verbose;
+	PROGRESS_JSON = !!opts.progressJson;
 	if (!ALLOWED_WIDTHS.includes(opts.width)) {
 		throw new Error(`--width must be one of ${ALLOWED_WIDTHS.join('/')}, got ${opts.width}`);
 	}
@@ -693,6 +729,7 @@ async function main() {
 
 	try {
 		log('preparing renderer…');
+		report({ phase: 'preparing' });
 		const startedAt = performance.now();
 		await checkWebglRenderer(browser, opts);
 		const { ctx, page, duration } = await setupPage(browser, opts, hash);
@@ -700,7 +737,8 @@ async function main() {
 
 		const cappedDuration = opts.endTime != null ? Math.min(duration, opts.endTime) : duration;
 		const totalFrames = Math.max(2, Math.ceil(cappedDuration * opts.fps) + 1);
-		const height = opts.height ?? Math.round((opts.width * 9) / 16);
+		const height = opts.height;
+		report({ phase: 'preparing', width: opts.width, height, frames: totalFrames });
 		log(
 			`  ${cappedDuration.toFixed(2)}s · ${totalFrames} frames at ${opts.fps} fps · ${opts.width}×${height}` +
 				(opts.motionBlur > 1
@@ -719,6 +757,7 @@ async function main() {
 		const { proc, exit } = spawnFfmpeg(opts);
 		const timing = await capturePass(page, cappedDuration, opts, proc.stdin);
 		log('encoding video…');
+		report({ phase: 'encoding' });
 		const encodeStart = performance.now();
 		await exit;
 		// ffmpeg encodes while frames are still being captured, so only what
