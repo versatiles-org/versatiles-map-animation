@@ -7,6 +7,10 @@
 	"hiddenLayers": ["roads", "transit", "boundaries", "pois", "markings"],
 	"terrain": true,
 	"sky": true,
+	"sun": {
+		"direction": 210,
+		"altitude": 60
+	},
 	"keyframes": [
 		{
 			"t": 0,

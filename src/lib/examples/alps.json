@@ -7,6 +7,10 @@
 	"projection": "globe",
 	"terrain": true,
 	"sky": true,
+	"sun": {
+		"direction": 210,
+		"altitude": 60
+	},
 	"keyframes": [
 		{
 			"t": 0,
