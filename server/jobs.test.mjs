@@ -102,7 +102,7 @@ describe('a job', () => {
 			shutterAngle: 270
 		},
 		status: 'finished',
-		createdAt: '2026-10-14T10:00:00.000Z'
+		createdAt: '2026-10-14T10:00:05.123Z'
 	};
 
 	it('runs the renderer with its settings', () => {
@@ -128,10 +128,10 @@ describe('a job', () => {
 		expect(rendererArgs(mp4, 'v.mp4')).not.toContain('--motion-blur');
 	});
 
-	it('has a file and a download name that fit its format and title', () => {
+	it('has a file and a download name that fit its format, title and time', () => {
 		expect(videoFile(job)).toBe('video.mkv');
-		expect(downloadName(job)).toBe('zurich-geneve-2026-10-14.mkv');
-		expect(downloadName({ ...job, title: '' })).toBe('map-animation-2026-10-14.mkv');
+		expect(downloadName(job)).toBe('zurich-geneve-2026-10-14_10-00-05.mkv');
+		expect(downloadName({ ...job, title: '' })).toBe('map-animation-2026-10-14_10-00-05.mkv');
 	});
 
 	it('does not show its hash to the browser', () => {

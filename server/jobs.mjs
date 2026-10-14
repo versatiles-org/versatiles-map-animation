@@ -129,7 +129,11 @@ export function videoFile(job) {
 	return 'video' + FORMATS[job.settings.format].extension;
 }
 
-/** The name a job's video is downloaded as: its title (or a default) and its day. */
+/**
+ * The name a job's video is downloaded as: its title (or a default), and the
+ * day and time (UTC, to the second) it was added — two renders of the same
+ * title do not overwrite each other in the downloads folder.
+ */
 export function downloadName(job) {
 	const base =
 		job.title
@@ -139,7 +143,8 @@ export function downloadName(job) {
 			.replace(/^-+|-+$/g, '')
 			.toLowerCase()
 			.slice(0, 60) || 'map-animation';
-	return `${base}-${job.createdAt.slice(0, 10)}${FORMATS[job.settings.format].extension}`;
+	const time = job.createdAt.slice(0, 19).replace('T', '_').replaceAll(':', '-');
+	return `${base}-${time}${FORMATS[job.settings.format].extension}`;
 }
 
 /** The renderer's arguments for a job, writing to `output`. */

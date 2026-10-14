@@ -187,7 +187,7 @@ describe('logged in', () => {
 		expect((await video.arrayBuffer()).byteLength).toBe(10);
 		const download = await get(`/api/jobs/${job.id}/video?download`, { headers });
 		expect(download.headers.get('content-disposition')).toMatch(
-			/^attachment; filename="alps-\d{4}-\d\d-\d\d\.mp4"$/
+			/^attachment; filename="alps-\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d\.mp4"$/
 		);
 		expect(await (await get(`/api/jobs/${job.id}/preview`, { headers })).text()).toBe('preview');
 		expect(await (await get(`/api/jobs/${job.id}/poster`, { headers })).text()).toBe('poster');
