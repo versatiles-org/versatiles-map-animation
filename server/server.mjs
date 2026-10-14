@@ -9,13 +9,19 @@
  *   /api/jobs         GET: the user's jobs, newest first; POST: a new one
  *   /api/jobs/<id>    DELETE: cancel a job, or delete one that is over
  *   /api/jobs/<id>/video|preview|poster   its files (`?download` to save the video)
+ *
+ * With DOMAIN set, all of that over HTTPS, with a certificate from Let's
+ * Encrypt (acme.mjs); plain HTTP then only answers its challenges and sends
+ * everyone else to HTTPS.
  */
 
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createServer as createSecureServer } from 'node:https';
 import { dirname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { CHALLENGE_PATH, Certificates, LETS_ENCRYPT } from './acme.mjs';
 import { Accounts, SESSION_MAX_AGE } from './auth.mjs';
 import { parseCookies, readBody, redirect, sendFile, sendJson, sendText } from './http.mjs';
 import { downloadName, JobStore, parseJobRequest, publicJob, videoFile } from './jobs.mjs';
@@ -24,15 +30,25 @@ import { removeOldJobs, RenderQueue } from './queue.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PAGE = join(HERE, 'page');
 const COOKIE = 'session';
+/** How often to check whether the certificate needs renewing. */
+const RENEW_CHECK_MS = 12 * 3600 * 1000;
 /** Files of the server's own pages that may be fetched without a session. */
 const ASSETS = new Set(['style.css', 'renders.js']);
 
 /** The configuration from the environment; see README.md. */
 export function loadConfig(env = process.env) {
 	const dataDir = resolve(env.DATA_DIR ?? join(HERE, 'data'));
+	const domains = (env.DOMAIN ?? '')
+		.split(',')
+		.map((d) => d.trim().toLowerCase())
+		.filter(Boolean);
 	return {
-		port: Number(env.PORT ?? 8080),
+		port: Number(env.PORT ?? (domains.length ? 80 : 8080)),
 		host: env.HOST ?? '0.0.0.0',
+		domains,
+		httpsPort: Number(env.HTTPS_PORT ?? 443),
+		acmeEmail: env.ACME_EMAIL || undefined,
+		acmeDirectory: env.ACME_DIRECTORY || LETS_ENCRYPT,
 		dataDir,
 		usersFile: resolve(env.USERS_FILE ?? join(dataDir, 'users.txt')),
 		renderer: resolve(env.RENDERER ?? join(HERE, '..', 'render', 'render.mjs')),
@@ -65,6 +81,8 @@ export function createHandler(config, { accounts, store, queue }) {
 		const url = new URL(req.url ?? '/', 'http://server');
 		const path = url.pathname;
 		const token = parseCookies(req.headers.cookie)[COOKIE];
+		// Over HTTPS, the browser is to send the session cookie over HTTPS only.
+		const cookie = `HttpOnly; SameSite=Strict; Path=/${'encrypted' in req.socket ? '; Secure' : ''}`;
 
 		try {
 			// --- Without a session -------------------------------------------
@@ -92,14 +110,14 @@ export function createHandler(config, { accounts, store, queue }) {
 					return;
 				}
 				redirect(res, next, {
-					'Set-Cookie': `${COOKIE}=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MAX_AGE}`
+					'Set-Cookie': `${COOKIE}=${session}; ${cookie}; Max-Age=${SESSION_MAX_AGE}`
 				});
 				return;
 			}
 			if (path === '/renders/logout' && req.method === 'POST') {
 				accounts.logout(token);
 				redirect(res, '/renders/login', {
-					'Set-Cookie': `${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`
+					'Set-Cookie': `${COOKIE}=; ${cookie}; Max-Age=0`
 				});
 				return;
 			}
@@ -224,6 +242,45 @@ export function createHandler(config, { accounts, store, queue }) {
 	};
 }
 
+/**
+ * Plain HTTP when the server has a domain: the answers to the ACME
+ * challenges, and for everything else the way to HTTPS — or, before there
+ * is a certificate, a note that one is on its way.
+ *
+ * @param {ReturnType<typeof loadConfig>} config
+ * @param {Map<string, string>} challenges  token → answer
+ * @param {() => boolean} secure  whether HTTPS is up
+ */
+export function createPlainHandler(config, challenges, secure) {
+	/** @param {import('node:http').IncomingMessage} req @param {import('node:http').ServerResponse} res */
+	return function handle(req, res) {
+		const url = new URL(req.url ?? '/', 'http://server');
+		if (url.pathname.startsWith(CHALLENGE_PATH)) {
+			const answer = challenges.get(url.pathname.slice(CHALLENGE_PATH.length));
+			if (answer) sendText(res, 200, answer);
+			else sendText(res, 404, 'Not found');
+			return;
+		}
+		if (!secure()) {
+			res.setHeader('Retry-After', '60');
+			sendText(
+				res,
+				503,
+				'Waiting for the HTTPS certificate — see the server log. Try again in a minute.'
+			);
+			return;
+		}
+		// The domain asked for if it is one of ours (not the bare IP address).
+		const asked = String(req.headers.host ?? '')
+			.replace(/:\d+$/, '')
+			.toLowerCase();
+		const host = config.domains.includes(asked) ? asked : config.domains[0];
+		const port = config.httpsPort === 443 ? '' : `:${config.httpsPort}`;
+		res.writeHead(308, { Location: `https://${host}${port}${url.pathname}${url.search}` });
+		res.end();
+	};
+}
+
 /** Where to go after logging in: a path on this server, nothing else. */
 function safeNext(next) {
 	return next && next.startsWith('/') && !next.startsWith('//') ? next : '/renders/';
@@ -273,19 +330,86 @@ async function main() {
 	});
 	await queue.start();
 
-	const server = createServer(createHandler(config, { accounts, store, queue }));
-	server.listen(config.port, config.host, () =>
-		log(`listening on http://${config.host}:${config.port}/ — data in ${config.dataDir}`)
-	);
+	const handler = createHandler(config, { accounts, store, queue });
+	/** @type {{ close(): unknown }[]} */
+	const servers = [];
+	if (config.domains.length === 0) {
+		const server = createServer(handler);
+		server.listen(config.port, config.host, () =>
+			log(`listening on http://${config.host}:${config.port}/ — data in ${config.dataDir}`)
+		);
+		servers.push(server);
+	} else {
+		servers.push(...(await serveSecurely(config, handler, log)));
+	}
 
 	const shutdown = () => {
 		log('shutting down');
 		queue.stop();
-		server.close();
+		for (const server of servers) server.close();
 		setTimeout(() => process.exit(0), 2000).unref();
 	};
 	process.on('SIGTERM', shutdown);
 	process.on('SIGINT', shutdown);
+}
+
+/**
+ * HTTPS for `config.domains` on `config.httpsPort`, with a certificate from
+ * Let's Encrypt that is renewed while the server runs; plain HTTP on
+ * `config.port` for its challenges and as the way to HTTPS.
+ */
+async function serveSecurely(config, handler, log) {
+	const certs = new Certificates({
+		dir: join(config.dataDir, 'tls'),
+		domains: config.domains,
+		email: config.acmeEmail,
+		directoryUrl: config.acmeDirectory
+	});
+	let pair = await certs.load();
+	/** @type {import('node:https').Server | null} */
+	let secure = null;
+	const useCertificate = () => {
+		if (!pair) return;
+		if (secure) {
+			secure.setSecureContext(pair);
+			return;
+		}
+		secure = createSecureServer(pair, handler);
+		secure.listen(config.httpsPort, config.host, () =>
+			log(
+				`listening on https://${config.domains[0]}${config.httpsPort === 443 ? '' : `:${config.httpsPort}`}/ — data in ${config.dataDir}`
+			)
+		);
+	};
+
+	const plain = createServer(createPlainHandler(config, certs.challenges, () => secure !== null));
+	await new Promise((resolve, reject) => {
+		plain.once('error', reject);
+		plain.listen(config.port, config.host, () => resolve(undefined));
+	});
+	log(`answering ACME challenges and sending to HTTPS on port ${config.port}`);
+
+	// An expired certificate is still better than none while a new one is on its way.
+	useCertificate();
+	let busy = false;
+	const check = async () => {
+		if (busy || !certs.needsRenewal(pair)) return;
+		busy = true;
+		try {
+			log(`getting a certificate for ${config.domains.join(', ')}`);
+			pair = await certs.renew();
+			useCertificate();
+			log('got the certificate');
+		} catch (err) {
+			log(`certificate: ${/** @type {Error} */ (err).message} — trying again in an hour`);
+			setTimeout(check, 3600 * 1000).unref();
+		} finally {
+			busy = false;
+		}
+	};
+	check();
+	setInterval(check, RENEW_CHECK_MS).unref();
+	return [plain, { close: () => secure?.close() }];
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

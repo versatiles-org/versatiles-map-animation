@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
+import { createServer as createSecureServer, request } from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,7 +9,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Accounts, formatUser, hashPassword } from './auth.mjs';
 import { JobStore } from './jobs.mjs';
 import { removeOldJobs, RenderQueue } from './queue.mjs';
-import { createHandler, loadConfig } from './server.mjs';
+import { createHandler, createPlainHandler, loadConfig } from './server.mjs';
+import { CERT, KEY } from './test-certificate.mjs';
 
 // Stands in for render.mjs: reports progress like it, and writes a "video".
 // The hash says how it should go: …FAIL… fails, …SLOW… takes its time.
@@ -128,6 +130,13 @@ describe('without logging in', () => {
 		const { res, cookie } = await login('alice', 'nope-nope');
 		expect(res.headers.get('location')).toMatch(/^\/renders\/login\?failed=1/);
 		expect(cookie).toBeUndefined();
+	});
+
+	it('the session cookie is HTTP-only, and not marked secure over plain HTTP', async () => {
+		const { res } = await login('alice', 'alice-secret');
+		const cookie = res.headers.get('set-cookie');
+		expect(cookie).toMatch(/HttpOnly; SameSite=Strict/);
+		expect(cookie).not.toMatch(/Secure/);
 	});
 });
 
@@ -266,5 +275,96 @@ describe('removeOldJobs', () => {
 		expect(removed).toBe(before);
 		expect(store.list().map((j) => j.id)).toEqual([waiting.id]);
 		await store.remove(waiting);
+	});
+});
+
+describe('with a domain', () => {
+	const config = loadConfig({
+		DOMAIN: 'map.example.org, WWW.example.org',
+		DATA_DIR: '/tmp/unused'
+	});
+
+	it('listens on 80 and 443 by default', () => {
+		expect(config.domains).toEqual(['map.example.org', 'www.example.org']);
+		expect([config.port, config.httpsPort]).toEqual([80, 443]);
+		expect(config.acmeDirectory).toMatch(/letsencrypt\.org/);
+		expect(loadConfig({ DATA_DIR: '/tmp/unused' }).port).toBe(8080);
+	});
+
+	/** Plain HTTP, as the server answers it on port 80. */
+	async function plain(secure, path, host = 'map.example.org') {
+		const challenges = new Map([['tok_1', 'tok_1.thumb']]);
+		const http = createServer(createPlainHandler(config, challenges, () => secure));
+		await new Promise((resolve) => http.listen(0, '127.0.0.1', resolve));
+		try {
+			// Not `fetch`, which sends a Host header of its own.
+			return await new Promise((resolve, reject) => {
+				const req = httpRequest(
+					{ host: '127.0.0.1', port: http.address().port, path, headers: { Host: host } },
+					(res) => {
+						let text = '';
+						res.on('data', (chunk) => (text += chunk));
+						res.on('end', () =>
+							resolve({ status: res.statusCode, location: res.headers.location, text })
+						);
+					}
+				);
+				req.on('error', reject);
+				req.end();
+			});
+		} finally {
+			await new Promise((resolve) => http.close(resolve));
+		}
+	}
+
+	it('answers the ACME challenges over plain HTTP', async () => {
+		expect(await plain(false, '/.well-known/acme-challenge/tok_1')).toMatchObject({
+			status: 200,
+			text: 'tok_1.thumb'
+		});
+		expect((await plain(true, '/.well-known/acme-challenge/other')).status).toBe(404);
+	});
+
+	it('sends everything else to HTTPS, once there is a certificate', async () => {
+		expect((await plain(false, '/renders/')).status).toBe(503);
+		expect(await plain(true, '/renders/?x=1', 'www.example.org:80')).toMatchObject({
+			status: 308,
+			location: 'https://www.example.org/renders/?x=1'
+		});
+		// Not to an IP address or a name of someone else's.
+		expect((await plain(true, '/', '203.0.113.7')).location).toBe('https://map.example.org/');
+	});
+
+	it('marks the session cookie secure over HTTPS', async () => {
+		const accounts = new Accounts(join(dir, 'users.txt'));
+		await accounts.load();
+		const https = createSecureServer(
+			{ key: KEY, cert: CERT },
+			createHandler(config, { accounts, store, queue })
+		);
+		await new Promise((resolve) => https.listen(0, '127.0.0.1', resolve));
+		try {
+			const cookie = await new Promise((resolve, reject) => {
+				const req = request(
+					{
+						host: '127.0.0.1',
+						port: https.address().port,
+						path: '/renders/login',
+						method: 'POST',
+						rejectUnauthorized: false,
+						headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+					},
+					(res) => {
+						res.resume();
+						resolve(res.headers['set-cookie']?.[0]);
+					}
+				);
+				req.on('error', reject);
+				req.end('user=alice&password=alice-secret');
+			});
+			expect(cookie).toMatch(/; Secure;/);
+		} finally {
+			await new Promise((resolve) => https.close(resolve));
+		}
 	});
 });

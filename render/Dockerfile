@@ -107,10 +107,11 @@ FROM renderer AS server
 WORKDIR /app/server
 COPY server/package.json server/*.mjs ./
 COPY server/page ./page
-ENV DATA_DIR=/data PORT=8080
+# Port 8080 — or, with DOMAIN set, 80 and 443 (HTTPS by Let's Encrypt).
+ENV DATA_DIR=/data
 WORKDIR /data
 VOLUME ["/data"]
-EXPOSE 8080
+EXPOSE 8080 80 443
 ENTRYPOINT ["node", "/app/server/server.mjs"]
 CMD []
 
