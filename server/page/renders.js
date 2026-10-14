@@ -40,7 +40,10 @@ function el(tag, attrs = {}, ...children) {
 function fmtDuration(seconds) {
 	if (!Number.isFinite(seconds)) return '';
 	const s = Math.max(0, Math.round(seconds));
-	return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min`;
+	const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+	if (s < 60) return `${s} s`;
+	if (s < 3600) return `${Math.floor(s / 60)}:${pad(s % 60)} min`;
+	return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)} h`;
 }
 function fmtSize(bytes) {
 	if (!Number.isFinite(bytes)) return '';
