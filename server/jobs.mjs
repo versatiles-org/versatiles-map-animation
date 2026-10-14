@@ -181,6 +181,8 @@ export class JobStore {
 	#dir;
 	/** @type {Map<string, Job>} */
 	#jobs = new Map();
+	/** Time of the newest job, in ms: no two jobs are made at the same time. */
+	#last = 0;
 
 	constructor(dataDir) {
 		this.#dir = join(dataDir, 'jobs');
@@ -194,7 +196,9 @@ export class JobStore {
 			if (!entry.isDirectory()) continue;
 			try {
 				const job = JSON.parse(await readFile(join(this.#dir, entry.name, 'job.json'), 'utf8'));
-				if (job.id === entry.name) this.#jobs.set(job.id, job);
+				if (job.id !== entry.name) continue;
+				this.#jobs.set(job.id, job);
+				this.#last = Math.max(this.#last, Date.parse(job.createdAt) || 0);
 			} catch {
 				// A folder of something else, or a job that never got its file.
 			}
@@ -223,7 +227,10 @@ export class JobStore {
 
 	/** A new job in the queue. */
 	async create({ user, hash, title, settings }) {
-		const now = new Date();
+		// A millisecond later than the one before, if need be, so that the order
+		// of the queue is the order the jobs came in.
+		const now = new Date(Math.max(Date.now(), this.#last + 1));
+		this.#last = now.getTime();
 		// Sortable by time, and not guessable.
 		const id = `${now.getTime().toString(36)}-${randomBytes(6).toString('hex')}`;
 		/** @type {Job} */

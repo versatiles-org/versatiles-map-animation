@@ -173,6 +173,16 @@ describe('JobStore', () => {
 		expect(again.nextQueued().id).toBe(b.id);
 		expect(JSON.parse(await readFile(again.path(a, 'job.json'), 'utf8')).id).toBe(a.id);
 
+		// Even when made in the same millisecond.
+		const [d, e] = await Promise.all([
+			again.create(request('alice', 'fourth')),
+			again.create(request('alice', 'fifth'))
+		]);
+		expect(again.list('alice').slice(0, 2)).toEqual([e, d]);
+		expect(again.nextQueued()?.id).toBe(b.id);
+		await again.remove(d);
+		await again.remove(e);
+
 		await again.remove(again.get(b.id));
 		expect(again.get(b.id)).toBeNull();
 		const third = new JobStore(dir);
