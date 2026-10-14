@@ -77,15 +77,14 @@
 				: null
 	);
 
-	// The sun only shows on what has relief: 3D buildings and the hillshade
-	// that comes with the terrain. It is set on the OSM map only; the
-	// satellite map's hillshade keeps its standard light.
+	// The sun only shows on what has relief: 3D buildings (OSM map only) and
+	// the hillshade that comes with the terrain.
 	const sunBlocked = $derived(
-		onSatellite
-			? 'The sun can only be set on the OSM map'
-			: !store.terrain && (!store.buildings3d || buildings3dBlocked !== null)
-				? 'Switch on 3D buildings or Terrain to see the sun'
-				: null
+		store.terrain || (store.buildings3d && buildings3dBlocked === null)
+			? null
+			: onSatellite
+				? 'Switch on Terrain to see the sun'
+				: 'Switch on 3D buildings or Terrain to see the sun'
 	);
 	function setAnchor(axis: keyof ScreenAnchor, e: Event): void {
 		const percent = Number((e.currentTarget as HTMLInputElement).value);

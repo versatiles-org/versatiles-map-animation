@@ -69,7 +69,7 @@ function makeSkySpec(): StyleSpecification['sky'] {
 		'sky-horizon-blend': 0.5,
 		'horizon-fog-blend': 0.5,
 		'fog-ground-blend': 0.5,
-		'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 0] as unknown as number
+		'atmosphere-blend': 0
 	};
 }
 
@@ -161,8 +161,11 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 	const common = {
 		urls: { base: TILES_BASE_URL },
 		sky: false,
-		projection: options.projection ?? DEFAULT_MAP_PROJECTION
-	} as const;
+		projection: options.projection ?? DEFAULT_MAP_PROJECTION,
+		// Fixed to the map, not the screen: the sun stays in its compass
+		// direction while the camera turns.
+		...(options.sun && { sun: { ...options.sun, anchor: 'map' as const } })
+	};
 	switch (id) {
 		case 'colorful':
 			// "Labels off" strips every symbol layer (place names, POIs,
@@ -172,9 +175,6 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 					osm({
 						...common,
 						theme,
-						// Fixed to the map, not the screen: the sun stays in its
-						// compass direction while the camera turns.
-						...(options.sun && { sun: { ...options.sun, anchor: 'map' as const } }),
 						layers: labels ? hidden : { ...hidden, labels: false, icons: false, pois: false },
 						features: {
 							terrain,

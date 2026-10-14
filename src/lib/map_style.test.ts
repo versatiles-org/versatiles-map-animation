@@ -191,9 +191,13 @@ describe('sun', () => {
 		expect(sunPatch({ ...base, sun }).hillshade).toEqual([]);
 	});
 
-	it('is ignored on satellite', () => {
+	it('lights the hillshade of the satellite map, too', () => {
 		const sat: MapStyleOptions = { ...relief, style: 'satellite' };
-		expect(buildBaseStyle({ ...sat, sun })).toEqual(buildBaseStyle(sat));
+		expect(buildBaseStyle({ ...sat, sun }).light?.position).toEqual([1.15, 135, 70]);
+		const paint = sunPatch({ ...sat, sun }).hillshade.map((h) => h.paint);
+		expect(paint).toHaveLength(1);
+		expect(paint[0]['hillshade-illumination-direction']).toBe(135);
+		expect(paint[0]['hillshade-illumination-altitude']).toBe(20);
 	});
 
 	it('patching the light and the hillshade is all a moved sun changes', () => {

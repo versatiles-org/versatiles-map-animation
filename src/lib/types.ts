@@ -819,8 +819,7 @@ export interface Animation {
 	buildings3d?: boolean;
 	/**
 	 * Position of the sun. Unset means the map's standard lighting. Only 3D
-	 * buildings and the terrain's hillshade react to it, and only on the OSM
-	 * map — the satellite map's hillshade keeps the standard light.
+	 * buildings (OSM map) and the terrain's hillshade (both maps) react to it.
 	 */
 	sun?: Sun;
 	/** Unset means `mercator`. Also decides how the camera travels between keyframes. */
