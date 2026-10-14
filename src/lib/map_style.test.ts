@@ -155,6 +155,20 @@ describe('3D buildings', () => {
 	});
 });
 
+describe('terrain', () => {
+	const hillshades = (options: MapStyleOptions) =>
+		buildBaseStyle(options).layers.filter((l) => l.type === 'hillshade').length;
+
+	it('comes with a hillshade, on both maps', () => {
+		for (const style of ['colorful', 'satellite'] as const) {
+			expect(buildBaseStyle({ ...base, style, terrain: true }).terrain, style).toBeTruthy();
+			expect(hillshades({ ...base, style, terrain: true }), style).toBe(1);
+			expect(buildBaseStyle({ ...base, style }).terrain, style).toBeFalsy();
+			expect(hillshades({ ...base, style }), style).toBe(0);
+		}
+	});
+});
+
 describe('sun', () => {
 	const sun = { direction: 135, altitude: 20 };
 	const relief: MapStyleOptions = { ...base, terrain: true, buildings3d: true };

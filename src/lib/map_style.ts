@@ -194,7 +194,9 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 					satellite({
 						...common,
 						osmOverlay: labels ? { theme, layers: hidden } : false,
-						features: { terrain }
+						// The imagery has light and shadow of its own; the hillshade
+						// on top brings out the relief of the terrain.
+						features: { terrain, hillshade: terrain }
 					})
 				),
 				sky
