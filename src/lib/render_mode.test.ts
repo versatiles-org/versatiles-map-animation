@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { refreshTerrainTexturesAtOnce } from './render_mode';
+import { refreshTerrainTexturesAtOnce, zoomShowsInTerrainTextures } from './render_mode';
 
 /** A stand-in for MapLibre's terrain renderer that renews one stale tile per frame. */
 function fakeTerrainTextures(staleTiles: number) {
@@ -14,7 +14,8 @@ function fakeTerrainTextures(staleTiles: number) {
 		needsFollowUpFrame: false,
 		_renderableTiles: tiles,
 		_textureDifference: (tile: { stale: boolean }) => (tile.stale ? 'zoom' : 'none'),
-		prepareForRender() {
+		// MapLibre's takes the style, the zoom and whether the map moves.
+		prepareForRender(..._args: unknown[]) {
 			this.needsFollowUpFrame = false;
 			let released = false;
 			for (const tile of tiles) {
@@ -76,5 +77,77 @@ describe('refreshTerrainTexturesAtOnce', () => {
 		expect(refreshTerrainTexturesAtOnce(map)).toBe(false);
 		expect(textures.prepareForRender).toBe(original);
 		expect(framesUntilFresh(textures as never)).toBe(4);
+	});
+
+	/** The stand-in, drawing `layers` into textures that are stale by `difference`. */
+	function withLayers(layers: object[], difference: string) {
+		const fake = fakeTerrainTextures(6);
+		const style = {
+			_layers: Object.fromEntries(layers.map((l, i) => [`l${i}`, { serialize: () => l }]))
+		};
+		const textures = Object.assign(fake.textures, {
+			_renderableLayerIds: Object.keys(style._layers),
+			_textureDifference: (tile: { stale: boolean }) => (tile.stale ? difference : 'none')
+		});
+		refreshTerrainTexturesAtOnce(fake.map);
+		textures.prepareForRender(style);
+		return fake.tiles.filter((t) => t.stale).length;
+	}
+	const imagery = [
+		{ type: 'background', paint: { 'background-color': '#000' } },
+		{ type: 'raster', paint: { 'raster-opacity': 1 } },
+		{ type: 'hillshade', paint: { 'hillshade-exaggeration': 0.1 } },
+		{ type: 'symbol', layout: { 'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10] } }
+	];
+	const roads = [
+		...imagery,
+		{ type: 'line', paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 18, 8] } }
+	];
+
+	it('keeps textures that differ only by zoom, where the zoom does not show in them', () => {
+		// The first frame renews one, as MapLibre does; the other five are kept.
+		expect(withLayers(imagery, 'zoom')).toBe(5);
+	});
+
+	it('renews them where it does, or when other tiles are under them', () => {
+		expect(withLayers(roads, 'zoom')).toBe(0);
+		expect(withLayers(imagery, 'sourceTiles')).toBe(0);
+		expect(withLayers(imagery, 'revision')).toBe(0);
+	});
+});
+
+describe('zoomShowsInTerrainTextures', () => {
+	it('is no for imagery and a fixed hillshade, and ignores what is not drawn into the terrain', () => {
+		expect(
+			zoomShowsInTerrainTextures([
+				{ type: 'raster', paint: {} },
+				{ type: 'hillshade' },
+				{ type: 'symbol', layout: { 'text-size': ['zoom'] } },
+				{ type: 'fill-extrusion', paint: { 'fill-extrusion-height': ['zoom'] } }
+			])
+		).toBe(false);
+	});
+
+	it('is yes for zoom expressions, old-style stops, custom layers and what it cannot read', () => {
+		expect(zoomShowsInTerrainTextures([{ type: 'line', paint: { 'line-width': ['zoom'] } }])).toBe(
+			true
+		);
+		expect(
+			zoomShowsInTerrainTextures([
+				{
+					type: 'fill',
+					paint: {
+						'fill-opacity': {
+							stops: [
+								[5, 0],
+								[6, 1]
+							]
+						}
+					}
+				}
+			])
+		).toBe(true);
+		expect(zoomShowsInTerrainTextures([{ type: 'custom' }])).toBe(true);
+		expect(zoomShowsInTerrainTextures([undefined])).toBe(true);
 	});
 });
