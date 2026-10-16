@@ -173,8 +173,8 @@ describe('sun', () => {
 	const sun = { direction: 135, altitude: 20 };
 	const relief: MapStyleOptions = { ...base, terrain: true, buildings3d: true };
 
-	it('leaves the style without a light when unset', () => {
-		expect(buildBaseStyle(relief).light).toBeUndefined();
+	it("uses the style's standard light from the north-west when unset", () => {
+		expect(buildBaseStyle(relief).light?.position).toEqual([1.15, 315, 45]);
 	});
 
 	it('writes a map-anchored light: azimuth as given, polar angle measured from overhead', () => {
@@ -193,7 +193,8 @@ describe('sun', () => {
 
 	it('lights the hillshade of the satellite map, too', () => {
 		const sat: MapStyleOptions = { ...relief, style: 'satellite' };
-		expect(buildBaseStyle({ ...sat, sun }).light?.position).toEqual([1.15, 135, 70]);
+		// No root light: on satellite nothing reads it, the hillshade has its own.
+		expect(buildBaseStyle({ ...sat, sun }).light).toBeUndefined();
 		const paint = sunPatch({ ...sat, sun }).hillshade.map((h) => h.paint);
 		expect(paint).toHaveLength(1);
 		expect(paint[0]['hillshade-illumination-direction']).toBe(135);

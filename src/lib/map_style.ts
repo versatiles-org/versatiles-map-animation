@@ -162,9 +162,9 @@ export function buildBaseStyle(options: MapStyleOptions): StyleSpecification {
 		urls: { base: TILES_BASE_URL },
 		sky: false,
 		projection: options.projection ?? DEFAULT_MAP_PROJECTION,
-		// Fixed to the map, not the screen: the sun stays in its compass
-		// direction while the camera turns.
-		...(options.sun && { sun: { ...options.sun, anchor: 'map' as const } })
+		// Turns with the map (the default, not `fixedToScreen`): the sun stays
+		// in its compass direction while the camera turns.
+		...(options.sun && { light: { ...options.sun } })
 	};
 	switch (id) {
 		case 'colorful':
